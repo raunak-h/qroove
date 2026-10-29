@@ -3,7 +3,7 @@
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
 **Current phase:** 1
-**Next session starts with:** Phase 1 (scaffold). Phase 0 done except Spotify secret.
+**Next session starts with:** Phase 1 (scaffold). Phase 0 done.
 
 ## Phases
 - [x] 0 — Accounts, MCP & infra provisioning
@@ -26,7 +26,7 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - Licence AGPL-3.0 (copyleft). Repo may move to a company org → brand/repo URL centralised in `packages/config`.
 
 ## Blocked / needs user
-- `SPOTIFY_CLIENT_SECRET`: add to local `.env` and Railway (`railway variables --set SPOTIFY_CLIENT_SECRET=...`). Non-blocking.
+- None.
 
 ## Notes per phase
 
