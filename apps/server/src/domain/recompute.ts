@@ -13,9 +13,10 @@ import type { RequestDoc } from '../db/types.js';
 import type { Work } from './context.js';
 import {
   fromSchedulerHistory,
+  rulesAt,
+  ruleWindowsOf,
   toCandidate,
   toSchedulerHistory,
-  toSchedulerRules,
 } from './history.js';
 
 const POOL_STATES: ReadonlySet<string> = new Set(['QUEUED', 'INELIGIBLE_TEMPORARILY', 'OVERFLOW']);
@@ -69,7 +70,7 @@ export function recompute(w: Work, now: number): void {
     return;
   }
 
-  const rules = toSchedulerRules(e.rules);
+  const rules = rulesAt(e, now);
   const history = toSchedulerHistory(e.history);
   const overheadMs = RULE_DEFAULTS.transitionOverheadSec * 1000;
   const windows = breakWindows(w, now);
@@ -97,10 +98,13 @@ export function recompute(w: Work, now: number): void {
         };
       } else if (pool.length === 0) {
         e.waitingReason = 'Waiting for songs to be requested';
+      } else if (
+        byBreak &&
+        sel.blocked.every((b) => b.reason === 'WOULD_EXCEED_END' || b.reason === 'STYLE_DISABLED')
+      ) {
+        e.waitingReason = 'Break time — start the break';
       } else if (sel.blocked.every((b) => b.reason === 'WOULD_EXCEED_END')) {
-        e.waitingReason = byBreak
-          ? 'Break time — start the break'
-          : 'Beyond planned end — admin must extend';
+        e.waitingReason = 'Beyond planned end — admin must extend';
       } else {
         e.waitingReason = sel.reason.replace(/^ALL_BLOCKED_FAIRNESS: /, '');
       }
@@ -137,6 +141,7 @@ export function recompute(w: Work, now: number): void {
     candidates,
     history: projHistory,
     rules,
+    ruleWindows: ruleWindowsOf(e),
     nowMs: now,
     endAtMs: e.endAt,
     currentRemainingMs,
@@ -171,7 +176,7 @@ export function recordPlay(w: Work, r: RequestDoc): void {
   const pool = [...w.requests.values()]
     .filter((x) => x.id !== r.id && POOL_STATES.has(x.state))
     .map(toCandidate);
-  const gate = isSingleGenre(toSchedulerRules(w.event.rules));
+  const gate = isSingleGenre(rulesAt(w.event, r.updatedAt));
   w.event.history = fromSchedulerHistory(
     applyPlay(toSchedulerHistory(w.event.history), toCandidate(r), { pool, gate }),
   );

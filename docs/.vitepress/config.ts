@@ -69,6 +69,10 @@ export default defineConfig({
           { text: '0008 QR-only join', link: '/adr/0008-qr-only-join' },
           { text: '0009 Single-genre spacing', link: '/adr/0009-single-genre-spacing' },
           { text: '0010 Break windows', link: '/adr/0010-break-windows' },
+          { text: '0011 Rules per segment', link: '/adr/0011-per-segment-rules' },
+          { text: '0012 Timeline and drums', link: '/adr/0012-visual-timeline-and-drums' },
+          { text: '0013 Generated names', link: '/adr/0013-generated-event-names' },
+          { text: '0014 Playlists per genre', link: '/adr/0014-playlists-per-genre' },
         ],
       },
       {

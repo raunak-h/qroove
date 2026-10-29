@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -31,10 +31,14 @@ afterEach(() => {
 });
 
 const rules = {
-  rulesVersion: 2,
-  enabledStyles: ['salsa', 'bachata'],
-  masterRunCap: 2,
-  runCaps: { salsa: 2, bachata: 2 },
+  rulesVersion: 3,
+  segments: [
+    {
+      enabledStyles: ['salsa', 'bachata'],
+      masterRunCap: 2,
+      runCaps: { salsa: 2, bachata: 2 },
+    },
+  ],
   submissionLimit: 5,
   minStyleTransitions: 1,
   noSameRequesterAdjacent: true,
@@ -147,6 +151,7 @@ describe('CreateEvent', () => {
     body: {
       eventId: 'ev1',
       slug: 'ABC123',
+      name: 'Mango Octopus Rye',
       joinUrl: 'http://x/e/ABC123#j=JOINKEYJOINKEYJOINKEY',
       adminUrl: 'http://x/a/ev1#k=SECRETSECRET',
       recoverySecret: 'RECOVERYRECOVERY',
@@ -154,88 +159,167 @@ describe('CreateEvent', () => {
       seeded: 0,
     },
   };
+  const wheel = (name: string) => screen.getByRole('spinbutton', { name });
+  const styleBox = (name: string) => screen.getByRole('checkbox', { name });
 
-  it('sets time like an oven timer, validates breaks and ratios, and shows the admin link once', async () => {
+  it('has no event-name field, a 2:00 time drum, and the default styles', async () => {
     respond = () => created;
-    const user = userEvent.setup();
     page('/new');
-    expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled(); // no name
-    await user.type(screen.getByLabelText('Event name'), 'Friday Social');
-
-    // 2 h to start; + hour, + 10 min steps, never past 8 h
-    expect(screen.getByRole('status', { name: '' })).toBeDefined();
-    for (let i = 0; i < 8; i++)
-      await user.click(screen.getByRole('button', { name: 'More hours' }));
-    expect(screen.getByRole('button', { name: 'More hours' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Ten minutes more' })).toBeDisabled(); // 8 h is the ceiling
-    for (let i = 0; i < 6; i++)
-      await user.click(screen.getByRole('button', { name: 'Fewer hours' }));
-    await user.click(screen.getByRole('button', { name: 'Ten minutes more' }));
-
-    // six styles, one is enough
-    expect(screen.getAllByRole('checkbox').length).toBeGreaterThanOrEqual(6);
-    await user.click(screen.getByRole('checkbox', { name: 'Bachata' }));
-    expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled(); // single genre is allowed
-    await user.click(screen.getByRole('checkbox', { name: 'Bachata' }));
-    await user.click(screen.getByRole('checkbox', { name: 'Non-Latin salsa-compatible' }));
-
-    // breaks: limits shown live
-    await user.click(screen.getByRole('button', { name: 'Add 30-minute break' }));
-    await user.click(screen.getByRole('button', { name: 'Add 30-minute break' }));
-    expect(await screen.findByText(/between breaks|half of the planned/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
-    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0]!);
-    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0]!);
-    await user.click(screen.getByRole('button', { name: 'Add 10-minute break' }));
-
-    await user.clear(screen.getByLabelText('Accepted songs per person'));
-    await user.type(screen.getByLabelText('Accepted songs per person'), '4');
-    await user.click(screen.getByRole('button', { name: 'Create event' }));
-    expect(
-      await screen.findByText(/Save this link — it is the only way to control the event/),
-    ).toBeInTheDocument();
-    expect(screen.getByText('http://x/a/ev1#k=SECRETSECRET')).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain('JOINKEY'); // the QR secret is never shown
-    expect(calls[0]!.body).toMatchObject({
-      name: 'Friday Social',
-      enabledStyles: ['salsa', 'salsa_nl', 'bachata'],
-      masterRunCap: 2,
-      submissionLimit: 4,
-      plannedDurationMin: 130,
-      breaks: [{ label: '10-minute break', durationSec: 600 }],
-    });
+    expect(screen.queryByLabelText(/event name/i)).toBeNull();
+    expect(wheel('Planned time')).toHaveAttribute('aria-valuetext', '2:00');
+    expect(styleBox('Salsa')).toHaveAttribute('aria-checked', 'true');
+    expect(styleBox('Non-Latin salsa-compatible')).toHaveAttribute('aria-checked', 'true');
+    expect(styleBox('Bachata')).toHaveAttribute('aria-checked', 'true');
+    expect(styleBox('Non-Latin bachata-compatible')).toHaveAttribute('aria-checked', 'true');
+    expect(styleBox('Cha-cha')).toHaveAttribute('aria-checked', 'false');
+    expect(styleBox('Other (Musicality Exercise)')).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
   });
 
-  it('refuses a ratio below one part in ten', async () => {
+  it('sends the drum choices and a break tapped on the bar, and shows the generated name', async () => {
+    respond = () => created;
+    Element.prototype.getBoundingClientRect = () =>
+      ({
+        left: 0,
+        top: 0,
+        right: 360,
+        bottom: 52,
+        width: 360,
+        height: 52,
+        x: 0,
+        y: 0,
+        toJSON() {},
+      }) as DOMRect;
+    const user = userEvent.setup();
+    page('/new');
+    wheel('Planned time').focus();
+    await user.keyboard('{ArrowDown}{ArrowDown}'); // 2:00 -> 2:30
+    expect(wheel('Planned time')).toHaveAttribute('aria-valuetext', '2:30');
+    await user.click(styleBox('Cha-cha'));
+    wheel('Accepted songs per person').focus();
+    await user.keyboard('{ArrowDown}{ArrowDown}'); // 5 -> 7
+    const bar = screen.getByRole('group', { name: /Evening timeline/ });
+    fireEvent.pointerDown(bar, { clientX: 180 }); // the middle: 75 min
+    fireEvent.pointerUp(bar, { clientX: 180 });
+    expect(screen.getAllByRole('tab')).toHaveLength(2);
+    await user.click(screen.getByRole('tab', { name: 'Part 2 of 2' }));
+    await user.click(styleBox('Bachata')); // part two drops bachata
+    await user.click(screen.getByRole('button', { name: 'Create event' }));
+    expect(await screen.findByRole('heading', { name: 'Mango Octopus Rye' })).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('JOINKEY');
+    const body = calls[0]!.body as Record<string, unknown>;
+    expect(body).not.toHaveProperty('name');
+    expect(body).toMatchObject({
+      plannedDurationMin: 150,
+      submissionLimit: 7,
+      breaks: [{ startMin: 80, durationSec: 600 }],
+    });
+    const segs = body.segments as Array<{ enabledStyles: string[] }>;
+    expect(segs).toHaveLength(2);
+    expect(segs[0]!.enabledStyles).toEqual([
+      'salsa',
+      'salsa_nl',
+      'bachata',
+      'bachata_nl',
+      'chacha',
+    ]);
+    expect(segs[1]!.enabledStyles).toEqual(['salsa', 'salsa_nl', 'bachata_nl', 'chacha']);
+  });
+
+  it('defaults to an equal split, and refuses a ratio below one part in ten', async () => {
     respond = () => created;
     const user = userEvent.setup();
     page('/new');
-    await user.type(screen.getByLabelText('Event name'), 'X');
-    await user.click(screen.getByRole('checkbox', { name: 'Cha-cha' })); // three genres
-    await user.click(screen.getByText(/Advanced: set a ratio/));
-    await user.click(screen.getByRole('checkbox', { name: 'Use a ratio instead of one number' }));
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Salsa' }), '1');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Bachata' }), '5');
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Cha-cha' }), '5');
+    await user.click(styleBox('Cha-cha')); // three genres
+    await user.click(screen.getByLabelText('Ratio between genres'));
+    for (const g of ['salsa', 'bachata', 'chacha']) {
+      expect(wheel(`Ratio ${g}`)).toHaveAttribute('aria-valuenow', '2'); // equal to the master number
+    }
+    wheel('Ratio bachata').focus();
+    await user.keyboard('{End}'); // 5
+    wheel('Ratio chacha').focus();
+    await user.keyboard('{End}'); // 5
+    wheel('Ratio salsa').focus();
+    await user.keyboard('{Home}'); // 1 : 5 : 5 is 1 part in 11
     expect(await screen.findByText(/at least 1 part in 10/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Cha-cha' }), '1'); // 1:5:1
+    wheel('Ratio chacha').focus();
+    await user.keyboard('{Home}'); // 1 : 5 : 1
     expect(screen.queryByText(/at least 1 part in 10/)).toBeNull();
   });
 
-  it('sends a playlist link with the chosen style', async () => {
+  it('needs at least one style in every part', async () => {
     respond = () => created;
     const user = userEvent.setup();
-    page('/new#playlist');
-    await user.type(screen.getByLabelText('Event name'), 'X');
-    await user.type(
-      screen.getByLabelText('Playlist link'),
-      'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
-    );
-    await user.click(screen.getByRole('button', { name: 'Create event' }));
-    await screen.findByText(/Save this link/);
-    expect(calls[0]!.body).toMatchObject({
-      playlist: { url: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M', style: 'salsa' },
+    page('/new');
+    for (const s of [
+      'Salsa',
+      'Non-Latin salsa-compatible',
+      'Bachata',
+      'Non-Latin bachata-compatible',
+    ]) {
+      await user.click(styleBox(s));
+    }
+    expect(await screen.findByText('Pick at least one style.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
+  });
+
+  describe('playlists', () => {
+    const SPOT = 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M';
+    const APPLE = 'https://music.apple.com/us/playlist/hits/pl.f4d106fed2bd41149aaacabb233eb5eb';
+    const link = (style: string) => screen.getByLabelText(`Playlist link for ${style}`);
+
+    it('lays the fields out like the style grid, one per active style', () => {
+      respond = () => created;
+      page('/new#playlist');
+      const labels = screen
+        .getAllByLabelText(/Playlist link for/)
+        .map((i) => i.getAttribute('aria-label')!.replace('Playlist link for ', ''));
+      expect(labels).toEqual([
+        'Salsa',
+        'Non-Latin salsa-compatible',
+        'Bachata',
+        'Non-Latin bachata-compatible',
+      ]);
+      expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled(); // none is fine
+    });
+
+    it('needs a playlist for every active genre once any playlist is added', async () => {
+      respond = () => created;
+      const user = userEvent.setup();
+      page('/new#playlist');
+      await user.type(link('Salsa'), SPOT);
+      expect(await screen.findByText(/playlist for every genre/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
+      // A Latin style's playlist covers its non-Latin counterpart, and vice versa.
+      await user.type(link('Non-Latin bachata-compatible'), APPLE);
+      expect(screen.queryByText(/playlist for every genre/i)).toBeNull();
+      expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
+      await user.click(screen.getByRole('button', { name: 'Create event' }));
+      await screen.findByText(/Save this link/);
+      expect(calls[0]!.body).toMatchObject({
+        playlists: [
+          { url: SPOT, style: 'salsa' },
+          { url: APPLE, style: 'bachata_nl' },
+        ],
+      });
+    });
+
+    it('asks for cha-cha too once it is selected, and for Other', async () => {
+      respond = () => created;
+      const user = userEvent.setup();
+      page('/new#playlist');
+      await user.type(link('Salsa'), SPOT);
+      await user.type(link('Bachata'), SPOT);
+      expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
+      await user.click(styleBox('Cha-cha'));
+      expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
+      await user.type(link('Cha-cha'), APPLE);
+      expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
+      await user.click(styleBox('Other (Musicality Exercise)'));
+      expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
+      await user.type(link('Other (Musicality Exercise)'), APPLE);
+      expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
     });
   });
 });
@@ -274,7 +358,8 @@ describe('AdminPage', () => {
     const user = userEvent.setup();
     page();
     expect(await screen.findByText('Playing Now')).toBeInTheDocument();
-    expect(screen.getByText(/Salsa run 1\/2/)).toBeInTheDocument();
+    expect(screen.getAllByRole('img', { name: 'Salsa' }).length).toBeGreaterThan(0); // the run, as a swatch
+    expect(screen.getByText(/1\/2/)).toBeInTheDocument();
     expect(screen.getByText(/1 song would run past the end/)).toBeInTheDocument();
     expect(screen.getByText(/Next: Next Song/)).toBeInTheDocument();
     expect(document.body.textContent).not.toContain('ABC123'); // no room code on the organiser screen
@@ -286,9 +371,8 @@ describe('AdminPage', () => {
     await user.click(screen.getByRole('tab', { name: 'More' }));
     await user.click(screen.getByRole('button', { name: 'Rules' }));
     expect(screen.getByText(/abcdef012345/)).toBeInTheDocument();
-    expect(screen.getByText(/Most songs in a row:/).closest('li')).toHaveTextContent(
-      'Salsa 2 · Bachata 2',
-    );
+    expect(screen.getAllByRole('img', { name: 'Bachata' })[0]).toBeInTheDocument(); // rules show swatches
+    expect(screen.getByText(/songs each/)).toHaveTextContent('5');
     expect(document.body.textContent).not.toContain('csrf-token');
   });
 

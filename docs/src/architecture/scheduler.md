@@ -78,3 +78,11 @@ See [ADR 0004](/adr/0004-no-ageing-bonus) and [ADR 0005](/adr/0005-quota-counts-
 
 The scheduler's `style` is the **genre** (the server maps each request's style with `genreOf`). With exactly one genre
 enabled, `NEEDS_STYLE_TRANSITION` is replaced by `NEEDS_OTHERS_PLAYED`; see [ADR 0009](/adr/0009-single-genre-spacing).
+
+## Parts of the evening
+
+Rules are held per part (segment) of the evening, split by the breaks ([ADR 0011](/adr/0011-per-segment-rules)).
+`projectQueue` takes `ruleWindows` (the rules from a given time on) next to the single `rules`, and uses the window
+in force when a song would start. A candidate carries its genre as `style` (for runs and changes) and its exact style
+as `variant`; `allowedVariants` lets a part allow salsa but not non-Latin salsa. A song blocked only by `STYLE_DISABLED`
+or by not fitting before a break makes the clock jump to the end of that break.

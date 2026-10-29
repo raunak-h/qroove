@@ -1,0 +1,39 @@
+/**
+ * Neutral words for generated event names: fruit, vegetables, carbs and popular sea creatures.
+ * Every word is a single, lower-case, unique token, so a name is any ordered triple of distinct
+ * words (n × (n − 1) × (n − 2) names). Add words at the end; never reorder or remove, because the
+ * name ledger refers to words by position.
+ */
+export const NAME_WORDS = {
+  fruit: [
+    'apple', 'apricot', 'banana', 'blueberry', 'cherry', 'coconut', 'cranberry', 'fig', 'grape',
+    'grapefruit', 'guava', 'kiwi', 'lemon', 'lime', 'lychee', 'mango', 'melon', 'nectarine',
+    'orange', 'papaya', 'peach', 'pear', 'pineapple', 'plum', 'pomegranate', 'raspberry',
+    'strawberry', 'tangerine',
+  ],
+  vegetable: [
+    'asparagus', 'aubergine', 'beetroot', 'broccoli', 'cabbage', 'carrot', 'cauliflower', 'celery',
+    'courgette', 'cucumber', 'fennel', 'garlic', 'kale', 'leek', 'lettuce', 'mushroom', 'olive',
+    'onion', 'parsnip', 'pea', 'pepper', 'pumpkin', 'radish', 'spinach', 'squash', 'sweetcorn',
+    'tomato', 'turnip',
+  ],
+  carb: [
+    'bagel', 'baguette', 'barley', 'biscuit', 'bread', 'bun', 'ciabatta', 'couscous', 'crumpet',
+    'cracker', 'croissant', 'dumpling', 'focaccia', 'gnocchi', 'macaroni', 'muffin', 'noodle',
+    'oatmeal', 'pancake', 'pasta', 'pretzel', 'quinoa', 'ramen', 'rice', 'risotto', 'spaghetti',
+    'toast', 'waffle',
+  ],
+  sea: [
+    'anchovy', 'clam', 'cod', 'crab', 'dolphin', 'eel', 'haddock', 'herring', 'jellyfish',
+    'lobster', 'mackerel', 'mussel', 'narwhal', 'octopus', 'orca', 'oyster', 'prawn', 'salmon',
+    'sardine', 'scallop', 'seahorse', 'seal', 'shrimp', 'squid', 'starfish', 'tuna', 'turtle',
+    'whale',
+  ],
+} as const;
+
+export const NAME_WORD_LIST: readonly string[] = [
+  ...NAME_WORDS.fruit,
+  ...NAME_WORDS.vegetable,
+  ...NAME_WORDS.carb,
+  ...NAME_WORDS.sea,
+];

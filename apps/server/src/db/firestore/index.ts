@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { DocumentReference, Firestore, Query, Transaction } from 'firebase-admin/firestore';
 import type { EventTx, Repository } from '../ports.js';
+import { EMPTY_NAME_LEDGER } from '../types.js';
 import type {
   AdminGrantDoc,
   AuditDoc,
@@ -8,6 +9,7 @@ import type {
   EventDoc,
   HandoverOfferDoc,
   IdempotencyDoc,
+  NameLedger,
   NewEventBundle,
   PurgeCutoffs,
   PurgeReport,
@@ -121,6 +123,19 @@ export class FirestoreRepository implements Repository {
   async listAudit(eventId: string): Promise<AuditDoc[]> {
     const snap = await this.event(eventId).collection('audit').get();
     return snap.docs.map((d) => d.data() as AuditDoc).sort((a, b) => a.at - b.at);
+  }
+
+  async updateNameLedger<T>(fn: (l: NameLedger) => { ledger: NameLedger; result: T }): Promise<T> {
+    const ref = this.db.collection('meta').doc('eventNames');
+    return this.db.runTransaction(async (t) => {
+      const snap = await t.get(ref);
+      const current = snap.exists
+        ? (snap.data() as NameLedger)
+        : structuredClone(EMPTY_NAME_LEDGER);
+      const { ledger, result } = fn(current);
+      t.set(ref, ledger);
+      return result;
+    });
   }
 
   async purge(c: PurgeCutoffs): Promise<PurgeReport> {

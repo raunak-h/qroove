@@ -18,8 +18,11 @@ export function canonicalJson(v: unknown): string {
   return canonical(v);
 }
 
-/** sha256 of the key-sorted JSON; `enabledStyles` is sorted so order does not change the hash. */
+/** sha256 of the key-sorted JSON; each segment's `enabledStyles` is sorted so order does not change the hash. */
 export function hashRules(rules: RulesSnapshot): string {
-  const normalised = { ...rules, enabledStyles: [...rules.enabledStyles].sort() };
+  const normalised = {
+    ...rules,
+    segments: rules.segments.map((g) => ({ ...g, enabledStyles: [...g.enabledStyles].sort() })),
+  };
   return createHash('sha256').update(canonical(normalised)).digest('hex');
 }

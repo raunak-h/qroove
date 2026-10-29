@@ -9,6 +9,7 @@ export const STYLE_PRESETS = [
   { id: 'bachata_nl', label: 'Non-Latin bachata-compatible', genre: 'bachata' },
   { id: 'chacha', label: 'Cha-cha', genre: 'chacha' },
   { id: 'chacha_nl', label: 'Non-Latin cha-cha-compatible', genre: 'chacha' },
+  { id: 'other', label: 'Other (Musicality Exercise)', genre: 'other' },
 ] as const;
 
 export type StyleId = (typeof STYLE_PRESETS)[number]['id'];
@@ -18,6 +19,7 @@ export const GENRES: ReadonlyArray<{ id: GenreId; label: string }> = [
   { id: 'salsa', label: 'Salsa' },
   { id: 'bachata', label: 'Bachata' },
   { id: 'chacha', label: 'Cha-cha' },
+  { id: 'other', label: 'Other (Musicality Exercise)' },
 ];
 
 export const genreOf = (style: StyleId): GenreId =>
@@ -27,4 +29,22 @@ export const genreOf = (style: StyleId): GenreId =>
 export const genresOf = (styles: readonly StyleId[]): GenreId[] =>
   GENRES.map((g) => g.id).filter((g) => styles.some((s) => genreOf(s) === g));
 
-export const DEFAULT_ENABLED_STYLES: readonly StyleId[] = ['salsa', 'bachata'];
+export const DEFAULT_ENABLED_STYLES: readonly StyleId[] = [
+  'salsa',
+  'salsa_nl',
+  'bachata',
+  'bachata_nl',
+];
+
+/**
+ * Colour code (each is drawn with a thin white outline so it never disappears into the
+ * background). Non-Latin styles use their genre's colour with white diagonal stripes.
+ */
+export const GENRE_COLOURS: Record<GenreId, string> = {
+  salsa: '#d32f2f',
+  bachata: '#000000',
+  chacha: '#fb8c00',
+  other: '#757575',
+};
+
+export const isNonLatin = (style: StyleId): boolean => style.endsWith('_nl');

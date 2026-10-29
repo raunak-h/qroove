@@ -69,6 +69,7 @@ const label = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function summarise(blocked: Selection['blocked']): string {
   const reasons = new Set(blocked.map((b) => b.reason));
+  if (reasons.has('STYLE_DISABLED')) return 'Waiting for its part of the evening';
   if (reasons.has('NEEDS_OTHERS_PLAYED')) return 'Waiting for other people’s songs to play first';
   if (reasons.has('SAME_OWNER_ADJACENT') || reasons.has('NEEDS_STYLE_TRANSITION')) {
     return 'Waiting for another contributor or a style change';

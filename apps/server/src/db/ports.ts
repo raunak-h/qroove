@@ -5,6 +5,7 @@ import type {
   EventDoc,
   HandoverOfferDoc,
   IdempotencyDoc,
+  NameLedger,
   NewEventBundle,
   PurgeCutoffs,
   PurgeReport,
@@ -62,6 +63,11 @@ export interface Repository {
   getEventPublic(eventId: string): Promise<EventAggregate | null>;
   /** Called after each committed change to the event doc. */
   subscribe(eventId: string, cb: (event: EventDoc) => void): () => void;
+  /**
+   * Atomic read-modify-write of the event-name ledger, so two instances can never hand out the
+   * same name (or consecutive names that share a word).
+   */
+  updateNameLedger<T>(fn: (l: NameLedger) => { ledger: NameLedger; result: T }): Promise<T>;
   /** Retention: removes expired data across all events. Safe to run repeatedly. */
   purge(cutoffs: PurgeCutoffs): Promise<PurgeReport>;
   close(): Promise<void>;

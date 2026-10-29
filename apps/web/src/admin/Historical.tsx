@@ -1,7 +1,7 @@
 import type { ExportSnapshot } from '@qroove/contracts';
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { styleLabel } from '../attendee/NowPlaying';
+import { GenreSwatch } from '../shared/Genre';
 import { api, ApiError } from '../shared/api';
 import { adminApi } from './adminApi';
 
@@ -51,7 +51,8 @@ export default function Historical() {
           <li key={i}>
             <span className="title">{r.title}</span>
             <span className="muted small">
-              {[r.artist, styleLabel(r.style)].filter(Boolean).join(' · ')}
+              {r.artist ? `${r.artist} ` : ''}
+              <GenreSwatch style={r.style} size={14} />
             </span>
           </li>
         ))}

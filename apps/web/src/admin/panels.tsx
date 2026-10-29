@@ -1,7 +1,7 @@
 import type { AdminRequestView, ExportSnapshot } from '@qroove/contracts';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { styleLabel } from '../attendee/NowPlaying';
+import { GenreSwatch } from '../shared/Genre';
 import { ApiError } from '../shared/api';
 import { formatClock, fromLocalInput, pluralise, toLocalInput } from '../shared/time';
 import { RulesList } from '../shared/menu';
@@ -32,18 +32,25 @@ export function PlaybackPanel({ s, cmd, refresh }: PanelProps) {
     <section className="card stack compact" aria-label="Playback">
       <p className="big">{v.nowPlaying ? v.nowPlaying.track.title : 'Nothing playing'}</p>
       <p className="muted small">
-        {v.nowPlaying
-          ? [v.nowPlaying.track.artist, styleLabel(v.nowPlaying.track.style)]
-              .filter(Boolean)
-              .join(' · ')
-          : v.waitingReason
-            ? `Waiting: ${v.waitingReason}`
-            : ''}
+        {v.nowPlaying ? (
+          <>
+            {v.nowPlaying.track.artist ? `${v.nowPlaying.track.artist} ` : ''}
+            <GenreSwatch style={v.nowPlaying.track.style} size={14} />
+          </>
+        ) : v.waitingReason ? (
+          `Waiting: ${v.waitingReason}`
+        ) : (
+          ''
+        )}
         {v.nowPlaying || v.waitingReason ? ' · ' : ''}
         Next: {next ? next.title : 'nothing reserved yet'}
-        {v.runIndicator && v.state === 'ACTIVE'
-          ? ` · ${styleLabel(v.runIndicator.style)} run ${v.runIndicator.runLength}/${v.runIndicator.cap}`
-          : ''}
+        {v.runIndicator && v.state === 'ACTIVE' ? (
+          <>
+            {' · '}
+            <GenreSwatch style={v.runIndicator.style} size={14} /> {v.runIndicator.runLength}/
+            {v.runIndicator.cap}
+          </>
+        ) : null}
       </p>
       {overflow > 0 ? (
         <p className="notice small">
@@ -116,8 +123,9 @@ export function ModerationPanel({ s, cmd, refresh }: PanelProps) {
     <li key={r.id} className={started.has(r.state) ? 'overflow' : undefined}>
       <span className="title">{r.title}</span>
       <span className="muted small">
-        {[r.artist, styleLabel(r.style)].filter(Boolean).join(' · ')} ·{' '}
-        {r.ownerNickname ?? 'No nickname'} (#{r.ownerLabel})
+        {r.artist ? `${r.artist} ` : ''}
+        <GenreSwatch style={r.style} size={14} /> · {r.ownerNickname ?? 'No nickname'} (#
+        {r.ownerLabel})
       </span>
       <span className="badge info">
         {r.possibleDuplicate ? 'Possible duplicate' : r.state.replaceAll('_', ' ').toLowerCase()}
@@ -374,7 +382,8 @@ export function ImportPicker({
               <span>
                 <strong>{r.title}</strong>{' '}
                 <span className="muted small">
-                  {[r.artist, styleLabel(r.style)].filter(Boolean).join(' · ')}
+                  {r.artist ? `${r.artist} ` : ''}
+                  <GenreSwatch style={r.style} size={14} />
                 </span>
               </span>
             </label>

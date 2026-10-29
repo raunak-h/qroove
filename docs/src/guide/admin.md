@@ -4,24 +4,29 @@ You run an event from your phone. There is no account: control belongs to whoeve
 
 ## Create an event
 
-Open **Create an event** from the home page (`/new`).
+Open **Create an event** from the home page (`/new`). Everything is set by spinning drums, tapping swatches and
+looking at one bar. There is no name to type: the event gets a generated name of three neutral words, such as
+_Mango Octopus Rye_ ([ADR 0013](/adr/0013-generated-event-names)).
 
-- **Planned time** works like an oven timer: hours up to 8, then minutes in steps of 10 (at least 10 minutes).
-  The clock starts when you press **Start event**; songs that cannot finish before the end are marked _After end time_.
-- **Dance styles:** Salsa, Bachata, Cha-cha, and a non-Latin-compatible version of each. A style and its
-  non-Latin-compatible version count as one genre, so a change between them is not a style change. One genre is
-  enough; with more, spacing is by style change, and with exactly one it is by waiting for half of the other
-  people's songs (see [ADR 0009](/adr/0009-single-genre-spacing)).
-- **Most songs in a row** is one number for every genre (1 to 5, default 2). Under _Advanced_ you can set a
-  ratio instead (parts 1 to 5, for example 1:5 or 1:1:5). No genre may get less than 1 part in 10.
-- **Accepted songs per person** (default 5).
-- **Breaks:** up to three of 10, 20 or 30 minutes, set now. They sit evenly spread and centred on the planned time
-  (one break is on the midpoint), together take at most half of it, and need at least 20 minutes of music around
-  them, so breaks can never be back to back. A song only starts if it can finish before the break.
-- **Start from a playlist:** paste a public Spotify, YouTube Music, YouTube or Apple Music playlist link. Songs are
-  queued in order for the style you pick, up to one minute less than the planned time. These public pages show only
-  the first part of long playlists, and sites can change them, so it is best effort; if a link cannot be read you
-  can still add songs by hand.
+- **Time drum:** quarter hours from 0:15 to 8:00, starting at 2:00. The clock starts when you press **Start event**.
+- **Styles:** tap swatches. Latin styles are on the left, their non-Latin counterparts directly across on the right,
+  and _Other (Musicality Exercise)_ underneath. Salsa, bachata and their non-Latin styles start selected; cha-cha is
+  an extra. Colours: red salsa, black bachata, orange cha-cha, grey Other; non-Latin styles are striped. A style and its
+  non-Latin version count as one genre.
+- **The bar:** the whole evening, always as wide as the screen. **Tap it to add a break** there (10 minutes, snapped
+  to the 10-minute grid). Drag a break's handles to move or lengthen it (10 to 30 minutes); tap the break and press ✕
+  to remove it. You cannot go past the limits: at most 3 breaks, together at most half of the time, and at least 20
+  minutes of music before, between and after. Songs only start if they can finish before a break.
+- **Parts of the evening:** each break splits the bar. Tap a part under the bar to give it its own styles and
+  numbers; new parts start as copies of the one they came from. A song waits for a part that allows its style.
+- **Drums:** most songs in a row (1 to 5, applied to every genre), and songs per person (1 to 20). Under the ratio
+  summary you can give each genre its own number; the default is an equal split, and no genre may get less than 1
+  part in 10 of the total.
+- **Playlists (optional, ♫ +):** one link per style from Spotify, YouTube Music, YouTube or Apple Music. If you add
+  any, every genre in the event needs at least one: a salsa playlist covers non-Latin salsa and the other way round,
+  but salsa, bachata and cha-cha each need their own once selected. Songs are taken from the playlists in turn and
+  queued up to one minute less than the planned time. These are public web pages, so the import is best effort and
+  long playlists are cut short; if a link cannot be read you can still add songs by hand.
 
 ## Save the organiser link
 

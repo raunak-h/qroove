@@ -98,3 +98,63 @@ describe('projectQueue', () => {
     expect(EMPTY_HISTORY.playedKeys.size).toBe(0);
   });
 });
+
+describe('segments with their own styles', () => {
+  const min = 60_000;
+  const all = { enabledStyles: ['salsa', 'bachata'], runCaps: { salsa: 5, bachata: 5 } };
+  const chachaOnly = { enabledStyles: ['chacha'], runCaps: { chacha: 5 } };
+  const base2 = (over: Partial<Parameters<typeof projectQueue>[0]>) => ({
+    candidates: [],
+    history: EMPTY_HISTORY,
+    rules: all,
+    nowMs: 0,
+    endAtMs: 120 * min,
+    currentRemainingMs: null,
+    breaks: [{ startMs: 55 * min, endMs: 65 * min }],
+    overheadSec: 5,
+    horizon: 100,
+    ruleWindows: [
+      { fromMs: 0, rules: all },
+      { fromMs: 65 * min, rules: chachaOnly },
+    ],
+    ...over,
+  });
+  it('plays a style only in the part of the evening that allows it', () => {
+    const early = cand('A', 'chacha', 1);
+    const salsa = cand('B', 'salsa', 2);
+    const p = projectQueue(base2({ candidates: [early, salsa] }));
+    // The cha-cha song was requested first but waits for segment 2; salsa plays at once.
+    expect(p.items.map((i) => i.requestId)).toEqual([salsa.requestId, early.requestId]);
+    expect(p.items[1]!.predictedStartMs!).toBeGreaterThanOrEqual(65 * min);
+  });
+  it('does not mark a song as overflow just because its style is not allowed yet', () => {
+    const p = projectQueue(base2({ candidates: [cand('A', 'chacha', 1)] }));
+    expect(p.overflowIds).toEqual([]);
+    expect(p.items).toHaveLength(1);
+  });
+  it('lists a style that no segment allows as waiting', () => {
+    const p = projectQueue(
+      base2({
+        candidates: [cand('A', 'bachata', 1)],
+        ruleWindows: [{ fromMs: 0, rules: chachaOnly }],
+      }),
+    );
+    expect(p.items).toHaveLength(0);
+    expect(p.waitingIds).toHaveLength(1);
+  });
+  it('uses single-genre spacing only in the single-genre segment', () => {
+    const a1 = cand('A', 'chacha', 1);
+    const a2 = cand('A', 'chacha', 4);
+    const others = [cand('B', 'chacha', 2), cand('C', 'chacha', 3)];
+    const p = projectQueue(
+      base2({
+        candidates: [a1, a2, ...others],
+        ruleWindows: [{ fromMs: 0, rules: chachaOnly }],
+        breaks: [],
+      }),
+    );
+    const order = p.items.map((i) => i.requestId);
+    expect(order[0]).toBe(a1.requestId);
+    expect(order.indexOf(a2.requestId)).toBeGreaterThan(order.indexOf(others[0]!.requestId));
+  });
+});

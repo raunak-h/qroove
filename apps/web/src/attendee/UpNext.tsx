@@ -1,6 +1,6 @@
 import type { EventPublicView } from '@qroove/contracts';
 import { formatClock } from '../shared/time';
-import { styleLabel } from './NowPlaying';
+import { GenreSwatch } from '../shared/Genre';
 import { breakMinutes, queueRows } from './queueRows';
 
 /** Titles only: other attendees' names are deliberately not shown (SPEC §6). */
@@ -24,7 +24,8 @@ export function UpNext({ view, mineIds }: { view: EventPublicView; mineIds: Read
               <li key={row.q.requestId} className={row.q.overflow ? 'overflow' : undefined}>
                 <span className="title">{row.q.title}</span>
                 <span className="muted small">
-                  {[row.q.artist, styleLabel(row.q.style)].filter(Boolean).join(' · ')}
+                  {row.q.artist ? `${row.q.artist} ` : ''}
+                  <GenreSwatch style={row.q.style} size={14} />
                 </span>
                 {mineIds.has(row.q.requestId) ? <span className="badge mine">Yours</span> : null}
                 {row.q.overflow ? <span className="badge warn">After end time</span> : null}

@@ -4,9 +4,11 @@ import type {
   EventPublicView,
   MyRequests,
   RequestView,
+  StyleId,
   TrackView,
 } from '@qroove/contracts';
 import type { EventAggregate, RequestDoc } from '../db/types.js';
+import { segmentIndexAt } from '../domain/history.js';
 import { sha256 } from '../domain/ids.js';
 
 const QUEUE_LIMIT = 50;
@@ -33,7 +35,8 @@ export function publicView(agg: EventAggregate, now: number): EventPublicView {
     return r ? [{ ...trackView(r, nicknames), position: it.position, overflow: it.overflow }] : [];
   });
   const last = e.history.lastStyle;
-  const cap = last ? (e.rules.runCaps[last as keyof typeof e.rules.runCaps] ?? 1) : null;
+  const seg = e.rules.segments[segmentIndexAt(e, now)] ?? e.rules.segments[0]!;
+  const cap = last ? (seg.runCaps[last as keyof typeof seg.runCaps] ?? 1) : null;
   return {
     id: e.id,
     name: e.name,
@@ -57,7 +60,7 @@ export function publicView(agg: EventAggregate, now: number): EventPublicView {
     waitingReason: e.waitingReason,
     runIndicator:
       last && cap !== null && e.history.runLength > 0
-        ? { style: last as keyof typeof e.rules.runCaps, runLength: e.history.runLength, cap }
+        ? { style: last as StyleId, runLength: e.history.runLength, cap }
         : null,
     breaks: e.breaks,
     preview: e.preview,

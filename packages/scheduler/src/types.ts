@@ -4,7 +4,10 @@ export type StyleId = string;
 export interface Candidate {
   requestId: string;
   ownerId: string;
+  /** What the scheduler counts runs and changes by: the genre. */
   style: StyleId;
+  /** The exact style (e.g. a non-Latin variant), when the rules allow only some variants of a genre. */
+  variant?: string;
   acceptedSeq: number;
   canonicalKey: string;
   durationMs: number | null;
@@ -28,6 +31,8 @@ export interface HistoryState {
 /** The subset of the frozen rules snapshot the scheduler needs. */
 export interface SchedulerRules {
   enabledStyles: readonly StyleId[];
+  /** Exact styles allowed; when set, a candidate with a `variant` outside it is not eligible. */
+  allowedVariants?: readonly string[];
   runCaps: Readonly<Record<StyleId, number>>;
 }
 

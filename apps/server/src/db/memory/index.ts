@@ -1,4 +1,5 @@
 import type { EventTx, Repository } from '../ports.js';
+import { EMPTY_NAME_LEDGER } from '../types.js';
 import type {
   AdminGrantDoc,
   AuditDoc,
@@ -6,6 +7,7 @@ import type {
   EventDoc,
   HandoverOfferDoc,
   IdempotencyDoc,
+  NameLedger,
   NewEventBundle,
   PurgeCutoffs,
   PurgeReport,
@@ -97,6 +99,14 @@ export class MemoryRepository implements Repository {
 
   async listAudit(eventId: string): Promise<AuditDoc[]> {
     return clone(this.stores.get(eventId)?.audit ?? []);
+  }
+
+  private ledger: NameLedger = structuredClone(EMPTY_NAME_LEDGER);
+
+  async updateNameLedger<T>(fn: (l: NameLedger) => { ledger: NameLedger; result: T }): Promise<T> {
+    const { ledger, result } = fn(clone(this.ledger));
+    this.ledger = clone(ledger);
+    return result;
   }
 
   async purge(c: PurgeCutoffs): Promise<PurgeReport> {

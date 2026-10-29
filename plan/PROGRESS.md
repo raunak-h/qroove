@@ -3,7 +3,7 @@
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
 **Current phase:** — (all phases done)
-**Next session starts with:** Pilot follow-up: the user-side items under "Blocked / needs user", then the pilot validation questions below. Phases 0–10 done, plus Phase 11 (pilot feedback); v0.2.0 tagged.
+**Next session starts with:** Pilot follow-up: the user-side items under "Blocked / needs user", then the pilot validation questions below. Phases 0–10 done, plus Phases 11–12 (pilot feedback); v0.3.0 tagged.
 
 ## Phases
 
@@ -163,3 +163,13 @@ Qroove 0.1.0 is live at https://qroove.sataklela.com: fair queue scheduler, atte
 - YouTube needs the `SOCS=CAI` consent cookie or EU-hosted servers get a consent redirect (found only after deploying; Spotify, Apple and YouTube imports were then verified on production, 17/17/13 songs for a 60-minute plan).
 - Not done: automatic break timer; rotating the join key; "Lock this device" / idle auto-lock for organiser sessions (right-click lock is cosmetic only); editing a draft's settings after creation; iPhone/WebKit e2e; playlist import for YouTube/Apple beyond the first page of tracks.
 - Tests: scheduler 27 (+property), contracts 10, server 125 (+emulator 46), web 45, e2e 3 (flow, 360×640 no-scroll, light theme) incl. axe.
+
+### Phase 12 — wheel pickers, timeline, colours, segments, names, playlists (2026-10-29, v0.3.0)
+
+- Plan: `/home/codespace/.claude/plans/flickering-wiggling-map.md`. ADRs 0011–0014. Rules snapshot v3 (segments), `BreakSpec.startMin`, planned time in quarter hours, `Candidate.variant` + `SchedulerRules.allowedVariants`, `projectQueue({ruleWindows})`.
+- Mid-turn requests folded in: generated event names (no typed name at all, to avoid offensive text) with a persistent ledger (`meta/eventNames`, `Repository.updateNameLedger`), and playlists per style with genre coverage (`playlistCoverageProblem`, `interleave`).
+- Wheel picker: the scroll-snap element is itself the `spinbutton` (needed for axe `scrollable-region-focusable`); commits 90 ms after scrolling stops; arrow keys work. Verified in jsdom and Chromium; real touch inertia on iOS/Android is untested.
+- Timeline: tap adds a break at the nearest legal 10-minute spot within an hour (shake if none); thin breaks stay tappable because the handles reach outward. Removal is one tap on ✕ (the plan said two taps; it is a draft setting). The part-selector row sits under the bar because tapping the bar itself adds breaks.
+- Names: 112 words (28 each of fruit, vegetables, carbs, sea creatures), about 1.4 M ordered triples. Names are claimed at creation, so unused suggestions are never burned. The ledger keeps every used triple in one document (about 100 k events before the 1 MB limit); fine for a pilot, revisit before wide use. Attendee nicknames are still free text.
+- Not done: segment-specific rules in the attendee style picker (it offers every style allowed anywhere; the server accepts it and the song waits for its part); WebKit e2e; editing a draft after creation.
+- Tests: scheduler 32 (+2 property incl. segments), contracts 11, server 140 (+emulator), web 63, e2e 4 incl. axe.

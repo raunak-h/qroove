@@ -18,7 +18,7 @@ import { RateLimiter } from './security/rateLimit.js';
 import { createSecurity } from './security/tokens.js';
 import { registerStatic } from './static.js';
 
-export const VERSION = '0.2.0';
+export const VERSION = '0.3.0';
 
 const here = dirname(fileURLToPath(import.meta.url));
 

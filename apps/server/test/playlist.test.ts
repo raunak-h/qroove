@@ -184,13 +184,15 @@ describe('POST /api/events with a playlist', () => {
     apps.push(t.app);
     const r = await t.api.call('POST', '/api/events', {
       body: {
-        name: 'P',
         timezone: 'UTC',
+        enabledStyles: ['salsa'],
         plannedDurationMin: 60,
-        playlist: {
-          url: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
-          style: 'salsa',
-        },
+        playlists: [
+          {
+            url: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
+            style: 'salsa',
+          },
+        ],
       },
     });
     expect(r.status).toBe(201);
@@ -217,13 +219,15 @@ describe('POST /api/events with a playlist', () => {
     apps.push(t.app);
     const r = await t.api.call('POST', '/api/events', {
       body: {
-        name: 'Y',
         timezone: 'UTC',
+        enabledStyles: ['salsa'],
         plannedDurationMin: 60,
-        playlist: {
-          url: 'https://music.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI',
-          style: 'salsa',
-        },
+        playlists: [
+          {
+            url: 'https://music.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI',
+            style: 'salsa',
+          },
+        ],
       },
     });
     expect(r.status).toBe(201);
@@ -239,23 +243,119 @@ describe('POST /api/events with a playlist', () => {
     apps.push(t.app);
     const noTime = await t.api.call('POST', '/api/events', {
       body: {
-        name: 'P',
         timezone: 'UTC',
-        playlist: {
-          url: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
-          style: 'salsa',
-        },
+        playlists: [
+          {
+            url: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
+            style: 'salsa',
+          },
+        ],
       },
     });
     expect(noTime.status).toBe(400);
     const bad = await t.api.call('POST', '/api/events', {
       body: {
-        name: 'P',
         timezone: 'UTC',
+        enabledStyles: ['salsa'],
         plannedDurationMin: 60,
-        playlist: { url: 'https://evil.example/x', style: 'salsa' },
+        playlists: [{ url: 'https://evil.example/x', style: 'salsa' }],
       },
     });
     expect(bad.status).toBe(422);
+  });
+
+  describe('one playlist per style, every genre covered', () => {
+    const SPOT = 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M';
+    const APPLE =
+      'https://music.apple.com/us/playlist/todays-hits/pl.f4d106fed2bd41149aaacabb233eb5eb';
+    const create = async (body: object, fetched: string[] = []) => {
+      const t = await testApp({
+        fetch: (async (url: string) => {
+          fetched.push(url);
+          return new Response(
+            url.includes('apple.com')
+              ? appleHtml(
+                  Array.from({ length: 10 }, (_, i) => ({
+                    id: `track-lockup - pl.x - ${i}`,
+                    title: `Apple ${i}`,
+                    artistName: 'Banda',
+                    duration: 240_000,
+                  })),
+                )
+              : page,
+          );
+        }) as any,
+      });
+      apps.push(t.app);
+      return t.api.call('POST', '/api/events', {
+        body: { timezone: 'UTC', plannedDurationMin: 120, ...body },
+      });
+    };
+
+    it('refuses a missing genre: salsa and bachata are active but only salsa has a playlist', async () => {
+      const r = await create({
+        enabledStyles: ['salsa', 'bachata'],
+        playlists: [{ url: SPOT, style: 'salsa' }],
+      });
+      expect(r.status).toBe(400);
+      expect(r.json.error.message).toMatch(/every genre/);
+    });
+
+    it('a Latin style’s playlist covers its non-Latin counterpart, and the other way round', async () => {
+      const both = await create({
+        enabledStyles: ['salsa', 'salsa_nl', 'bachata', 'bachata_nl'],
+        playlists: [
+          { url: SPOT, style: 'salsa' },
+          { url: APPLE, style: 'bachata_nl' },
+        ],
+      });
+      expect(both.status).toBe(201);
+    });
+
+    it('the genre rule counts every part of the evening, not just the first', async () => {
+      const r = await create({
+        plannedDurationMin: 120,
+        breaks: [{ startMin: 60, durationSec: 600 }],
+        segments: [{ enabledStyles: ['salsa'] }, { enabledStyles: ['chacha'] }],
+        playlists: [{ url: SPOT, style: 'salsa' }],
+      });
+      expect(r.status).toBe(400);
+    });
+
+    it('refuses two playlists for one style, and a playlist for a style that is not in the event', async () => {
+      expect(
+        (
+          await create({
+            enabledStyles: ['salsa'],
+            playlists: [
+              { url: SPOT, style: 'salsa' },
+              { url: APPLE, style: 'salsa' },
+            ],
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (await create({ enabledStyles: ['salsa'], playlists: [{ url: SPOT, style: 'chacha' }] }))
+          .status,
+      ).toBe(400);
+    });
+
+    it('fetches each playlist and shares the time between them, so no genre is crowded out', async () => {
+      const fetched: string[] = [];
+      const r = await create(
+        {
+          enabledStyles: ['salsa', 'bachata'],
+          plannedDurationMin: 15, // 14 minutes: room for three four-minute songs
+          playlists: [
+            { url: SPOT, style: 'salsa' },
+            { url: APPLE, style: 'bachata' },
+          ],
+        },
+        fetched,
+      );
+      expect(r.status).toBe(201);
+      expect(fetched).toHaveLength(2);
+      expect(r.json.seeded).toBe(3);
+    });
   });
 });

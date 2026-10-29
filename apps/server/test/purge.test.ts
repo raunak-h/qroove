@@ -28,7 +28,7 @@ describe('POST /api/internal/purge', () => {
 
   it('deletes a draft that is older than 7 days', async () => {
     const { api, clock } = await testApp({ env: { CRON_SECRET: 'cron-secret-value' } });
-    const c = await api.call('POST', '/api/events', { body: { name: 'Old', timezone: 'UTC' } });
+    const c = await api.call('POST', '/api/events', { body: { timezone: 'UTC' } });
     clock.advance(8 * 24 * 3600 * 1000);
     const r = await api.call('POST', '/api/internal/purge', {
       headers: { 'x-cron-secret': 'cron-secret-value' },

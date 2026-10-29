@@ -1,10 +1,12 @@
-import { DEFAULT_ENABLED_STYLES, RULE_DEFAULTS, genresOf, type GenreId } from '@qroove/config';
+import { DEFAULT_ENABLED_STYLES, RULE_DEFAULTS, type GenreId } from '@qroove/config';
 import {
   DomainError,
   RulesSnapshot,
   defaultRules,
+  defaultSegment,
   validateBreaks,
   type BreakSpec,
+  type SegmentInput,
   type StyleId,
 } from '@qroove/contracts';
 import type {
@@ -21,53 +23,89 @@ import { sha256 } from './ids.js';
 import { manualKey } from './keys.js';
 
 export interface RuleInput {
+  /** Defaults for every segment that is not given explicitly. */
   enabledStyles?: readonly StyleId[] | undefined;
   /** "Most songs in a row" for every genre, unless `ratio` overrides a genre. */
   masterRunCap?: number | undefined;
   /** Per-genre ratio parts (keys are genre ids). */
   ratio?: Partial<Record<StyleId, number>> | undefined;
+  /** One per stretch between breaks. */
+  segments?: ReadonlyArray<SegmentInput> | undefined;
   submissionLimit?: number | undefined;
 }
 
-/** Builds and validates a rules snapshot: defaults, then `base`, then explicit overrides. */
-export function buildRules(input: RuleInput, base?: RulesSnapshot): RulesSnapshot {
-  const enabled = input.enabledStyles ?? base?.enabledStyles ?? DEFAULT_ENABLED_STYLES;
-  const master = input.masterRunCap ?? base?.masterRunCap ?? RULE_DEFAULTS.masterRunCap;
-  const ratio: Partial<Record<GenreId, number>> = {};
-  for (const g of genresOf(enabled)) {
-    const given = input.ratio?.[g];
-    if (given !== undefined) ratio[g] = given;
-    else if (input.masterRunCap === undefined && base?.runCaps[g] !== undefined) {
-      ratio[g] = base.runCaps[g]!;
-    }
+/**
+ * Builds and validates a rules snapshot with one segment per stretch between breaks: explicit
+ * segments first, then the event-level defaults, then `base`'s segment, then global defaults.
+ */
+export function buildRules(
+  input: RuleInput,
+  segmentCount: number,
+  base?: RulesSnapshot,
+): RulesSnapshot {
+  if (input.segments && input.segments.length !== segmentCount) {
+    throw new DomainError('VALIDATION', 'Choose styles for each part of the evening.');
   }
-  const rules = defaultRules(enabled, master, ratio);
-  const limit = input.submissionLimit ?? base?.submissionLimit;
-  if (limit !== undefined) rules.submissionLimit = limit;
+  const hasDefaults =
+    input.enabledStyles !== undefined ||
+    input.masterRunCap !== undefined ||
+    input.ratio !== undefined;
+  const enabled = input.enabledStyles ?? base?.segments[0]?.enabledStyles ?? DEFAULT_ENABLED_STYLES;
+  const master =
+    input.masterRunCap ?? base?.segments[0]?.masterRunCap ?? RULE_DEFAULTS.masterRunCap;
+  const segments = Array.from({ length: segmentCount }, (_, i) => {
+    const given = input.segments?.[i];
+    if (given) {
+      return defaultSegment(
+        given.enabledStyles,
+        given.masterRunCap ?? master,
+        (given.ratio ?? {}) as Partial<Record<GenreId, number>>,
+      );
+    }
+    const kept = base?.segments[i];
+    if (kept && !hasDefaults) return kept;
+    return defaultSegment(enabled, master, (input.ratio ?? {}) as Partial<Record<GenreId, number>>);
+  });
+  const rules: RulesSnapshot = {
+    ...defaultRules(),
+    segments,
+    submissionLimit:
+      input.submissionLimit ?? base?.submissionLimit ?? RULE_DEFAULTS.submissionLimit,
+  };
   const parsed = RulesSnapshot.safeParse(rules);
   if (!parsed.success) throw new DomainError('VALIDATION', parsed.error.issues[0]?.message);
   return parsed.data;
 }
 
-/** Validates against the planned time (hard limits) and creates the break specs. */
+export interface BreakInput {
+  label?: string | undefined;
+  /** Offset from the start of the event, minutes, a multiple of 10. */
+  startMin: number;
+  durationSec: number;
+}
+
+/** Validates against the planned time (hard limits) and creates the break specs, in time order. */
 export function buildBreaks(
   deps: Deps,
-  breaks: ReadonlyArray<{ label: string; durationSec: number }> = [],
+  breaks: ReadonlyArray<BreakInput> = [],
   plannedMin: number | null = null,
 ): BreakSpec[] {
   const problem = validateBreaks(
     plannedMin,
-    breaks.map((b) => b.durationSec / 60),
+    breaks.map((b) => ({ startMin: b.startMin, durationMin: b.durationSec / 60 })),
   );
   if (problem) throw new DomainError('VALIDATION', problem);
-  return breaks.map((b) => ({
-    id: deps.ids.breakId(),
-    label: b.label,
-    durationSec: b.durationSec,
-    startsAt: null,
-    actualStart: null,
-    actualEnd: null,
-  }));
+  return [...breaks]
+    .sort((a, b) => a.startMin - b.startMin)
+    .map((b) => ({
+      id: deps.ids.breakId(),
+      label: b.label ?? `${Math.round(b.durationSec / 60)}-minute break`,
+      durationSec: b.durationSec,
+      startMin: b.startMin,
+      startsAt: null,
+      actualStart: null,
+      actualEnd: null,
+    }));
 }
 
 export interface DraftInput {

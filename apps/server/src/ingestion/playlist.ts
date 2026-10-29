@@ -320,3 +320,11 @@ export function capPlaytime<
   }
   return out;
 }
+
+/** Takes one song from each list in turn, so every playlist (and so every genre) is represented. */
+export function interleave<T>(lists: ReadonlyArray<readonly T[]>): T[] {
+  const out: T[] = [];
+  const longest = Math.max(0, ...lists.map((l) => l.length));
+  for (let i = 0; i < longest; i++) for (const l of lists) if (i < l.length) out.push(l[i]!);
+  return out;
+}

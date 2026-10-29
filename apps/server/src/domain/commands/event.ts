@@ -1,7 +1,7 @@
 import { hashRules } from '@qroove/contracts/hash';
 import {
   DomainError,
-  breakSlots,
+  allowedStyles,
   type CreateEventBody,
   type RulesSnapshot,
 } from '@qroove/contracts';
@@ -18,11 +18,13 @@ import {
   buildBreaks,
   buildRules,
   insertDraft,
+  type BreakInput,
   newDraft,
   seedRows,
   type RuleInput,
   type SeedSong,
 } from '../draft.js';
+import { claimEventName } from '../eventNames.js';
 import { closePlaying, readPlaying, requireLive } from '../lifecycle.js';
 import { breakInProgress } from '../recompute.js';
 
@@ -36,6 +38,7 @@ export interface CreatedEvent {
   slug: string;
   adminSecret: string;
   recoverySecret: string;
+  name: string;
   rules: RulesSnapshot;
   joinKey: string;
 }
@@ -51,18 +54,21 @@ export async function createEvent(
   body: CreateEventBody,
   opts: CreateOptions = {},
 ): Promise<CreatedEvent & { seeded: number }> {
-  const rules = buildRules(body);
   const planned = body.plannedDurationMin ?? null;
   const breaks = buildBreaks(deps, body.breaks, planned);
+  const rules = buildRules(body, breaks.length + 1);
   const seeds = opts.seeds ?? [];
   for (const s of seeds) {
-    if (!rules.enabledStyles.includes(s.style)) {
+    if (!allowedStyles(rules).includes(s.style)) {
       throw new DomainError('VALIDATION', 'Imported songs need one of the event’s styles.');
     }
   }
+  // Names are generated, never typed (nothing offensive can get onto a screen), and claimed only
+  // once everything else about the request has been checked.
+  const name = await claimEventName(deps);
   const { bundle, secrets } = await insertDraft(deps, () => {
     const d = newDraft(deps, {
-      name: body.name,
+      name,
       timezone: body.timezone,
       rules,
       plannedDurationMin: planned,
@@ -75,6 +81,7 @@ export async function createEvent(
   return {
     eventId: bundle.event.id,
     slug: bundle.event.publicSlug,
+    name: bundle.event.name,
     rules: bundle.event.rules,
     joinKey: bundle.event.joinKey,
     seeded: seeds.length,
@@ -83,10 +90,9 @@ export async function createEvent(
 }
 
 export interface UpdateDraftInput extends AdminInput, RuleInput {
-  name?: string | undefined;
   timezone?: string | undefined;
   plannedDurationMin?: number | null | undefined;
-  breaks?: ReadonlyArray<{ label: string; durationSec: number }> | undefined;
+  breaks?: ReadonlyArray<BreakInput> | undefined;
 }
 
 /** Rules (and everything else) are editable only while the event is a DRAFT. */
@@ -95,20 +101,21 @@ export function updateDraft(deps: Deps, input: UpdateDraftInput) {
     await requireAdmin(c.tx, input.adminSecret);
     if (c.event.state !== 'DRAFT') throw new DomainError('RULES_FROZEN');
     const e = { ...c.event };
-    if (input.name !== undefined) e.name = input.name;
     if (input.timezone !== undefined) e.timezone = input.timezone;
     if (input.plannedDurationMin !== undefined) e.plannedDurationMin = input.plannedDurationMin;
     if (input.breaks !== undefined || input.plannedDurationMin !== undefined) {
-      e.breaks =
-        input.breaks !== undefined
-          ? buildBreaks(deps, input.breaks, e.plannedDurationMin)
-          : buildBreaks(
-              deps,
-              e.breaks.map((b) => ({ label: b.label, durationSec: b.durationSec })),
-              e.plannedDurationMin,
-            );
+      e.breaks = buildBreaks(
+        deps,
+        input.breaks ??
+          e.breaks.map((b) => ({
+            label: b.label,
+            startMin: b.startMin,
+            durationSec: b.durationSec,
+          })),
+        e.plannedDurationMin,
+      );
     }
-    e.rules = buildRules(input, c.event.rules);
+    e.rules = buildRules(input, e.breaks.length + 1, c.event.rules);
     audit(c, 'draft.update', 'admin');
     return { ok: true as const, version: c.tx.putEvent(e) };
   });
@@ -126,22 +133,12 @@ export function startEvent(deps: Deps, input: AdminInput) {
     const w = await loadWork(c);
     // The planned time starts counting now; breaks are centred on their points of that span.
     const planned = c.event.plannedDurationMin;
-    const slots =
-      planned === null
-        ? []
-        : breakSlots(
-            planned,
-            c.event.breaks.map((b) => b.durationSec / 60),
-          );
     w.event = {
       ...c.event,
       state: 'ACTIVE',
       startedAt: c.now,
       endAt: planned === null ? null : c.now + planned * 60_000,
-      breaks: c.event.breaks.map((b, i) => ({
-        ...b,
-        startsAt: slots[i] ? c.now + Math.round(slots[i]!.startMin * 60_000) : null,
-      })),
+      breaks: c.event.breaks.map((b) => ({ ...b, startsAt: c.now + b.startMin * 60_000 })),
       rulesHash: hashRules(c.event.rules),
     };
     audit(c, 'event.start', 'admin', { rulesHash: w.event.rulesHash });

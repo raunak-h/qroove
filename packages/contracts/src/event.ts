@@ -30,6 +30,8 @@ export const BreakSpec = z.object({
   id: z.string(),
   label: z.string().max(60),
   durationSec: z.number().int().min(1).max(3600),
+  /** Offset from the start of the event, a multiple of 10 minutes. */
+  startMin: z.number().int().min(0).max(480),
   startsAt: z.number().int().nullable(),
   actualStart: z.number().int().nullable(),
   actualEnd: z.number().int().nullable(),

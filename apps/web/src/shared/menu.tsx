@@ -1,7 +1,8 @@
 import type { RulesSnapshot } from '@qroove/contracts';
-import { STYLE_PRESETS, genresOf } from '@qroove/config';
+import { genresOf } from '@qroove/config';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
+import { GenreDot, StyleSwatches } from './Genre';
 import { ThemeToggle } from './ThemeToggle';
 
 const RulesCtx = createContext<{
@@ -23,26 +24,29 @@ export function useMenuRules(rules: RulesSnapshot | null | undefined) {
   }, [rules, setRules]);
 }
 
-const label = (id: string) => STYLE_PRESETS.find((s) => s.id === id)?.label ?? id;
-
 export function RulesList({ rules }: { rules: RulesSnapshot }) {
-  const genres = genresOf(rules.enabledStyles);
-  const caps = genres.map((g) => `${label(g)} ${rules.runCaps[g]}`).join(' · ');
+  const single = rules.segments.length === 1;
   return (
     <ul className="rules-list">
+      {rules.segments.map((seg, i) => {
+        const genres = genresOf(seg.enabledStyles);
+        return (
+          <li key={i}>
+            {single ? null : <strong>{i + 1}. </strong>}
+            <StyleSwatches styles={seg.enabledStyles} size={16} />{' '}
+            {genres.map((g) => (
+              <span key={g} className="cap">
+                <GenreDot genre={g} size={12} />×{seg.runCaps[g]}
+              </span>
+            ))}
+            <span className="muted small">
+              {genres.length > 1 ? ' · style change' : ' · half of the others first'}
+            </span>
+          </li>
+        );
+      })}
       <li>
-        <strong>Styles:</strong> {rules.enabledStyles.map(label).join(', ')}
-      </li>
-      <li>
-        <strong>Most songs in a row:</strong> {caps}
-      </li>
-      <li>
-        <strong>Songs per person:</strong> {rules.submissionLimit} (played songs count)
-      </li>
-      <li>
-        {genres.length > 1
-          ? 'Nobody plays twice in a row, or again until the style has changed.'
-          : 'Nobody plays twice in a row, or again until half of the other songs waiting have played.'}
+        <strong>{rules.submissionLimit}</strong> songs each
       </li>
     </ul>
   );

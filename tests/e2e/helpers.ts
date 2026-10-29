@@ -24,7 +24,7 @@ export async function newPage(
 export async function addSong(page: Page, title: string, artist: string, style: string) {
   await page.getByLabel(/Paste a Spotify/).fill(title);
   await page.getByLabel(/Artist/).fill(artist);
-  await page.getByLabel(style, { exact: true }).check();
+  await page.getByRole('radio', { name: style, exact: true }).check();
   await page.getByRole('button', { name: 'Add to queue' }).click();
   await expect(page.getByText(new RegExp(`Added “${title}”`))).toBeVisible();
 }

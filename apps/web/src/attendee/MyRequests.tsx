@@ -1,7 +1,7 @@
 import type { MyRequests as Mine, RequestView } from '@qroove/contracts';
 import { useState } from 'react';
 import { ApiError } from '../shared/api';
-import { styleLabel } from './NowPlaying';
+import { GenreSwatch } from '../shared/Genre';
 
 const LABEL: Record<string, { text: string; tone: 'ok' | 'warn' | 'info' | 'done' }> = {
   PENDING_METADATA: { text: 'Checking', tone: 'info' },
@@ -62,7 +62,8 @@ export function MyRequests({
               <li key={r.id}>
                 <span className="title">{r.title}</span>
                 <span className="muted small">
-                  {[r.artist, styleLabel(r.style)].filter(Boolean).join(' · ')}
+                  {r.artist ? `${r.artist} ` : ''}
+                  <GenreSwatch style={r.style} size={14} />
                 </span>
                 <span className={`badge ${l.tone}`}>{l.text}</span>
                 {r.statusText && r.statusText !== l.text ? (

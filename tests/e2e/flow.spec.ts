@@ -29,14 +29,25 @@ test('create → run → play manually → hand over → end → carry over', as
 
   await page.getByRole('link', { name: 'Create an event' }).click();
   await expectAccessible(page, '/new');
-  await page.getByLabel('Event name').fill('E2E Social');
-  await page.getByRole('button', { name: 'Add 10-minute break' }).click();
+  // No name field: the server names the event from neutral words.
+  await expect(page.getByLabel(/event name/i)).toHaveCount(0);
+  await expect(page.getByRole('spinbutton', { name: 'Planned time' })).toHaveAttribute(
+    'aria-valuetext',
+    '2:00',
+  );
+  // Tap the middle of the bar to add a break there.
+  const timeline = page.getByRole('group', { name: /Evening timeline/ });
+  const box = (await timeline.boundingBox())!;
+  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+  await expect(page.getByRole('tab')).toHaveCount(2);
   await page.getByRole('button', { name: 'Create event' }).click();
   await expect(page.getByText(/Save this link/)).toBeVisible();
+  const eventName = (await page.getByRole('heading', { level: 1 }).innerText()).trim();
+  expect(eventName).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+ [A-Z][a-z]+$/);
   const adminUrl = (await page.locator('p.mono').first().innerText()).trim();
   expect(adminUrl).toContain('#k=');
   await page.getByRole('link', { name: 'Open organiser page' }).click();
-  await expect(page.getByRole('heading', { name: 'E2E Social' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: eventName })).toBeVisible();
   const eventId = new URL(page.url()).pathname.split('/').pop()!;
 
   // The organiser console fits one screen on every tab except the queue list ----------------
@@ -100,7 +111,7 @@ test('create → run → play manually → hand over → end → carry over', as
   // Player in manual mode (no local file) ---------------------------------------------------
   const player = await newPage(browser, ctxOpts);
   await player.page.goto(`/a/${eventId}${adminUrl.slice(adminUrl.indexOf('#'))}`);
-  await expect(player.page.getByRole('heading', { name: 'E2E Social' })).toBeVisible();
+  await expect(player.page.getByRole('heading', { name: eventName })).toBeVisible();
   await player.page.goto(`/player/${eventId}`);
   await expect(player.page.getByText(/No matching file on this device/)).toBeVisible();
   await expectAccessible(player.page, '/player');
@@ -123,7 +134,7 @@ test('create → run → play manually → hand over → end → carry over', as
   const claim = (await page.locator('p.mono', { hasText: '/claim/' }).innerText()).trim();
   const second = await newPage(browser, ctxOpts);
   await second.page.goto(claim);
-  await expect(second.page.getByRole('heading', { name: 'E2E Social' })).toBeVisible();
+  await expect(second.page.getByRole('heading', { name: eventName })).toBeVisible();
   await page.reload();
   await expect(page.getByText(/You do not have organiser access/)).toBeVisible();
 
@@ -147,7 +158,7 @@ test('create → run → play manually → hand over → end → carry over', as
   await page.goto('/privacy');
   await expectAccessible(page, '/privacy');
   await page.goto(`/h/${slug}`);
-  await expect(page.getByRole('heading', { name: 'E2E Social' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: eventName })).toBeVisible();
   await expectAccessible(page, '/h/:slug');
 
   for (const p of [codeOnly, ...people, player, second]) await p.context.close();

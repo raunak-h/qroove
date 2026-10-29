@@ -185,3 +185,16 @@ export interface PurgeReport {
   auditDeleted: number;
   idempotencyDeleted: number;
 }
+
+/**
+ * Global record of generated event names. `used` holds the ordered word triples already handed
+ * out this cycle (encoded as indices into the word list); `last` is the most recent name's words.
+ */
+export interface NameLedger {
+  used: number[];
+  last: string[] | null;
+  /** How many times every permutation has been exhausted. */
+  cycle: number;
+}
+
+export const EMPTY_NAME_LEDGER: NameLedger = { used: [], last: null, cycle: 0 };

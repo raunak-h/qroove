@@ -1,8 +1,8 @@
-import type { Candidate, HistoryState, SchedulerRules } from '@qroove/scheduler';
+import type { Candidate, HistoryState, RuleWindow, SchedulerRules } from '@qroove/scheduler';
 import { FALLBACK_RUN_CAP } from '@qroove/scheduler';
 import { genreOf, genresOf } from '@qroove/config';
-import type { RulesSnapshot } from '@qroove/contracts';
-import type { HistoryDoc, RequestDoc } from '../db/types.js';
+import type { Segment } from '@qroove/contracts';
+import type { EventDoc, HistoryDoc, RequestDoc } from '../db/types.js';
 
 export const EMPTY_HISTORY_DOC: HistoryDoc = {
   lastStyle: null,
@@ -33,19 +33,53 @@ export const fromSchedulerHistory = (h: HistoryState): HistoryDoc => ({
 
 /**
  * The scheduler's "style" is the genre: salsa and non-Latin salsa-compatible count as one, so a
- * change between them is not a style change. Run caps are keyed by genre in the rules snapshot.
+ * change between them is not a style change. `allowedVariants` keeps the exact styles a segment
+ * allows (a segment may allow salsa but not its non-Latin version).
  */
-export function toSchedulerRules(rules: RulesSnapshot): SchedulerRules {
-  const genres = genresOf(rules.enabledStyles);
+export function toSchedulerRules(seg: Segment): SchedulerRules {
+  const genres = genresOf(seg.enabledStyles);
   const runCaps: Record<string, number> = {};
-  for (const g of genres) runCaps[g] = rules.runCaps[g] ?? FALLBACK_RUN_CAP;
-  return { enabledStyles: genres, runCaps };
+  for (const g of genres) runCaps[g] = seg.runCaps[g] ?? FALLBACK_RUN_CAP;
+  return { enabledStyles: genres, allowedVariants: seg.enabledStyles, runCaps };
+}
+
+/** When each break ends (actual if known, else as scheduled); `null` before the event starts. */
+function breakEnds(e: EventDoc): number[] | null {
+  const ends: number[] = [];
+  for (const b of e.breaks) {
+    const ms = b.durationSec * 1000;
+    if (b.actualEnd !== null) ends.push(b.actualEnd);
+    else if (b.actualStart !== null) ends.push(b.actualStart + ms);
+    else if (b.startsAt !== null) ends.push(b.startsAt + ms);
+    else return null;
+  }
+  return ends;
+}
+
+/** Index of the segment of the evening that time `t` falls in. */
+export function segmentIndexAt(e: EventDoc, t: number): number {
+  const ends = breakEnds(e) ?? [];
+  const i = ends.filter((end) => end <= t).length;
+  return Math.min(i, e.rules.segments.length - 1);
+}
+
+export const rulesAt = (e: EventDoc, t: number): SchedulerRules =>
+  toSchedulerRules(e.rules.segments[segmentIndexAt(e, t)]!);
+
+/** Per-segment rules with the times they start, for the projection. */
+export function ruleWindowsOf(e: EventDoc): RuleWindow[] {
+  const ends = breakEnds(e) ?? [];
+  return e.rules.segments.map((seg, i) => ({
+    fromMs: i === 0 ? Number.NEGATIVE_INFINITY : (ends[i - 1] ?? Number.POSITIVE_INFINITY),
+    rules: toSchedulerRules(seg),
+  }));
 }
 
 export const toCandidate = (r: RequestDoc): Candidate => ({
   requestId: r.id,
   ownerId: r.ownerId,
   style: genreOf(r.style),
+  variant: r.style,
   acceptedSeq: r.acceptedSeq,
   canonicalKey: r.canonicalKey,
   durationMs: r.durationMs,

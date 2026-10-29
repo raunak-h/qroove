@@ -10,7 +10,10 @@ import {
 export interface ProjectInput {
   candidates: readonly Candidate[];
   history: HistoryState;
+  /** Rules in force when `ruleWindows` is absent or has not started yet. */
   rules: SchedulerRules;
+  /** Per-segment rules, sorted by `fromMs`; the last one with `fromMs <= t` applies at time `t`. */
+  ruleWindows?: readonly RuleWindow[];
   nowMs: number;
   endAtMs: number | null;
   /** Time left on the song currently playing; null when nothing is playing. */
@@ -19,6 +22,12 @@ export interface ProjectInput {
   breaks: readonly BreakWindow[];
   overheadSec: number;
   horizon?: number;
+}
+
+/** The rules that apply from `fromMs` until the next window starts (one per segment of the evening). */
+export interface RuleWindow {
+  fromMs: number;
+  rules: SchedulerRules;
 }
 
 export interface BreakWindow {
@@ -46,7 +55,11 @@ export function projectQueue(input: ProjectInput): Projection {
   const horizon = input.horizon ?? 50;
   const overheadMs = input.overheadSec * 1000;
   const breaks = [...input.breaks].sort((a, b) => a.startMs - b.startMs);
-  const gate = isSingleGenre(input.rules);
+  const rulesAt = (t: number): SchedulerRules => {
+    let r = input.rules;
+    for (const w of input.ruleWindows ?? []) if (w.fromMs <= t) r = w.rules;
+    return r;
+  };
   let remaining = [...input.candidates];
   let history = input.history;
   let t =
@@ -80,7 +93,8 @@ export function projectQueue(input: ProjectInput): Projection {
       }
       break;
     }
-    const sel = selectNext(remaining, history, input.rules, {
+    const rules = rulesAt(t);
+    const sel = selectNext(remaining, history, rules, {
       remainingMs: windowEnd === null ? null : windowEnd - t,
     });
     if (!sel.pick) {
@@ -88,7 +102,8 @@ export function projectQueue(input: ProjectInput): Projection {
       if (
         limitedBy &&
         sel.blocked.length > 0 &&
-        sel.blocked.every((b) => b.reason === 'WOULD_EXCEED_END')
+        // Songs that do not fit, or whose style is not allowed in this part of the evening, wait.
+        sel.blocked.every((b) => b.reason === 'WOULD_EXCEED_END' || b.reason === 'STYLE_DISABLED')
       ) {
         t = limitedBy.endMs;
         continue;
@@ -107,7 +122,7 @@ export function projectQueue(input: ProjectInput): Projection {
     if (c.durationMs === null) uncertain = true;
     t += (c.durationMs ?? DEFAULT_DURATION_MS) + overheadMs;
     remaining = remaining.filter((r) => r.requestId !== c.requestId);
-    history = applyPlay(history, c, { pool: remaining, gate });
+    history = applyPlay(history, c, { pool: remaining, gate: isSingleGenre(rules) });
   }
 
   const overflowIds: string[] = [];

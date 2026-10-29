@@ -1,7 +1,8 @@
-import type { EventPublicView, StyleId } from '@qroove/contracts';
+import { allowedStyles, type EventPublicView, type StyleId } from '@qroove/contracts';
 import { STYLE_PRESETS } from '@qroove/config';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, type Creds, type ResolvedLink } from '../shared/api';
+import { GenreSwatch } from '../shared/Genre';
 import { parseDuration } from '../shared/time';
 
 const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
@@ -19,9 +20,8 @@ export function AddSong({
   full: boolean;
   onAdded: () => void;
 }) {
-  const styles = STYLE_PRESETS.filter(
-    (s) => !view.rules || view.rules.enabledStyles.includes(s.id),
-  );
+  const allowed = view.rules ? allowedStyles(view.rules) : null;
+  const styles = STYLE_PRESETS.filter((s) => !allowed || allowed.includes(s.id));
   const [input, setInput] = useState('');
   const [style, setStyle] = useState<StyleId | null>(null);
   // Lookup results are keyed by the input they answer, so stale ones are ignored without resets.
@@ -204,7 +204,7 @@ export function AddSong({
         ) : null}
 
         <fieldset className="chips">
-          <legend>Dance style</legend>
+          <legend className="sr-only">Dance style</legend>
           {styles.map((s) => (
             <label key={s.id} className={`chip${style === s.id ? ' on' : ''}`}>
               <input
@@ -214,7 +214,7 @@ export function AddSong({
                 checked={style === s.id}
                 onChange={() => setStyle(s.id)}
               />
-              {s.label}
+              <GenreSwatch style={s.id} size={28} />
             </label>
           ))}
         </fieldset>

@@ -77,7 +77,6 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
         cmd.updateDraft(deps, {
           eventId: ev.eventId,
           adminSecret: ev.adminSecret,
-          name: 'x',
           expectedVersion: 99,
         }),
         'STALE_VERSION',
@@ -371,7 +370,7 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
     it('holds starts during a break and resumes after it', async () => {
       const { deps, ev, admin, submit, player } = await setup({
         plannedDurationMin: 120,
-        breaks: [{ label: 'Class', durationSec: 600 }],
+        breaks: [{ label: 'Class', startMin: 60, durationSec: 600 }],
       });
       const brk = (await snap(deps, ev.eventId)).event.breaks[0]!;
       await submit(await guest(deps, ev.eventId), 1);
@@ -595,40 +594,96 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
 
     it('enforces the break limits: half of the time, spacing, steps of ten minutes', async () => {
       const deps = makeDeps(await make());
-      const mk = (planned: number | undefined, mins: number[]) =>
+      const mk = (planned: number | undefined, spec: Array<[number, number]>) =>
         cmd.createEvent(deps, {
-          name: 'B',
           timezone: 'UTC',
           ...(planned ? { plannedDurationMin: planned } : {}),
-          breaks: mins.map((m) => ({ label: `${m} min`, durationSec: m * 60 })),
+          breaks: spec.map(([startMin, m]) => ({ startMin, durationSec: m * 60 })),
         });
-      await mk(120, [10]);
-      await mk(120, [20, 20]); // two breaks, 20 minutes of music between them
-      await expectCode(mk(120, [30, 30]), 'VALIDATION'); // back to back: only 10 minutes between
-      await expectCode(mk(120, [30, 30, 30]), 'VALIDATION'); // over half
-      await expectCode(mk(undefined, [10]), 'VALIDATION'); // needs a planned time
-      await expectCode(mk(120, [15]), 'VALIDATION'); // not a ten-minute step
-      await mk(60, [20]);
-      await expectCode(mk(60, [30]), 'VALIDATION'); // only 15 minutes of music before it
+      await mk(120, [[60, 10]]);
+      await mk(120, [
+        [30, 20],
+        [70, 20],
+      ]); // two breaks, 20 minutes of music between them
+      await expectCode(
+        mk(120, [
+          [40, 30],
+          [70, 30],
+        ]),
+        'VALIDATION',
+      ); // back to back: nothing between them
+      await expectCode(
+        mk(120, [
+          [20, 30],
+          [60, 30],
+          [100, 30],
+        ]),
+        'VALIDATION',
+      ); // over half
+      await expectCode(mk(undefined, [[60, 10]]), 'VALIDATION'); // needs a planned time
+      await expectCode(mk(120, [[60, 15]]), 'VALIDATION'); // not a ten-minute step
+      await expectCode(mk(120, [[55, 10]]), 'VALIDATION'); // not on the 10-minute grid
+      await mk(60, [[20, 20]]);
+      await expectCode(mk(60, [[10, 30]]), 'VALIDATION'); // only 10 minutes of music before it
+    });
+
+    it('gives each part of the evening its own styles', async () => {
+      const deps = makeDeps(await make());
+      const ev = await cmd.createEvent(deps, {
+        timezone: 'UTC',
+        plannedDurationMin: 120,
+        breaks: [{ startMin: 60, durationSec: 600 }],
+        segments: [{ enabledStyles: ['salsa'] }, { enabledStyles: ['chacha', 'other'] }],
+      });
+      expect(ev.rules.segments.map((s) => s.enabledStyles)).toEqual([
+        ['salsa'],
+        ['chacha', 'other'],
+      ]);
+      await expectCode(
+        cmd.createEvent(deps, {
+          timezone: 'UTC',
+          plannedDurationMin: 120,
+          breaks: [{ startMin: 60, durationSec: 600 }],
+          segments: [{ enabledStyles: ['salsa'] }], // one part short
+        }),
+        'VALIDATION',
+      );
+      const admin = { eventId: ev.eventId, adminSecret: ev.adminSecret };
+      await cmd.startEvent(deps, admin);
+      const g = await guest(deps, ev.eventId);
+      const h = await guest(deps, ev.eventId);
+      await expectCode(
+        cmd.submitRequest(deps, { ...g, style: 'bachata', track: track(1) }),
+        'VALIDATION',
+      ); // allowed in no part of the evening
+      const early = await cmd.submitRequest(deps, { ...g, style: 'chacha', track: track(2) });
+      const salsa = await cmd.submitRequest(deps, { ...h, style: 'salsa', track: track(3) });
+      const s = await snap(deps, ev.eventId);
+      // The cha-cha song came first but is only allowed after the break; salsa is reserved now.
+      expect(s.state(salsa.request.id)).toBe('RESERVED_NEXT');
+      const brk = s.event.breaks[0]!;
+      expect(s.state(early.request.id)).toBe('QUEUED');
+      const at = s.event.preview.items.find((i) => i.requestId === early.request.id)!;
+      expect(at.predictedStartMs!).toBeGreaterThanOrEqual(brk.startsAt! + 600_000); // after the break
     });
 
     it('stops reserving songs that would run into a break, and resumes after it', async () => {
-      // 2 h event, 10 min break centred on the midpoint: music until 0:55, break 0:55-1:05.
+      // 2 h event, a 10-minute break tapped at the midpoint: music until 1:00, break 1:00-1:10.
       const { deps, ev, admin, submit, player } = await setup({
         plannedDurationMin: 120,
-        breaks: [{ label: 'Break', durationSec: 600 }],
+        breaks: [{ startMin: 60, durationSec: 600 }],
       });
       const brk = (await snap(deps, ev.eventId)).event.breaks[0]!;
-      expect(brk.startsAt).toBe(deps.clock.now() + 55 * 60_000);
-      deps.clock.advance(52 * 60_000);
-      await submit(await guest(deps, ev.eventId), 1, 'salsa', 240_000); // 4 min: ends 0:56 > 0:55
+      expect(brk.startsAt).toBe(deps.clock.now() + 60 * 60_000);
+      deps.clock.advance(57 * 60_000);
+      await submit(await guest(deps, ev.eventId), 1, 'salsa', 240_000); // 4 min: ends 1:01 > 1:00
       let s = await snap(deps, ev.eventId);
       expect(s.event.reservation).toBeNull();
       expect(s.event.waitingReason).toMatch(/break/i);
       expect(
         s.event.preview.items.some((i) => i.predictedStartMs! >= brk.startsAt! + 600_000),
       ).toBe(true);
-      deps.clock.advance(4 * 60_000); // 0:56
+      deps.clock.advance(4 * 60_000); // 1:01
       await cmd.startBreak(deps, { ...admin, breakId: brk.id });
       deps.clock.advance(10 * 60_000);
       await cmd.endBreak(deps, { ...admin, breakId: brk.id });

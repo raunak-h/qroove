@@ -9,28 +9,54 @@ const Nickname = z.string().trim().min(1).max(30);
 const Ms = z.number().int().nonnegative();
 
 // POST /api/events
-export const CreateEventBody = z.object({
-  name: z.string().trim().min(1).max(80),
-  timezone: z.string().min(1).max(64),
-  enabledStyles: z.array(StyleId).min(1).optional(),
-  /** "Most songs in a row", the same for every genre unless `ratio` is given. */
+export const SegmentInput = z.object({
+  enabledStyles: z.array(StyleId).min(1),
   masterRunCap: z.number().int().min(1).max(5).optional(),
   /** Optional per-genre ratio parts (1–5); keys are genre ids. */
   ratio: z.partialRecord(StyleId, z.number().int().min(1).max(5)).optional(),
-  submissionLimit: z.number().int().min(1).max(20).optional(),
-  /** Planned time like an oven timer: multiples of 10 min, 10 min to 8 h. The clock starts with the event. */
-  plannedDurationMin: z.number().int().min(10).max(480).multipleOf(10).optional(),
-  breaks: z
-    .array(BreakSpec.pick({ label: true, durationSec: true }))
-    .max(3)
-    .optional(),
-  /** Pre-queue songs from a public Spotify, YouTube (Music) or Apple Music playlist. */
-  playlist: z.object({ url: z.string().url().max(500), style: StyleId }).optional(),
 });
+export type SegmentInput = z.infer<typeof SegmentInput>;
+
+export const CreateEventBody = z
+  .object({
+    // No `name`: event names are generated on the server from a neutral word list.
+    timezone: z.string().min(1).max(64),
+    /** Defaults applied to every segment that does not say otherwise. */
+    enabledStyles: z.array(StyleId).min(1).optional(),
+    masterRunCap: z.number().int().min(1).max(5).optional(),
+    ratio: z.partialRecord(StyleId, z.number().int().min(1).max(5)).optional(),
+    /** One entry per stretch between breaks (breaks + 1). */
+    segments: z.array(SegmentInput).min(1).max(4).optional(),
+    submissionLimit: z.number().int().min(1).max(20).optional(),
+    /** Planned time in quarter hours, 15 min to 8 h. The clock starts with the event. */
+    plannedDurationMin: z.number().int().min(15).max(480).multipleOf(15).optional(),
+    breaks: z
+      .array(
+        z.object({
+          label: BreakSpec.shape.label.optional(),
+          startMin: BreakSpec.shape.startMin,
+          durationSec: BreakSpec.shape.durationSec,
+        }),
+      )
+      .max(3)
+      .optional(),
+    /**
+     * Pre-queue songs from public Spotify, YouTube (Music) or Apple Music playlists: one per
+     * style, and every active genre needs at least one (see `playlistCoverageProblem`).
+     */
+    playlists: z
+      .array(z.object({ url: z.string().url().max(500), style: StyleId }))
+      .max(7)
+      .optional(),
+  })
+  // Unknown fields (a client-supplied `name`, say) are an error, not silently dropped.
+  .strict();
 export type CreateEventBody = z.infer<typeof CreateEventBody>;
 export const CreateEventResponse = z.object({
   eventId: Id,
   slug: z.string(),
+  /** Generated on the server; clients cannot choose it. */
+  name: z.string(),
   joinUrl: z.string(),
   /** Shown once; the client keeps it in the URL fragment only. */
   adminUrl: z.string(),

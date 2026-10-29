@@ -5,6 +5,26 @@ versioning: [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-29
+
+### Added
+- Wheel pickers (drums with fade-away rows) for planned time (quarter hours, default 2:00), most songs in a row, songs per person and ratio parts; the ratio defaults to an equal split.
+- Visual timeline: the evening as one bar of fixed width; tap to add a break (10-minute grid), drag handles to move or resize, limits enforced while dragging.
+- Rules per part of the evening: each part between breaks has its own styles and ratio; new parts copy the part they split.
+- Colour-coded genres with a thin white outline (red salsa, black bachata, orange cha-cha, grey Other, stripes for non-Latin); swatches replace most style text.
+- "Other (Musicality Exercise)" style; style grid with Latin styles on the left and non-Latin counterparts across.
+- Generated event names (three neutral words); no name is repeated until all permutations are used, and consecutive names share no word.
+- Playlists per style: one per style, every active genre needs one (a Latin style's playlist covers its non-Latin counterpart and vice versa); songs interleaved and cut to the planned time minus one minute.
+
+### Changed
+- Event names can no longer be typed; the create request rejects a `name`.
+- Planned time moves in quarter hours (was ten-minute steps); breaks are placed by tapping the bar (was evenly spread automatically).
+- Default styles are salsa and bachata with their non-Latin versions; cha-cha is an extra.
+- Rules snapshot is version 3.
+
+### Removed
+- Break-adding buttons, number inputs and the event name field on the create screen.
+
 ## [0.2.0] - 2026-10-29
 
 Changes from the first pilot feedback.

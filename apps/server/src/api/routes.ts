@@ -18,14 +18,16 @@ import {
   SubmitRequestBody,
   UpdateDraftBody,
   VersionedBody,
+  playlistCoverageProblem,
   type ExportSnapshot,
 } from '@qroove/contracts';
+import { DEFAULT_ENABLED_STYLES, STYLE_PRESETS } from '@qroove/config';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import * as cmd from '../domain/commands/index.js';
 import { SESSION_HEADROOM_MS } from '../domain/commands/import.js';
 import { MAX_SEEDS, type SeedSong } from '../domain/draft.js';
-import { capPlaytime } from '../ingestion/playlist.js';
+import { capPlaytime, interleave } from '../ingestion/playlist.js';
 import { verifyAdmin, verifyParticipant } from '../domain/queries.js';
 import { HOUR, MINUTE } from '../security/rateLimit.js';
 import {
@@ -141,6 +143,7 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
   const created = (r: {
     eventId: string;
     slug: string;
+    name: string;
     adminSecret: string;
     recoverySecret: string;
     rules: unknown;
@@ -148,6 +151,7 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
   }) => ({
     eventId: r.eventId,
     slug: r.slug,
+    name: r.name,
     // The key rides in the fragment (never logged); only the QR code should carry this URL.
     joinUrl: `${base}/e/${r.slug}#j=${r.joinKey}`,
     // The secret lives in the fragment, which browsers never send to a server.
@@ -158,23 +162,37 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
 
   app.post('/api/events', async (req, reply) => {
     limit(`create:${req.ip}`, 5, HOUR);
-    const { playlist, ...body } = parse(CreateEventBody, req.body);
+    const { playlists, ...body } = parse(CreateEventBody, req.body);
     let seeds: SeedSong[] = [];
-    if (playlist) {
+    if (playlists?.length) {
       if (!body.plannedDurationMin) {
         throw new DomainError('VALIDATION', 'Set a planned time before importing a playlist.');
       }
-      limit(`playlist:${req.ip}`, 10, HOUR);
-      const pl = await ingestion.resolvePlaylist(playlist.url);
+      const everywhere = new Set(
+        (
+          body.segments ?? [{ enabledStyles: body.enabledStyles ?? DEFAULT_ENABLED_STYLES }]
+        ).flatMap((s) => s.enabledStyles),
+      );
+      const problem = playlistCoverageProblem(
+        STYLE_PRESETS.filter((p) => everywhere.has(p.id)).map((p) => p.id),
+        playlists.map((p) => p.style),
+      );
+      if (problem) throw new DomainError('VALIDATION', problem);
+      limit(`playlist:${req.ip}`, 30, HOUR);
+      const fetched = await Promise.all(
+        playlists.map(async (p) =>
+          (await ingestion.resolvePlaylist(p.url)).tracks.map((t) => ({ ...t, style: p.style })),
+        ),
+      );
       seeds = capPlaytime(
-        pl.tracks.map((t) => ({ ...t, style: playlist.style })),
+        interleave(fetched),
         body.plannedDurationMin * 60_000 - SESSION_HEADROOM_MS,
         MAX_SEEDS,
       );
       if (seeds.length === 0) {
         throw new DomainError(
           'VALIDATION',
-          'None of the playlist’s songs fit in the planned time.',
+          'None of the playlists’ songs fit in the planned time.',
         );
       }
     }
@@ -190,7 +208,7 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
         timezone: z.string().min(1).max(64),
         shuffle: z.boolean().optional(),
         name: z.string().trim().min(1).max(80).optional(),
-        plannedDurationMin: z.number().int().min(10).max(480).multipleOf(10),
+        plannedDurationMin: z.number().int().min(15).max(480).multipleOf(15),
       }),
       req.body,
     );
@@ -200,7 +218,6 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
       plannedDurationMin: body.plannedDurationMin,
       ...(body.selectedIndexes ? { selectedIndexes: body.selectedIndexes } : {}),
       ...(body.shuffle !== undefined ? { shuffle: body.shuffle } : {}),
-      ...(body.name ? { name: body.name } : {}),
     });
     reply.header('cache-control', 'no-store');
     return reply.code(201).send({ ...created(r), seeded: r.seeded });

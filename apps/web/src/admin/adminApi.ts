@@ -4,6 +4,7 @@ import { request } from '../shared/api';
 export interface Created {
   eventId: string;
   slug: string;
+  name: string;
   /** Carries the QR secret: never display it as text. */
   joinUrl: string;
   seeded?: number;

@@ -149,3 +149,53 @@ describe('single-genre invariants', () => {
     );
   });
 });
+
+describe('segment invariants', () => {
+  it('never plays a style outside its segment, and never overlaps a break', () => {
+    const min = 60_000;
+    fc.assert(
+      fc.property(scenario, fc.integer({ min: 20, max: 90 }), (sc, cut) => {
+        const styles = STYLES.slice(0, sc.styleCount);
+        const first: SchedulerRules = { enabledStyles: [styles[0]!], runCaps: { [styles[0]!]: 3 } };
+        const second: SchedulerRules = {
+          enabledStyles: styles,
+          runCaps: Object.fromEntries(styles.map((s) => [s, 3])),
+        };
+        const brk = { startMs: cut * min, endMs: (cut + 10) * min };
+        const cands: Candidate[] = sc.reqs.map((r, i) => ({
+          requestId: `r${String(i).padStart(3, '0')}`,
+          ownerId: `o${r.o % sc.owners}`,
+          style: styles[r.s % styles.length]!,
+          acceptedSeq: i,
+          canonicalKey: `k${r.key}`,
+          durationMs: r.dur,
+          playable: true,
+        }));
+        const p = projectQueue({
+          candidates: cands,
+          history: EMPTY_HISTORY,
+          rules: first,
+          ruleWindows: [
+            { fromMs: 0, rules: first },
+            { fromMs: brk.endMs, rules: second },
+          ],
+          nowMs: 0,
+          endAtMs: 240 * min,
+          currentRemainingMs: null,
+          breaks: [brk],
+          overheadSec: 5,
+          horizon: 100,
+        });
+        const byId = new Map(cands.map((c) => [c.requestId, c]));
+        for (const it of p.items.filter((i) => !i.overflow)) {
+          const c = byId.get(it.requestId)!;
+          const start = it.predictedStartMs!;
+          const end = start + (c.durationMs ?? DEFAULT_DURATION_MS);
+          expect(end <= brk.startMs || start >= brk.endMs).toBe(true);
+          if (start < brk.startMs) expect(c.style).toBe(styles[0]);
+        }
+      }),
+      { numRuns: Number(process.env.PROPERTY_RUNS ?? 2000) },
+    );
+  });
+});

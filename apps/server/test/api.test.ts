@@ -121,7 +121,7 @@ describe('events and admin session', () => {
   it('refuses a wrong admin secret at session exchange and sets hardened cookies', async () => {
     const { app } = await setup();
     const api = new Client(app);
-    const c = await api.call('POST', '/api/events', { body: { name: 'X', timezone: 'UTC' } });
+    const c = await api.call('POST', '/api/events', { body: { timezone: 'UTC' } });
     const bad = await api.call('POST', `/api/events/${c.json.eventId}/admin/session`, {
       body: { secret: 'x'.repeat(40) },
     });
@@ -149,7 +149,7 @@ describe('events and admin session', () => {
     apps.push(t.app);
     const c = await t.api.call('POST', '/api/events', {
       headers: { origin: 'https://q.example' },
-      body: { name: 'X', timezone: 'UTC' },
+      body: { timezone: 'UTC' },
     });
     const res = await t.app.inject({
       method: 'POST',
@@ -411,12 +411,10 @@ describe('link intake', () => {
     const ip = '10.9.9.9';
     for (let i = 0; i < 5; i++)
       expect(
-        (await c.api.call('POST', '/api/events', { ip, body: { name: 'X', timezone: 'UTC' } }))
-          .status,
+        (await c.api.call('POST', '/api/events', { ip, body: { timezone: 'UTC' } })).status,
       ).toBe(201);
     expect(
-      (await c.api.call('POST', '/api/events', { ip, body: { name: 'X', timezone: 'UTC' } }))
-        .status,
+      (await c.api.call('POST', '/api/events', { ip, body: { timezone: 'UTC' } })).status,
     ).toBe(429);
   });
 });
@@ -538,7 +536,7 @@ describe('misc routes', () => {
   it('updates a draft, then freezes rules', async () => {
     const t = await testApp();
     apps.push(t.app);
-    const c = await t.api.call('POST', '/api/events', { body: { name: 'D', timezone: 'UTC' } });
+    const c = await t.api.call('POST', '/api/events', { body: { timezone: 'UTC' } });
     const id = c.json.eventId;
     await t.api.call('POST', `/api/events/${id}/admin/session`, {
       body: { secret: new URL(c.json.adminUrl).hash.slice(3) },

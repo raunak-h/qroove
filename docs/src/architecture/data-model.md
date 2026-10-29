@@ -70,3 +70,9 @@ checks changes when a song starts.
 - **Frozen rules**: only `updateDraft` can change rules, and only in `DRAFT`.
 - **Stale controllers**: an admin secret is revoked server-side at handover; a player must present the current
   `leaseToken` and `epoch`.
+
+## Event-name ledger
+
+`meta/eventNames` holds `{ used: number[], last: string[] | null, cycle: number }`: the ordered word triples handed
+out this cycle (indices into the word list), the words of the previous name, and how many cycles have completed. It is
+read and written in one transaction ([ADR 0013](/adr/0013-generated-event-names)). It is not deleted by the retention purge.

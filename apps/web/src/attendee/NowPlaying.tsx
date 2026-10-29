@@ -1,7 +1,5 @@
 import type { EventPublicView } from '@qroove/contracts';
-import { STYLE_PRESETS } from '@qroove/config';
-
-export const styleLabel = (id: string) => STYLE_PRESETS.find((s) => s.id === id)?.label ?? id;
+import { GenreSwatch } from '../shared/Genre';
 
 export function NowPlaying({ view }: { view: EventPublicView }) {
   const np = view.nowPlaying;
@@ -12,7 +10,8 @@ export function NowPlaying({ view }: { view: EventPublicView }) {
         <>
           <p className="big">{np.track.title}</p>
           <p className="muted">
-            {[np.track.artist, styleLabel(np.track.style)].filter(Boolean).join(' · ')}
+            {np.track.artist ? `${np.track.artist} ` : ''}
+            <GenreSwatch style={np.track.style} />
           </p>
         </>
       ) : (
@@ -24,7 +23,7 @@ export function NowPlaying({ view }: { view: EventPublicView }) {
       )}
       {view.runIndicator && view.state === 'ACTIVE' ? (
         <p className="muted small">
-          {styleLabel(view.runIndicator.style)} run: {view.runIndicator.runLength} of{' '}
+          <GenreSwatch style={view.runIndicator.style} size={14} /> {view.runIndicator.runLength}/
           {view.runIndicator.cap}
         </p>
       ) : null}

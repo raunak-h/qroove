@@ -23,6 +23,9 @@ export function checkEligibility(
 ): Eligibility {
   if (!c.playable) return { ok: false, reason: 'NOT_PLAYABLE' };
   if (!rules.enabledStyles.includes(c.style)) return { ok: false, reason: 'STYLE_DISABLED' };
+  if (rules.allowedVariants && c.variant && !rules.allowedVariants.includes(c.variant)) {
+    return { ok: false, reason: 'STYLE_DISABLED' };
+  }
   if (history.playedKeys.has(c.canonicalKey)) return { ok: false, reason: 'ALREADY_PLAYED' };
   if (history.lastOwnerId !== null && c.ownerId === history.lastOwnerId) {
     return { ok: false, reason: 'SAME_OWNER_ADJACENT' };

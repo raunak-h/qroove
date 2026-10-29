@@ -11,9 +11,13 @@ export const RULE_DEFAULTS = {
 
 /** Planned time and break limits (SPEC changes from pilot feedback). */
 export const EVENT_LIMITS = {
-  minDurationMin: 10,
+  minDurationMin: 15,
   maxDurationMin: 480,
-  durationStepMin: 10,
+  /** The time drum moves in quarter hours. */
+  durationStepMin: 15,
+  defaultDurationMin: 120,
+  /** Breaks snap to this grid on the timeline. */
+  breakStartStepMin: 10,
   maxBreaks: 3,
   breakStepMin: 10,
   maxBreakMin: 30,

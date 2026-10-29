@@ -1,4 +1,4 @@
-import { DomainError, RulesSnapshot, type ExportSnapshot } from '@qroove/contracts';
+import { DomainError, RulesSnapshot, allowedStyles, type ExportSnapshot } from '@qroove/contracts';
 import { capPlaytime } from '../../ingestion/playlist.js';
 import type { Deps } from '../context.js';
 import { MAX_SEEDS, SYSTEM_SEED_ID, type SeedSong } from '../draft.js';
@@ -16,7 +16,6 @@ export interface ImportInput {
   /** Shuffle independently within each style; the seed is stored on the event. */
   shuffle?: boolean;
   seed?: number;
-  name?: string;
   timezone: string;
   /** Planned time of the new session; queued songs fit in this minus one minute. */
   plannedDurationMin: number;
@@ -44,13 +43,12 @@ export async function importSnapshot(
   if (!parsedRules.success)
     throw new DomainError('VALIDATION', parsedRules.error.issues[0]?.message);
   const r = parsedRules.data;
+  const allowed = allowedStyles(r);
 
   const picked = (input.selectedIndexes ?? input.snapshot.recommendations.map((_, i) => i))
     .filter((i, n, all) => all.indexOf(i) === n)
     .map((i) => input.snapshot.recommendations[i])
-    .filter(
-      (s): s is NonNullable<typeof s> => s !== undefined && r.enabledStyles.includes(s.style),
-    );
+    .filter((s): s is NonNullable<typeof s> => s !== undefined && allowed.includes(s.style));
   let songs: SeedSong[] = picked.map((s) => ({ ...s }));
 
   const seed = input.seed ?? deps.ids.seed();
@@ -67,11 +65,10 @@ export async function importSnapshot(
   return createEvent(
     deps,
     {
-      name: input.name ?? input.snapshot.name,
       timezone: input.timezone,
-      enabledStyles: r.enabledStyles,
-      masterRunCap: r.masterRunCap,
-      ratio: r.runCaps,
+      // A new event is one open stretch: use the styles that were allowed anywhere, equal split.
+      enabledStyles: allowed,
+      masterRunCap: r.segments[0]!.masterRunCap,
       submissionLimit: r.submissionLimit,
       plannedDurationMin: input.plannedDurationMin,
     },

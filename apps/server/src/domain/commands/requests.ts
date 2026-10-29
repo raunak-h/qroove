@@ -1,4 +1,4 @@
-import { DomainError, type Provider, type StyleId } from '@qroove/contracts';
+import { DomainError, allowedStyles, type Provider, type StyleId } from '@qroove/contracts';
 import { countsTowardQuota } from '@qroove/scheduler';
 import type { ParticipantDoc, RecordingKeyDoc, RequestDoc } from '../../db/types.js';
 import {
@@ -83,7 +83,7 @@ export function submitRequest(deps: Deps, input: SubmitInput) {
     const e = c.event;
     if (e.state === 'ENDED' || e.state === 'ARCHIVED') throw new DomainError('EVENT_ENDED');
     if (!OPEN_FOR_SUBMIT.has(e.state)) throw new DomainError('EVENT_NOT_ACTIVE');
-    if (!e.rules.enabledStyles.includes(input.style)) {
+    if (!allowedStyles(e.rules).includes(input.style)) {
       throw new DomainError('VALIDATION', 'That style is not part of this event.');
     }
     const t = input.track;

@@ -14,10 +14,10 @@ const baseView = {
   serverNow: Date.now(),
   version: 1,
   rules: {
-    rulesVersion: 2,
-    enabledStyles: ['salsa', 'bachata'],
-    masterRunCap: 2,
-    runCaps: { salsa: 2, bachata: 2 },
+    rulesVersion: 3,
+    segments: [
+      { enabledStyles: ['salsa', 'bachata'], masterRunCap: 2, runCaps: { salsa: 2, bachata: 2 } },
+    ],
     submissionLimit: 5,
   },
   nowPlaying: null,
@@ -229,7 +229,7 @@ describe('EventPage', () => {
     await user.type(input, 'Mi Bachata');
     expect(screen.getByRole('button', { name: 'Add to queue' })).toBeDisabled(); // no style yet
     await user.type(screen.getByLabelText(/Artist/), 'Band');
-    await user.click(screen.getByLabelText('Bachata'));
+    await user.click(screen.getByRole('radio', { name: 'Bachata' }));
     await user.click(screen.getByRole('button', { name: 'Add to queue' }));
     expect(await screen.findByText(/Added “Mi Bachata”/)).toBeInTheDocument();
     const post = calls.find((c) => c.url.endsWith('/requests') && c.init.method === 'POST')!;
@@ -274,7 +274,7 @@ describe('EventPage', () => {
     const user = userEvent.setup();
     renderPage();
     await user.type(await screen.findByLabelText(/Paste a Spotify/), 'X');
-    await user.click(screen.getByLabelText('Salsa'));
+    await user.click(screen.getByRole('radio', { name: 'Salsa' }));
     await user.click(screen.getByRole('button', { name: 'Add to queue' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'Already queued as “X”. Pick a different song or version.',
