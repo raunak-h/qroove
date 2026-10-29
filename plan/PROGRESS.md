@@ -29,6 +29,6 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - firebase login, railway login (Phase 0)
 - Service-account key → `.secrets/firebase-sa.json` and Railway var (Phase 0)
 - Spotify developer app credentials (Phase 0, non-blocking)
-- Cloudflare DNS records (Phase 9)
+- Cloudflare MCP authentication via `/mcp` (needed by Phase 9 for DNS records)
 
 ## Notes per phase

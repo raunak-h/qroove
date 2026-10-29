@@ -53,7 +53,7 @@
 | Testing | Vitest (unit/property with `fast-check`, integration against memory repo AND Firestore emulator), Playwright (e2e, mobile Chromium + WebKit). |
 | CI | GitHub Actions: lint, typecheck, unit, property, integration (emulator), build, e2e (Chromium only in CI). |
 | Lint/format | ESLint 9 flat config + typescript-eslint, Prettier 3. |
-| MCP servers | Already configured in `.mcp.json` (project scope): `railway` (`@railway/mcp-server@0.1.12`) and `firebase` (`firebase-tools@15.34.2 mcp`). CLIs installed globally: `railway`, `firebase`. Prefer MCP tools; fall back to CLI. |
+| MCP servers | Already configured in `.mcp.json` (project scope): `railway` (`@railway/mcp-server@0.1.12`) `firebase` (`firebase-tools@15.34.2 mcp`) and `cloudflare` (remote `https://mcp.cloudflare.com/mcp`, OAuth via `/mcp`; covers DNS for zone `sataklela.com`). CLIs installed globally: `railway`, `firebase`. Prefer MCP tools; fall back to CLI. |
 
 Pin exact dependency versions that exist at execution time (`pnpm add -E`). Before adding any package,
 check it was published >14 days ago (`npm view <pkg> time --json`); pick the newest version that satisfies that.
@@ -550,7 +550,7 @@ export per event via API as the free alternative), update architecture overview.
    Set `REPO_DRIVER=firestore`.
 3. Verify `https://<railway-domain>/api/health`, `/`, `/docs/`, `/docs/changelog`.
 4. Custom domain: `railway domain qroove.sataklela.com` (or MCP) → returns CNAME target + TXT verification.
-   Cloudflare (user does this unless a Cloudflare token is supplied): DNS → add `CNAME qroove → <target>`,
+   Cloudflare (use the `cloudflare` MCP; if not authenticated ask the user to run `/mcp` → cloudflare → authenticate; fallback: user does it in the dashboard): DNS → add `CNAME qroove → <target>`,
    **Proxy status: DNS only (grey cloud)** until Railway issues the certificate, plus the `_railway-verify`
    TXT record if shown. After cert is active, optionally enable proxy (orange) with SSL mode **Full
    (strict)**; SSE requires no buffering — Cloudflare proxies SSE fine but set `Cache-Control: no-cache`
