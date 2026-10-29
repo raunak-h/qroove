@@ -43,10 +43,11 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - Cloudflare MCP authenticated (Phase 9 DNS).
 
 ### Phase 1 (2026-10-29)
+
 - Monorepo scaffolded: pnpm 10.34.9 (via corepack), TS 5.9 strict, ESLint 9, Prettier, Vitest 4. Local default pnpm was v12; `packageManager` pins 10.
 - Server bundled with tsup (`noExternal: @qroove/*`) because workspace packages are source-only `.ts`. Docker image builds and serves `/api/health`, `/docs/`, `/` (verified).
 - Versions chosen as newest >14 days old: `@vitejs/plugin-react` 5.2.0 (6.x needs Vite 8; plan says Vite 7); TypeScript 5.9.3 (7.x skipped, new native port).
 - VitePress config imports `packages/config/src/brand` by relative path (VitePress config loader can't resolve the workspace `.ts` package). Docs theme adds the shared footer via `layout-bottom`.
 - CSP: `/docs` gets `script-src 'self' 'unsafe-inline'` (VitePress inline bootstrap scripts); everything else stays `'self'`. Covered by a test.
 - Mermaid is a plain fenced block for now (no plugin); revisit if diagrams need rendering.
-- PWA icons are SVG-only (`purpose: any`/`maskable`); PNG 192/512 not generated.
+- Brand art added post-phase: `brand/` holds logo + avatar; `pnpm icons` generates PNG icons, maskable, Apple touch, OG images (replaces the placeholder SVG icons).

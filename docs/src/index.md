@@ -2,6 +2,9 @@
 layout: home
 hero:
   name: Qroove
+  image:
+    src: /logo.png
+    alt: Qroove mascot
   text: Fair, collaborative music queues for dance socials.
   tagline: A CSR initiative of Sataklela OÜ. Open source under AGPL-3.0.
   actions:

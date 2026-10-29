@@ -1,3 +1,5 @@
+<p align="center"><img src="brand/qroove-avatar.jpg" alt="Qroove mascot" width="160"></p>
+
 # Qroove
 
 Fair, collaborative music queues for dance socials.

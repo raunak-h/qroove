@@ -13,5 +13,7 @@ versioning: [SemVer](https://semver.org/).
 - VitePress docs site served at `/docs`, with initial architecture pages and ADRs.
 - Dockerfile, `railway.json` and GitHub Actions CI.
 
+- Brand assets in `brand/` (avatar + transparent logo) and `pnpm icons` to generate favicons, PWA/maskable/Apple icons and Open Graph preview images.
+
 ### Changed
 - Licence switched from MIT to AGPL-3.0-only.

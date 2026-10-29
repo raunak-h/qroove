@@ -81,3 +81,12 @@ button {
     transition: none !important;
   }
 }
+
+.logo {
+  image-rendering: pixelated;
+  display: block;
+}
+/* The logo has dark outlines; give it a light halo on the dark theme so it stays legible. */
+:root:not([data-theme='light']) .logo {
+  filter: drop-shadow(0 0 2px #fff4dc) drop-shadow(0 0 6px rgb(255 244 220 / 0.35));
+}

@@ -7,6 +7,7 @@ export const BRAND = {
   copyleftYear: 2026,
   // Single place to change on org transfer.
   repoUrl: 'https://github.com/raunak-h/qroove',
+  siteUrl: 'https://qroove.sataklela.com',
   docsPath: '/docs',
   pilotCommunity: 'LSU Salsa Society (pilot community; not an endorsement)',
 } as const;

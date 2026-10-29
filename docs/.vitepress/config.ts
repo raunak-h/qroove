@@ -7,8 +7,17 @@ export default defineConfig({
   title: `${BRAND.product} Docs`,
   description: BRAND.tagline,
   cleanUrls: true,
+  head: [
+    ['link', { rel: 'icon', type: 'image/png', href: `${BRAND.docsPath}/favicon.png` }],
+    ['meta', { property: 'og:type', content: 'website' }],
+    ['meta', { property: 'og:title', content: `${BRAND.product} Docs` }],
+    ['meta', { property: 'og:description', content: BRAND.tagline }],
+    ['meta', { property: 'og:image', content: `${BRAND.siteUrl}${BRAND.docsPath}/og-image.png` }],
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+  ],
   lastUpdated: false,
   themeConfig: {
+    logo: '/logo.png',
     nav: [
       { text: 'Guide', link: '/guide/attendee' },
       { text: 'Architecture', link: '/architecture/overview' },
