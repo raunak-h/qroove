@@ -10,6 +10,11 @@
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run --passWithNoTests",
-    "build": "echo \"scheduler: source-only package\""
+    "build": "echo \"scheduler: source-only package\"",
+    "test:property": "PROPERTY_RUNS=100000 vitest run test/property.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "24.19.2",
+    "fast-check": "4.10.2"
   }
 }

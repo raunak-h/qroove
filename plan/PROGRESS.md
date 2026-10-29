@@ -2,14 +2,14 @@
 
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
-**Current phase:** 2
-**Next session starts with:** Phase 2 (contracts + scheduler). Phases 0–1 done.
+**Current phase:** 3
+**Next session starts with:** Phase 3 (persistence ports, adapters, domain commands). Phases 0–2 done.
 
 ## Phases
 
 - [x] 0 — Accounts, MCP & infra provisioning
 - [x] 1 — Monorepo scaffold, branding, docs skeleton, CI
-- [ ] 2 — Contracts + scheduler
+- [x] 2 — Contracts + scheduler
 - [ ] 3 — Persistence ports, adapters, domain commands
 - [ ] 4 — HTTP API, auth, realtime, metadata
 - [ ] 5 — Attendee UI
@@ -51,3 +51,12 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - CSP: `/docs` gets `script-src 'self' 'unsafe-inline'` (VitePress inline bootstrap scripts); everything else stays `'self'`. Covered by a test.
 - Mermaid is a plain fenced block for now (no plugin); revisit if diagrams need rendering.
 - Brand art added post-phase: `brand/` holds logo + avatar; `pnpm icons` generates PNG icons, maskable, Apple touch, OG images (replaces the placeholder SVG icons).
+
+### Phase 2 (2026-10-29)
+
+- `packages/scheduler` is dependency-free: `StyleId` is an opaque string there; contracts' `RulesSnapshot` has a partial `runCaps`, so Phase 3 must adapt it to `SchedulerRules` (fill missing caps / use `FALLBACK_RUN_CAP`).
+- Scheduler `HistoryState.playedKeys` is a `Set`; the Firestore `EventDoc` stores an array — convert at the adapter boundary.
+- Overflow is decided by an eligibility check (`WOULD_EXCEED_END`, `remainingMs`), so a shorter later song may still fit; overflow items are appended after playable ones with `predictedStartMs: null`.
+- `OVERFLOW` is included in quota-counting states (SPEC §3.3); the plan's list omitted it.
+- Property test: 2,000 runs in `pnpm test`; `pnpm --filter @qroove/scheduler test:property` = 100,000 runs (passes).
+- `z.partialRecord` is required for non-exhaustive enum-keyed records in zod 4.

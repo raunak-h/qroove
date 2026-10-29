@@ -62,6 +62,8 @@ export default defineConfig({
           { text: '0001 Firestore', link: '/adr/0001-firestore' },
           { text: '0002 Single service', link: '/adr/0002-single-service' },
           { text: '0003 AGPL', link: '/adr/0003-agpl' },
+          { text: '0004 No ageing bonus', link: '/adr/0004-no-ageing-bonus' },
+          { text: '0005 Quota counts played', link: '/adr/0005-quota-counts-played' },
         ],
       },
       {
