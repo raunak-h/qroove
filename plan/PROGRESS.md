@@ -2,8 +2,8 @@
 
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
-**Current phase:** 5
-**Next session starts with:** Phase 5 (Attendee UI). Phases 0–4 done.
+**Current phase:** 6
+**Next session starts with:** Phase 6 (Admin UI). Phases 0–5 done.
 
 ## Phases
 
@@ -12,7 +12,7 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - [x] 2 — Contracts + scheduler
 - [x] 3 — Persistence ports, adapters, domain commands
 - [x] 4 — HTTP API, auth, realtime, metadata
-- [ ] 5 — Attendee UI
+- [x] 5 — Attendee UI
 - [ ] 6 — Admin UI
 - [ ] 7 — Player
 - [ ] 8 — Hardening, e2e, a11y, perf
@@ -79,3 +79,11 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - Spotify oEmbed has no artist, so a Spotify link without API keys has no artist and its fingerprint only matches manual entries with an empty artist. With keys (ISRC, artist) matching is much better — set `SPOTIFY_CLIENT_SECRET` in Railway before the pilot.
 - Added routes beyond the plan list: `admin/draft` (PATCH), `admin/archive`, `admin/recover`, `admin/duplicate/:rid`, export/import.
 - Not done / for later: purge job and retention (Phase 8); `statusText` copy and `RATE_LIMITED` retry-after hints are plain; SSE client reconnect + polling fallback is Phase 5; Firestore read cost per change grows with request count (fine at pilot size).
+
+### Phase 5 (2026-10-29)
+
+- `apps/web/src/{attendee,shared,landing}`; web imports only **types** from `@qroove/contracts` (error copy comes from the API's own `error.message/action`, so zod is not bundled). `hashRules` moved to `@qroove/contracts/hash` (needs `node:crypto`).
+- Tests: 15 new (countdown/pluralisation/duration parsing, `nextSong` states, EventPage flows with a stubbed fetch). Screenshots in `docs/src/public/screens/` were taken with Playwright (chromium + system libs installed in the codespace; the scripts are not committed — Phase 8 adds the real e2e setup).
+- **Bundle size:** attendee route initial load is ~79 KB gzip JS (react-dom ≈ 45, react-router ≈ 20, app ≈ 15) + 1.8 KB CSS, so the 40 KB target is **not met**. Only the placeholder `/create` route is code-split so far; Phase 6/7 must lazy-load admin and player. Cheapest future saving: replace react-router with a ~1 KB router (≈ −20 KB). Re-measure with `ANALYZE=1 pnpm exec vite build`.
+- Decisions: joining is an explicit one-tap card (so a nickname can be set) instead of an automatic join; "songs until" counts the playing song plus songs ahead in the preview; `/create` is a placeholder until Phase 6; the queue never shows nicknames' owners beyond what the API sends — the UI ignores `ownerNickname` entirely.
+- Not done: QR code for the join link (admin screen, Phase 6); service-worker offline shell is whatever vite-plugin-pwa generates (no runtime caching of API).

@@ -12,3 +12,4 @@ test-results/
 playwright-report/
 .firebase/
 firebase-debug.log
+apps/web/stats.json

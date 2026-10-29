@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { hashRules } from '@qroove/contracts';
+import { hashRules } from '@qroove/contracts/hash';
 import type { Repository } from '../src/db/ports.js';
 import * as cmd from '../src/domain/commands/index.js';
 import { expectCode, guest, liveEvent, makeDeps, snap, track } from './helpers.js';

@@ -1,6 +1,6 @@
+import { hashRules } from '@qroove/contracts/hash';
 import {
   DomainError,
-  hashRules,
   type CreateEventBody,
   type RulesSnapshot,
 } from '@qroove/contracts';

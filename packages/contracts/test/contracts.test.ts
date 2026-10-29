@@ -1,3 +1,4 @@
+import { canonicalJson, hashRules } from '../src/hash.js';
 import { describe, expect, it } from 'vitest';
 import {
   DomainError,
@@ -6,8 +7,6 @@ import {
   RulesSnapshot,
   SubmitRequestBody,
   defaultRules,
-  hashRules,
-  canonicalJson,
 } from '../src/index.js';
 
 describe('rules', () => {

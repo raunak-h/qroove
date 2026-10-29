@@ -28,7 +28,11 @@ versioning: [SemVer](https://semver.org/).
 - Per-IP/per-participant rate limits and a 16 KB body limit.
 - Link intake: allowlisted `parseLink`, Spotify Web API (client credentials, cached token) with oEmbed fallback, iTunes lookup for Apple Music, YouTube oEmbed; SSRF-guarded fetch; ISRC → platform id → fingerprint duplicate keys; possible duplicates held for admin review; style suggestions from title cues only.
 - Server-Sent Events (`/stream`, `/admin/stream`) fed by one repository subscription per event.
+- Attendee UI: landing with join-by-code, event page (`/e/:slug`) with live connection indicator (SSE with 10 s polling fallback), now playing, "My next song" with a ticking server-clock countdown, add-song form (paste, link preview, manual fallback, style chips, idempotent submit), my songs with confirmed withdraw, up-next list with overflow labelling, privacy page and a dark/light toggle.
+- `ANALYZE=1 vite build` writes a bundle report (`rollup-plugin-visualizer`).
+- Docs: attendee guide with screenshots.
 - Docs: API reference, realtime, security, threat model and privacy pages.
 
 ### Changed
+- `hashRules`/`canonicalJson` moved to `@qroove/contracts/hash` so the contracts index is browser-safe.
 - Licence switched from MIT to AGPL-3.0-only.
