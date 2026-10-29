@@ -1,0 +1,20 @@
+{
+  "name": "@qroove/docs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "dev": "vitepress dev",
+    "build": "vitepress build",
+    "typecheck": "echo \"docs: nothing to typecheck\"",
+    "test": "echo \"docs: no tests\""
+  },
+  "dependencies": {
+    "@qroove/config": "workspace:*"
+  },
+  "devDependencies": {
+    "vitepress": "1.6.4",
+    "vue": "3.5.44"
+  }
+}

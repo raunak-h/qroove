@@ -1,0 +1,6 @@
+LICENSE
+pnpm-lock.yaml
+dist
+docs/.vitepress/cache
+docs/.vitepress/dist
+CHANGELOG.md

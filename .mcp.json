@@ -3,20 +3,13 @@
     "railway": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "@railway/mcp-server@0.1.12"
-      ],
+      "args": ["-y", "@railway/mcp-server@0.1.12"],
       "env": {}
     },
     "firebase": {
       "type": "stdio",
       "command": "npx",
-      "args": [
-        "-y",
-        "firebase-tools@15.34.2",
-        "mcp"
-      ],
+      "args": ["-y", "firebase-tools@15.34.2", "mcp"],
       "env": {}
     },
     "cloudflare": {

@@ -1,0 +1,15 @@
+:root {
+  --vp-c-brand-1: #f2a541;
+  --vp-c-brand-2: #f2a541;
+  --vp-c-brand-3: #d98f2e;
+}
+.qroove-footer {
+  padding: 1.5rem 1rem;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--vp-c-text-2);
+  border-top: 1px solid var(--vp-c-divider);
+}
+.qroove-footer p {
+  margin: 0.25rem 0;
+}

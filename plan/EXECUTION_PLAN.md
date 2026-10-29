@@ -2,7 +2,7 @@
 
 > **Audience:** Claude Sonnet 5 (medium effort) executing autonomously, one phase per context window.
 > **Product spec (source of truth for behaviour):** `plan/SPEC.md`. This file is the source of truth for
-> *how* to build it. Where they conflict, this file wins on technology (Firestore replaces SQLite);
+> _how_ to build it. Where they conflict, this file wins on technology (Firestore replaces SQLite);
 > SPEC wins on product rules (fairness, quota, states, UX).
 > **Progress tracker:** `plan/PROGRESS.md` — update it at the end of every phase.
 
@@ -28,32 +28,32 @@
 
 ## 1. Fixed decisions (do not revisit)
 
-| Topic | Decision |
-|---|---|
-| Product name | **Qroove**. Tagline: "Fair, collaborative music queues for dance socials." Never imply LSU endorsement; LSU Salsa Society is the *pilot community* only. |
-| Owner / brand | A **CSR initiative of Sataklela OÜ** (https://sataklela.com). Repo may be transferred from `raunak-h/qroove` to a company org later → no personal names/paths hardcoded; all brand strings in one config module. |
-| Licence | **AGPL-3.0-only** (copyleft, correct for network services). `LICENSE` file at root; SPDX headers not required per file. |
-| Footer (app AND docs, every page) | `Copyleft 🄯 2026 Sataklela OÜ · A CSR initiative · AGPL-3.0` where "Sataklela OÜ" links to `https://sataklela.com` (`rel="noopener"`, opens same tab). Plus link to `/docs` and source repo URL (from config). |
-| Language | TypeScript strict everywhere. Node 24 (`.nvmrc` = `24`). ESM only. |
-| Package manager | **pnpm 10** workspaces (`corepack enable`). |
-| Front end | React 19 + Vite 7 + `vite-plugin-pwa`. No UI framework; hand-written CSS with custom properties. React Router 7 (library mode). |
-| Back end | **Fastify 5** single service; serves `/api/*`, the built SPA, and the built docs at `/docs`. |
-| Database | **Google Cloud Firestore (Native mode)** via `firebase-admin` (server-side only; browsers never talk to Firestore directly). Firestore security rules = deny all client access. |
-| DB portability | All persistence behind a `Repository` port (`apps/server/src/db/ports.ts`). Two adapters: `firestore/` (prod) and `memory/` (tests + local dev without credentials). Domain code never imports `firebase-admin`. |
-| Realtime | Server-Sent Events from Fastify. Fan-out via an in-process `EventBus` port; Firestore adapter additionally subscribes with `onSnapshot` on the event doc so multiple instances stay correct (future-proof; prod runs 1 instance). Polling fallback `GET /public` every 10 s when SSE fails. |
-| Scheduler | Pure TS package `packages/scheduler`, zero dependencies, deterministic. |
-| Contracts | `packages/contracts`: zod 4 schemas + inferred types shared by web & server. |
-| Brand/config | `packages/config`: `brand.ts` (name, company, URLs, footer text), `styles.ts` (dance style presets), `defaults.ts` (rule defaults). Web and docs import from here. |
-| Metadata | Adapters behind `MetadataProvider` port: Spotify Web API (client-credentials; enabled only if `SPOTIFY_CLIENT_ID/SECRET` set; `env.ts` also accepts legacy `SPOTIFY_DEV_CLIENT_ID`), Spotify/YouTube oEmbed (keyless), iTunes Lookup API for Apple Music (keyless), manual entry. Allowlisted hosts only (SSRF). |
-| Playback | Local-file player on the designated device (`<input type=file multiple accept="audio/*">`, optional IndexedDB cache) + Manual mode (Mark started / Mark ended). No streaming/ripping, ever (SPEC §0 hard boundaries). |
-| Docs | **VitePress 1.x** in `docs/`, `base: '/docs/'`, built to `docs/.vitepress/dist`, served by Fastify at `/docs`. Public. Includes architecture, ADRs, API reference, runbook, privacy, threat model, and `CHANGELOG` page. |
-| Changelog | Root `CHANGELOG.md` (Keep a Changelog format, SemVer). Docs page `docs/src/changelog.md` includes it via `<!--@include: ../../CHANGELOG.md-->`. Every phase adds entries under `## [Unreleased]`; Phase 10 cuts `0.1.0`. |
-| Hosting | Railway: one service, one instance, Dockerfile build, `main` auto-deploy. Healthcheck `/api/health`. |
-| Domain | `qroove.sataklela.com` via **Cloudflare** DNS → CNAME to Railway target. |
-| Testing | Vitest (unit/property with `fast-check`, integration against memory repo AND Firestore emulator), Playwright (e2e, mobile Chromium + WebKit). |
-| CI | GitHub Actions: lint, typecheck, unit, property, integration (emulator), build, e2e (Chromium only in CI). |
-| Lint/format | ESLint 9 flat config + typescript-eslint, Prettier 3. |
-| MCP servers | Already configured in `.mcp.json` (project scope): `railway` (`@railway/mcp-server@0.1.12`) `firebase` (`firebase-tools@15.34.2 mcp`) and `cloudflare` (remote `https://mcp.cloudflare.com/mcp`, OAuth via `/mcp`; covers DNS for zone `sataklela.com`). CLIs installed globally: `railway`, `firebase`. Prefer MCP tools; fall back to CLI. |
+| Topic                             | Decision                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product name                      | **Qroove**. Tagline: "Fair, collaborative music queues for dance socials." Never imply LSU endorsement; LSU Salsa Society is the _pilot community_ only.                                                                                                                                                                                     |
+| Owner / brand                     | A **CSR initiative of Sataklela OÜ** (https://sataklela.com). Repo may be transferred from `raunak-h/qroove` to a company org later → no personal names/paths hardcoded; all brand strings in one config module.                                                                                                                             |
+| Licence                           | **AGPL-3.0-only** (copyleft, correct for network services). `LICENSE` file at root; SPDX headers not required per file.                                                                                                                                                                                                                      |
+| Footer (app AND docs, every page) | `Copyleft 🄯 2026 Sataklela OÜ · A CSR initiative · AGPL-3.0` where "Sataklela OÜ" links to `https://sataklela.com` (`rel="noopener"`, opens same tab). Plus link to `/docs` and source repo URL (from config).                                                                                                                               |
+| Language                          | TypeScript strict everywhere. Node 24 (`.nvmrc` = `24`). ESM only.                                                                                                                                                                                                                                                                           |
+| Package manager                   | **pnpm 10** workspaces (`corepack enable`).                                                                                                                                                                                                                                                                                                  |
+| Front end                         | React 19 + Vite 7 + `vite-plugin-pwa`. No UI framework; hand-written CSS with custom properties. React Router 7 (library mode).                                                                                                                                                                                                              |
+| Back end                          | **Fastify 5** single service; serves `/api/*`, the built SPA, and the built docs at `/docs`.                                                                                                                                                                                                                                                 |
+| Database                          | **Google Cloud Firestore (Native mode)** via `firebase-admin` (server-side only; browsers never talk to Firestore directly). Firestore security rules = deny all client access.                                                                                                                                                              |
+| DB portability                    | All persistence behind a `Repository` port (`apps/server/src/db/ports.ts`). Two adapters: `firestore/` (prod) and `memory/` (tests + local dev without credentials). Domain code never imports `firebase-admin`.                                                                                                                             |
+| Realtime                          | Server-Sent Events from Fastify. Fan-out via an in-process `EventBus` port; Firestore adapter additionally subscribes with `onSnapshot` on the event doc so multiple instances stay correct (future-proof; prod runs 1 instance). Polling fallback `GET /public` every 10 s when SSE fails.                                                  |
+| Scheduler                         | Pure TS package `packages/scheduler`, zero dependencies, deterministic.                                                                                                                                                                                                                                                                      |
+| Contracts                         | `packages/contracts`: zod 4 schemas + inferred types shared by web & server.                                                                                                                                                                                                                                                                 |
+| Brand/config                      | `packages/config`: `brand.ts` (name, company, URLs, footer text), `styles.ts` (dance style presets), `defaults.ts` (rule defaults). Web and docs import from here.                                                                                                                                                                           |
+| Metadata                          | Adapters behind `MetadataProvider` port: Spotify Web API (client-credentials; enabled only if `SPOTIFY_CLIENT_ID/SECRET` set; `env.ts` also accepts legacy `SPOTIFY_DEV_CLIENT_ID`), Spotify/YouTube oEmbed (keyless), iTunes Lookup API for Apple Music (keyless), manual entry. Allowlisted hosts only (SSRF).                             |
+| Playback                          | Local-file player on the designated device (`<input type=file multiple accept="audio/*">`, optional IndexedDB cache) + Manual mode (Mark started / Mark ended). No streaming/ripping, ever (SPEC §0 hard boundaries).                                                                                                                        |
+| Docs                              | **VitePress 1.x** in `docs/`, `base: '/docs/'`, built to `docs/.vitepress/dist`, served by Fastify at `/docs`. Public. Includes architecture, ADRs, API reference, runbook, privacy, threat model, and `CHANGELOG` page.                                                                                                                     |
+| Changelog                         | Root `CHANGELOG.md` (Keep a Changelog format, SemVer). Docs page `docs/src/changelog.md` includes it via `<!--@include: ../../CHANGELOG.md-->`. Every phase adds entries under `## [Unreleased]`; Phase 10 cuts `0.1.0`.                                                                                                                     |
+| Hosting                           | Railway: one service, one instance, Dockerfile build, `main` auto-deploy. Healthcheck `/api/health`.                                                                                                                                                                                                                                         |
+| Domain                            | `qroove.sataklela.com` via **Cloudflare** DNS → CNAME to Railway target.                                                                                                                                                                                                                                                                     |
+| Testing                           | Vitest (unit/property with `fast-check`, integration against memory repo AND Firestore emulator), Playwright (e2e, mobile Chromium + WebKit).                                                                                                                                                                                                |
+| CI                                | GitHub Actions: lint, typecheck, unit, property, integration (emulator), build, e2e (Chromium only in CI).                                                                                                                                                                                                                                   |
+| Lint/format                       | ESLint 9 flat config + typescript-eslint, Prettier 3.                                                                                                                                                                                                                                                                                        |
+| MCP servers                       | Already configured in `.mcp.json` (project scope): `railway` (`@railway/mcp-server@0.1.12`) `firebase` (`firebase-tools@15.34.2 mcp`) and `cloudflare` (remote `https://mcp.cloudflare.com/mcp`, OAuth via `/mcp`; covers DNS for zone `sataklela.com`). CLIs installed globally: `railway`, `firebase`. Prefer MCP tools; fall back to CLI. |
 
 Pin exact dependency versions that exist at execution time (`pnpm add -E`). Before adding any package,
 check it was published >14 days ago (`npm view <pkg> time --json`); pick the newest version that satisfies that.
@@ -127,6 +127,7 @@ events/{eventId}                     EventDoc
 
 `EventDoc` (single doc = the transactional "aggregate root"; every command runs in
 `db.runTransaction` reading this doc first and **incrementing `version`**):
+
 ```ts
 {
   name, publicSlug, state: 'DRAFT'|'ACTIVE'|'PAUSED'|'TRANSFERRING'|'ENDED'|'ARCHIVED',
@@ -143,6 +144,7 @@ events/{eventId}                     EventDoc
   adminGrantVersion: number,
 }
 ```
+
 `HistoryState` = `{ lastStyle|null, runLength, lastOwnerId|null, transitionCount, ownerLastPlayTransition: Record<ownerId, number>, playedKeys: string[] }`.
 (Keeps scheduler O(1) per decision; `transitionCount` increments when a played style differs from `lastStyle`.)
 A requester `p` is eligible for return iff `transitionCount > ownerLastPlayTransition[p]` (SPEC §3.4).
@@ -164,8 +166,8 @@ in-memory cache populated by `onSnapshot`, never Firestore per client.
 
 - **Errors:** every domain failure is a typed `DomainError` with `code` from `packages/contracts/src/errors.ts`:
   `DUPLICATE, QUOTA_FULL, RULES_FROZEN, NOT_OWNER, ALREADY_STARTED, EVENT_NOT_ACTIVE, EVENT_ENDED,
-  STALE_LEASE, STALE_VERSION, UNSUPPORTED_LINK, METADATA_UNAVAILABLE, RATE_LIMITED, UNAUTHORISED,
-  NOT_FOUND, VALIDATION`. API maps to HTTP and JSON `{ error: { code, message, action } }` where `action`
+STALE_LEASE, STALE_VERSION, UNSUPPORTED_LINK, METADATA_UNAVAILABLE, RATE_LIMITED, UNAUTHORISED,
+NOT_FOUND, VALIDATION`. API maps to HTTP and JSON `{ error: { code, message, action } }` where `action`
   is the "practical next action" text (SPEC §6 Unavailable states). User-facing copy lives in
   `packages/contracts/src/errors.ts` `ERROR_COPY` so web and server agree.
 - **Auth tokens:** 32 random bytes base64url. Store `sha256` only. Participant token: `localStorage`
@@ -201,6 +203,7 @@ Already done during planning: `.mcp.json` with railway + firebase servers; globa
 `firebase` 15.34.2 CLIs.
 
 Steps:
+
 1. Ask the user to run (in Claude Code prompt): `! firebase login --no-localhost` and `! railway login --browserless`.
    Verify with `firebase projects:list` and `railway whoami`. Restart Claude Code if MCP servers didn't load.
 2. Firebase: create project id `qroove-sataklela` (if taken, `qroove-sataklela-<4 random>`), display name
@@ -248,11 +251,12 @@ NOT require Phase 0 to be complete (memory repo + emulator).
      initiative: 'A CSR initiative',
      licence: { name: 'AGPL-3.0', url: 'https://www.gnu.org/licenses/agpl-3.0.html' },
      copyleftYear: 2026,
-     repoUrl: 'https://github.com/raunak-h/qroove',   // single place to change on org transfer
+     repoUrl: 'https://github.com/raunak-h/qroove', // single place to change on org transfer
      docsPath: '/docs',
      pilotCommunity: 'LSU Salsa Society (pilot community; not an endorsement)',
    } as const;
-   export const footerText = () => `Copyleft 🄯 ${BRAND.copyleftYear} ${BRAND.company.name} · ${BRAND.initiative} · ${BRAND.licence.name}`;
+   export const footerText = () =>
+     `Copyleft 🄯 ${BRAND.copyleftYear} ${BRAND.company.name} · ${BRAND.initiative} · ${BRAND.licence.name}`;
    ```
    `styles.ts`: presets `salsa, bachata, chacha, kizomba, merengue, other` with labels; default enabled
    `['salsa','bachata']`. `defaults.ts`: `submissionLimit: 5`, run caps `{salsa:2,bachata:2}`, other styles 1,
@@ -267,7 +271,7 @@ NOT require Phase 0 to be complete (memory repo + emulator).
    using `sharp` dev dep or hand-written SVG-only icons + `purpose: any`).
 6. `docs/` VitePress: `config.ts` with `base: '/docs/'`, title "Qroove Docs", nav (Guide, Architecture, API,
    Runbook, Changelog), sidebar, `themeConfig.footer` = `{ message: 'Released under the AGPL-3.0.',
-   copyright: 'Copyleft 🄯 2026 <a href="https://sataklela.com">Sataklela OÜ</a> · A CSR initiative' }`
+copyright: 'Copyleft 🄯 2026 <a href="https://sataklela.com">Sataklela OÜ</a> · A CSR initiative' }`
    (import string pieces from `@qroove/config`), `socialLinks` github → `BRAND.repoUrl`, local search
    enabled. Pages: index (hero), getting-started, changelog (include), placeholders for each section with
    one-line "Documented in Phase N" — replace as phases land.
@@ -275,12 +279,12 @@ NOT require Phase 0 to be complete (memory repo + emulator).
    `index.html`) and `docs/.vitepress/dist` at `/docs/` (with `index.html` resolution and VitePress
    clean-URL handling: try `path.html`). Cache: hashed assets `immutable, max-age=31536000`; html `no-cache`.
    `@fastify/compress`, `@fastify/helmet` (CSP: `default-src 'self'; img-src 'self' data: https://i.scdn.co
-   https://*.mzstatic.com https://i.ytimg.com; media-src 'self' blob:; connect-src 'self'; style-src 'self'
-   'unsafe-inline'` — VitePress needs inline styles; scripts `'self'`).
+https://*.mzstatic.com https://i.ytimg.com; media-src 'self' blob:; connect-src 'self'; style-src 'self'
+'unsafe-inline'` — VitePress needs inline styles; scripts `'self'`).
 8. `Dockerfile`: multi-stage `node:24-slim`; corepack pnpm; `pnpm install --frozen-lockfile`;
    `pnpm build` (packages → web → docs → server via `tsc`/`tsup`); runtime stage copies `apps/server/dist`,
    `apps/web/dist`, `docs/.vitepress/dist`, prod node_modules (`pnpm deploy --prod`); `CMD node
-   apps/server/dist/main.js`; listens on `$PORT`. `railway.json`: builder DOCKERFILE, healthcheckPath
+apps/server/dist/main.js`; listens on `$PORT`. `railway.json`: builder DOCKERFILE, healthcheckPath
    `/api/health`, numReplicas 1, restartPolicy ON_FAILURE.
 9. `.github/workflows/ci.yml`: on push/PR: setup pnpm + node 24, install, lint, typecheck, test, build.
    (Emulator + e2e jobs added in later phases.)
@@ -299,18 +303,37 @@ Exit check also: `docker build .` succeeds locally if Docker is available (skip 
 Read SPEC §3 (all) and §4 first.
 
 1. `packages/contracts/src/rules.ts`: `RulesSnapshot` zod schema: `{ rulesVersion: 1, enabledStyles:
-   StyleId[], runCaps: Record<StyleId, int 1..10>, submissionLimit: int 1..20, minStyleTransitions: 1,
-   noSameRequesterAdjacent: true, recordingUniquePerEvent: true, admissionOrder: 'fifo' }`. `hashRules()`
+StyleId[], runCaps: Record<StyleId, int 1..10>, submissionLimit: int 1..20, minStyleTransitions: 1,
+noSameRequesterAdjacent: true, recordingUniquePerEvent: true, admissionOrder: 'fifo' }`. `hashRules()`
    = sha256 of canonical (sorted-key) JSON. Other schemas: event public view, request view, preview item,
    API bodies for every route in Phase 4, `ErrorCode` + `ERROR_COPY`.
 2. `packages/scheduler/src/types.ts`:
    ```ts
-   export interface Candidate { requestId: string; ownerId: string; style: StyleId; acceptedSeq: number;
-     canonicalKey: string; durationMs: number | null; playable: boolean; }
-   export interface HistoryState { lastStyle: StyleId|null; runLength: number; lastOwnerId: string|null;
-     transitionCount: number; ownerLastPlayTransition: Record<string, number>; playedKeys: ReadonlySet<string>; }
-   export type Ineligibility = 'SAME_OWNER_ADJACENT'|'NEEDS_STYLE_TRANSITION'|'RUN_CAP'|'ALREADY_PLAYED'|
-     'STYLE_DISABLED'|'NOT_PLAYABLE'|'WOULD_EXCEED_END';
+   export interface Candidate {
+     requestId: string;
+     ownerId: string;
+     style: StyleId;
+     acceptedSeq: number;
+     canonicalKey: string;
+     durationMs: number | null;
+     playable: boolean;
+   }
+   export interface HistoryState {
+     lastStyle: StyleId | null;
+     runLength: number;
+     lastOwnerId: string | null;
+     transitionCount: number;
+     ownerLastPlayTransition: Record<string, number>;
+     playedKeys: ReadonlySet<string>;
+   }
+   export type Ineligibility =
+     | 'SAME_OWNER_ADJACENT'
+     | 'NEEDS_STYLE_TRANSITION'
+     | 'RUN_CAP'
+     | 'ALREADY_PLAYED'
+     | 'STYLE_DISABLED'
+     | 'NOT_PLAYABLE'
+     | 'WOULD_EXCEED_END';
    ```
 3. `eligibility.ts`: `checkEligibility(c, history, rules, ctx?) → { ok: true } | { ok: false, reason }`
    implementing SPEC §3.4 exactly. First-ever play of an owner: eligible w.r.t. transitions.
@@ -319,7 +342,7 @@ Read SPEC §3 (all) and §4 first.
    `lastOwnerId`, `ownerLastPlayTransition[owner] = newTransitionCount`, add key.
    Note: skipped-after-start counts as a play (SPEC §3.4). Pauses/breaks don't touch history.
 5. `select.ts`: `selectNext(candidates, history, rules) → { pick: Candidate|null, reason: string,
-   blocked: Array<{requestId, reason}> }` with the comparator of SPEC §3.7:
+blocked: Array<{requestId, reason}> }` with the comparator of SPEC §3.7:
    (1) group eligible by style; if `lastStyle` at cap, exclude it (already by eligibility);
    (2) choose style whose earliest eligible `acceptedSeq` is smallest (oldest waiting); tie-break: prefer
    style ≠ `lastStyle` (balance), then style id alphabetical; (3) oldest eligible in that style;
@@ -328,11 +351,11 @@ Read SPEC §3 (all) and §4 first.
    If no pick → reason one of `NO_CANDIDATES`, `ALL_BLOCKED_FAIRNESS` (with summary e.g. "Waiting for
    another contributor or a style change").
 6. `project.ts`: `projectQueue({ candidates, history, rules, nowMs, endAtMs|null, currentRemainingMs|null,
-   breaksRemainingSec, overheadSec, horizon = 50 }) → { items: Array<{requestId, position, predictedStartMs
-   |null, uncertain: boolean, overflow: boolean}>, stoppedReason: 'EXHAUSTED'|'WAITING_FAIRNESS'|
-   'HORIZON', overflowIds, waitingIds }`. Simulates by repeatedly `selectNext` + `applyPlay` on a copy.
+breaksRemainingSec, overheadSec, horizon = 50 }) → { items: Array<{requestId, position, predictedStartMs
+|null, uncertain: boolean, overflow: boolean}>, stoppedReason: 'EXHAUSTED'|'WAITING_FAIRNESS'|
+'HORIZON', overflowIds, waitingIds }`. Simulates by repeatedly `selectNext` + `applyPlay` on a copy.
    Unknown duration → subsequent items `uncertain=true`, `predictedStartMs` still computed using a 4-min
-   default but flagged. Overflow only if `endAtMs` set and predicted *end* > endAt (song must fit fully —
+   default but flagged. Overflow only if `endAtMs` set and predicted _end_ > endAt (song must fit fully —
    SPEC §4). Overflow items are still listed (greyed), and projection continues past them? No: an
    overflowed item can't play, so it is marked overflow and the simulation **stops advancing time** past
    endAt; remaining candidates that would also start after endAt are overflow.
@@ -341,6 +364,7 @@ Read SPEC §3 (all) and §4 first.
    INELIGIBLE_TEMPORARILY, RESERVED_NEXT, PLAYING, PLAYED, SKIPPED; not WITHDRAWN/REJECTED/UNAVAILABLE).
 
 Tests (Vitest + fast-check):
+
 - Example tests: SPEC §3.4 impossibility example (`A` all Salsa, `B` all Bachata → `A-S1,B-B1,A-S2,B-B2`);
   single owner → plays one then waits; `S,S,B,B,S,B` acceptance; cap 2 blocks third Salsa; skipped-started
   counts; deterministic output for same input.
@@ -348,8 +372,8 @@ Tests (Vitest + fast-check):
   separate `test:property` script): random owners (1–8), styles (1–4), caps (1–3), 0–60 requests; run full
   projection; assert no same-owner adjacency, owner returns only after ≥1 transition, run ≤ cap, no
   repeated canonical key, no item starts/ends after endAt, determinism (run twice → equal).
-Docs: `architecture/scheduler.md` — formal rules, comparator, worked examples (tables), invariants list,
-ADR `0004-no-ageing-bonus.md`, `0005-quota-counts-played.md`.
+  Docs: `architecture/scheduler.md` — formal rules, comparator, worked examples (tables), invariants list,
+  ADR `0004-no-ageing-bonus.md`, `0005-quota-counts-played.md`.
 
 ---
 
@@ -375,7 +399,7 @@ ADR `0004-no-ageing-bonus.md`, `0005-quota-counts-played.md`.
    `createEvent` (returns adminSecret once), `updateDraft` (rules editable only in DRAFT), `startEvent`
    (freeze rules + hash; state ACTIVE), `joinEvent` (issue participant token), `submitRequest`
    (validate style enabled, quota via participant.acceptedCount + recount guard, duplicate via
-   recordingKeys, assign `acceptedSeq = ++event.acceptedSeq`, state QUEUED or PENDING_METADATA), 
+   recordingKeys, assign `acceptedSeq = ++event.acceptedSeq`, state QUEUED or PENDING_METADATA),
    `withdrawRequest` (owner; not RESERVED? — SPEC: withdraw allowed for unplayed unstarted incl. reserved;
    if reserved, clear reservation and re-select), `adminRemove` (same, any owner; REJECTED),
    `pause`, `resume`, `setEndTime` (must be concrete future timestamp; allowed ACTIVE/PAUSED),
@@ -396,7 +420,7 @@ ADR `0004-no-ageing-bonus.md`, `0005-quota-counts-played.md`.
    consumed; stale admin after handover rejected; stale player epoch rejected; rules immutable after start;
    withdrawal frees quota; replay of played recording rejected; pause preserves reservation.
    Run the concurrency tests against the emulator too.
-Docs: `architecture/data-model.md` (§3 of this plan, refined to reality), ADR `0006-aggregate-event-doc.md`.
+   Docs: `architecture/data-model.md` (§3 of this plan, refined to reality), ADR `0006-aggregate-event-doc.md`.
 
 ---
 
@@ -417,8 +441,8 @@ Read SPEC §5 (Link intake, Duplicate identity) and §8.
    equal `PUBLIC_BASE_URL` or localhost in dev), CSRF double-submit, cookie flags. Body limit 16 KB.
 4. Ingestion (`ingestion/`):
    - `parseLink(url)`: allowlist hosts `open.spotify.com, spotify.link (reject — needs redirect; ask user to
-     open & copy full link), music.apple.com, geo.music.apple.com, www.youtube.com, youtube.com,
-     music.youtube.com, youtu.be, m.youtube.com`. Extract `{platform, id}`; strip tracking params
+open & copy full link), music.apple.com, geo.music.apple.com, www.youtube.com, youtube.com,
+music.youtube.com, youtu.be, m.youtube.com`. Extract `{platform, id}`; strip tracking params
      (`si`, `utm_*`, `feature`, `pp`). Spotify: `/track/{22-char id}` (also `/intl-xx/track/`). Apple:
      `?i={songId}` or `/song/{slug}/{id}`. YouTube: `v=` or youtu.be path, 11-char id.
    - Providers: Spotify Web API `GET /v1/tracks/{id}` (client-credentials token cached until expiry) →
@@ -436,21 +460,21 @@ Read SPEC §5 (Link intake, Duplicate identity) and §8.
      version tag or duration differs >5s) → request state `PENDING_METADATA` with flag `possibleDuplicate`,
      admin resolves (approve as distinct / reject). Played keys block re-entry.
    - Style pre-fill: only from explicit title cues (`bachata`, `salsa`, `cha cha`, `kizomba`, `merengue`)
-     returned as a *suggestion*; user's chip choice is authoritative.
+     returned as a _suggestion_; user's chip choice is authoritative.
 5. Realtime: `GET /api/events/:id/stream` SSE: on connect send `event: state` with public view; on each
    repo change push `{revision}` + public view (≤ 4 KB). Heartbeat comment every 20s. Admin stream variant
    `/admin/stream` includes moderation list. Personalised data ("my next song") is computed client-side
    from the public preview + `my-requests` ids (preview contains requestIds, not owner ids — never leak
    owners or nicknames).
 6. Public view shape (contracts): `{ eventId, slug, name, state, endAt, nowPlaying: {title, artist, style,
-   startedAt, durationMs}|null, upNext: PreviewItem[] (title, artist, style, predictedStartMs, uncertain,
-   overflow, requestId), waitingReason, runIndicator: {style, runLength, cap}, revision }`.
+startedAt, durationMs}|null, upNext: PreviewItem[] (title, artist, style, predictedStartMs, uncertain,
+overflow, requestId), waitingReason, runIndicator: {style, runLength, cap}, revision }`.
 7. Integration tests via `fastify.inject` with memory repo + mocked fetch for providers; SSE test reads
    first two messages.
-Docs: `api/reference.md` (every route: auth, body, responses, errors), `architecture/realtime.md`,
-`architecture/security.md` (tokens, cookies, CSRF, rate limits, SSRF allowlist), `threat-model.md`
-(STRIDE table from SPEC §8 "Protect against"), `privacy.md` (what's stored, retention: participants and
-nicknames purged 30 days after event end — implement purge in Phase 8).
+   Docs: `api/reference.md` (every route: auth, body, responses, errors), `architecture/realtime.md`,
+   `architecture/security.md` (tokens, cookies, CSRF, rate limits, SSRF allowlist), `threat-model.md`
+   (STRIDE table from SPEC §8 "Protect against"), `privacy.md` (what's stored, retention: participants and
+   nicknames purged 30 days after event end — implement purge in Phase 8).
 
 ---
 
@@ -460,8 +484,9 @@ Read SPEC §2 (Guest), §4 (Attendee countdown), §6.
 
 Routes: `/` Landing (what it is, "Create an event", "Join with code" input), `/e/:slug` attendee event page,
 `/privacy`. Components:
+
 - Join: on first visit auto-POST join, store token; optional nickname field (collapsible).
-- `NowPlaying` tile; `MyNextSong` ("2 songs until *Title*" with correct plural; ticking `~MM:SS` via
+- `NowPlaying` tile; `MyNextSong` ("2 songs until _Title_" with correct plural; ticking `~MM:SS` via
   `requestAnimationFrame`-free 1s interval; states: Estimated / Session paused / Waiting for more eligible
   songs / Beyond planned end — admin must extend / Position not yet predictable).
 - `AddSong`: one input (paste button using `navigator.clipboard.readText` only on user tap, with graceful
@@ -472,10 +497,10 @@ Routes: `/` Landing (what it is, "Create an event", "Join with code" input), `/e
 - Up next list (titles only, no owners), overflow greyed + "After end time" label.
 - Connection indicator (SSE state: Live / Reconnecting / Offline — polling).
 - Theme toggle; footer.
-Bundle budget: attendee route initial JS+CSS ≤ 40 KB gzip where feasible (code-split admin/player with
-`React.lazy`). Check with `vite build` + `rollup-plugin-visualizer` once; record size in PROGRESS.
-Component tests for countdown formatting + pluralisation.
-Docs: `guide/attendee.md` with screenshots (Playwright screenshots saved to `docs/src/public/screens/`).
+  Bundle budget: attendee route initial JS+CSS ≤ 40 KB gzip where feasible (code-split admin/player with
+  `React.lazy`). Check with `vite build` + `rollup-plugin-visualizer` once; record size in PROGRESS.
+  Component tests for countdown formatting + pluralisation.
+  Docs: `guide/attendee.md` with screenshots (Playwright screenshots saved to `docs/src/public/screens/`).
 
 ---
 
@@ -504,6 +529,7 @@ Docs: `guide/admin.md` with screenshots.
 Read SPEC §3.8, §5 Playback adapters + Browser/Bluetooth realities.
 
 Route `/player/:eventId` (admin cookie required to claim lease; separate privilege recorded on lease).
+
 - Claim lease → epoch; heartbeat 10s; on `STALE_LEASE` stop audio immediately and show "Another device took
   over playback".
 - Sound check button (plays a short generated tone via WebAudio) — required before first Start.
@@ -520,7 +546,7 @@ Route `/player/:eventId` (admin cookie required to claim lease; separate privile
 - Media Session API metadata + play/pause handlers; Wake Lock while playing (if supported).
 - Transfer: on "Transfer player", old device releases; new device claims and must tap Start. Partially
   played current track is already PLAYING → mark SKIPPED (consumed) on release per SPEC §2.
-Docs: `guide/player.md` (Bluetooth tips, iOS autoplay caveats, sound check, rights notice).
+  Docs: `guide/player.md` (Bluetooth tips, iOS autoplay caveats, sound check, rights notice).
 
 ---
 
@@ -540,8 +566,8 @@ Docs: `guide/player.md` (Bluetooth tips, iOS autoplay caveats, sound check, righ
 5. Load sanity: script `scripts/load.ts` (autocannon or plain fetch loop) simulating 40 SSE clients + 25
    submitters × 6 songs against memory repo locally and against emulator; assert p95 mutation < 2s; record.
 6. CI: add jobs `integration-emulator` (Java 21 + `firebase emulators:exec`) and `e2e` (Chromium).
-Docs: `runbook/backup.md` (Firestore export via `gcloud firestore export` needs Blaze → document manual JSON
-export per event via API as the free alternative), update architecture overview.
+   Docs: `runbook/backup.md` (Firestore export via `gcloud firestore export` needs Blaze → document manual JSON
+   export per event via API as the free alternative), update architecture overview.
 
 ---
 
@@ -562,7 +588,7 @@ export per event via API as the free alternative), update architecture overview.
 5. Set `PUBLIC_BASE_URL=https://qroove.sataklela.com`; redeploy; verify cookies (Secure) and admin same-origin
    check work on the custom domain.
 6. Smoke test on two real phones (user): checklist in `runbook/deploy.md`.
-Docs: `runbook/deploy.md`, `runbook/dns-cloudflare.md`, `runbook/firebase.md` finalised.
+   Docs: `runbook/deploy.md`, `runbook/dns-cloudflare.md`, `runbook/firebase.md` finalised.
 
 ---
 
