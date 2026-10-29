@@ -18,6 +18,11 @@ versioning: [SemVer](https://semver.org/).
 - `@qroove/contracts`: zod 4 schemas for rules (with canonical hash), events, requests, player leases, every API body, and typed error codes with user-facing copy.
 - `@qroove/scheduler`: pure eligibility, selection, queue projection (ETA and overflow) and quota logic, with example and property tests.
 - Docs: scheduler architecture page, ADRs 0004 (no ageing bonus) and 0005 (quota counts played).
+- Persistence port (`Repository` / `EventTx`) with a memory adapter and a Firestore adapter, both passing one contract suite; the Firestore run uses the emulator (`pnpm --filter @qroove/server test:emulator`, also in CI).
+- Domain commands: create/update/start/pause/resume/end/archive events, end-time and breaks, join, submit/withdraw/remove requests, metadata resolution, admin handover and recovery, player lease (claim, heartbeat, started, finished, release), and snapshot import with a seeded per-style shuffle.
+- Automatic next-track reservation, request-state labelling and a denormalised queue preview after every change.
+- ESLint rules: `firebase-admin` only under `db/firestore`; no `Date.now()` in domain code.
+- Docs: data model page and ADR 0006.
 
 ### Changed
 - Licence switched from MIT to AGPL-3.0-only.

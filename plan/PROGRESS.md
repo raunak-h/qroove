@@ -2,15 +2,15 @@
 
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
-**Current phase:** 3
-**Next session starts with:** Phase 3 (persistence ports, adapters, domain commands). Phases 0–2 done.
+**Current phase:** 4
+**Next session starts with:** Phase 4 (HTTP API, auth, realtime, metadata). Phases 0–3 done.
 
 ## Phases
 
 - [x] 0 — Accounts, MCP & infra provisioning
 - [x] 1 — Monorepo scaffold, branding, docs skeleton, CI
 - [x] 2 — Contracts + scheduler
-- [ ] 3 — Persistence ports, adapters, domain commands
+- [x] 3 — Persistence ports, adapters, domain commands
 - [ ] 4 — HTTP API, auth, realtime, metadata
 - [ ] 5 — Attendee UI
 - [ ] 6 — Admin UI
@@ -60,3 +60,12 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - `OVERFLOW` is included in quota-counting states (SPEC §3.3); the plan's list omitted it.
 - Property test: 2,000 runs in `pnpm test`; `pnpm --filter @qroove/scheduler test:property` = 100,000 runs (passes).
 - `z.partialRecord` is required for non-exhaustive enum-keyed records in zod 4.
+
+### Phase 3 (2026-10-29)
+
+- `apps/server/src/db/{ports,types}.ts`, `memory/`, `firestore/`; `createRepository(env)` lazy-loads Firestore. Domain commands in `src/domain/commands/`, shared plumbing in `context.ts` (`runCommand`, `Work`, `commit`) and `recompute.ts`.
+- Tests: `test/repo.contract.ts` and `test/commands.suite.ts` run against memory (`pnpm test`) and the Firestore emulator (`pnpm --filter @qroove/server test:emulator`; needs Java; wired into CI). 39 tests each, all passing, including the 6-concurrent-submit, concurrent-duplicate, stale-admin and stale-epoch cases.
+- Plan deviations: times stored as plain epoch-ms numbers (no Timestamp converters); `RequestDoc.ownerId` replaces `participantId` (indexes file updated; request lists are sorted in the adapter, so the composite indexes are not actually used); `putEvent(doc, {silent})` for heartbeats; added `EventDoc.{playbackSeq,leaseEpoch,transferOfferId,importSeed}`; `putPlayback`/`getPlayback` instead of `appendPlayback`. `subscribe` passes the raw event doc; the LRU public-view cache is deferred to Phase 4, where the view is built.
+- Decisions: claiming the player requires an admin secret (a separate player credential can come later); a lease claim or handover treats any track still playing as consumed; handover claim leaves the event PAUSED so the receiver must resume; only one handover offer is live at a time and resuming cancels it; a recovery secret can replace all admin access (`recoverAdmin`); `startBreak` holds new starts until `endBreak`; submissions are accepted while PAUSED but not reserved until resume; a duplicate is refused before quota is checked.
+- Phase 4 must: build `RequestView`/`EventPublicView` from `getEventPublic`, add `parseLink`/`canonicalKey` and call `resolveMetadata` for `PENDING_METADATA`, set `Idempotency-Key` through `idempotencyKey`, and skip SSE pushes for silent (heartbeat) writes.
+- Not covered: a player-side "media unavailable before start" command (reserved track that cannot play); the admin can remove it.

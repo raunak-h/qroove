@@ -1,0 +1,596 @@
+import { describe, expect, it } from 'vitest';
+import { hashRules } from '@qroove/contracts';
+import type { Repository } from '../src/db/ports.js';
+import * as cmd from '../src/domain/commands/index.js';
+import { expectCode, guest, liveEvent, makeDeps, snap, track } from './helpers.js';
+
+/** Domain command behaviour; runs against every adapter. */
+export function runCommandSuite(name: string, make: () => Promise<Repository>, skip = false) {
+  describe.skipIf(skip)(`Domain commands: ${name}`, () => {
+    async function setup(body: Parameters<typeof liveEvent>[1] = {}, start = true) {
+      const deps = makeDeps(await make());
+      const ev = await liveEvent(deps, body, start);
+      const admin = { eventId: ev.eventId, adminSecret: ev.adminSecret };
+      const submit = (
+        g: Awaited<ReturnType<typeof guest>>,
+        n: string | number,
+        style: 'salsa' | 'bachata' = 'salsa',
+        dur?: number | null,
+      ) => cmd.submitRequest(deps, { ...g, style, track: track(n, dur) });
+      /** Claims the player, starts the reserved track and returns the lease handle. */
+      const player = async () => {
+        const c = await cmd.claimLease(deps, admin);
+        const lease = { eventId: ev.eventId, leaseToken: c.leaseToken, epoch: c.lease.epoch };
+        return {
+          lease,
+          start: async () => {
+            const s = await snap(deps, ev.eventId);
+            const id = s.event.reservation!.requestId;
+            await cmd.reportStarted(deps, { ...lease, requestId: id });
+            return id;
+          },
+          finish: (requestId: string, outcome: 'PLAYED' | 'FAILED' = 'PLAYED') =>
+            cmd.reportFinished(deps, { ...lease, requestId, outcome }),
+        };
+      };
+      return { deps, ev, admin, submit, player };
+    }
+
+    it('creates a draft, edits rules, then freezes them with a hash at start', async () => {
+      const { deps, ev, admin } = await setup({}, false);
+      expect(ev.slug).toHaveLength(6);
+      expect((await snap(deps, ev.eventId)).event.state).toBe('DRAFT');
+      await cmd.updateDraft(deps, { ...admin, submissionLimit: 3, runCaps: { salsa: 3 } });
+      await cmd.startEvent(deps, admin);
+      const { event } = await snap(deps, ev.eventId);
+      expect(event.state).toBe('ACTIVE');
+      expect(event.rules.submissionLimit).toBe(3);
+      expect(event.rulesHash).toBe(hashRules(event.rules));
+      await expectCode(cmd.updateDraft(deps, { ...admin, submissionLimit: 9 }), 'RULES_FROZEN');
+      expect((await snap(deps, ev.eventId)).event.rulesHash).toBe(event.rulesHash);
+    });
+
+    it('rejects wrong, missing and recovery secrets for admin actions', async () => {
+      const { deps, ev, admin } = await setup();
+      await expectCode(
+        cmd.pause(deps, { ...admin, adminSecret: 'nope-nope-nope-nope-nope' }),
+        'UNAUTHORISED',
+      );
+      await expectCode(
+        cmd.pause(deps, { ...admin, adminSecret: ev.recoverySecret }),
+        'UNAUTHORISED',
+      );
+      await expectCode(
+        cmd.pause(deps, { eventId: 'does-not-exist', adminSecret: ev.adminSecret }),
+        'NOT_FOUND',
+      );
+    });
+
+    it('refuses a start time in the past and a stale expectedVersion', async () => {
+      const deps = makeDeps(await make());
+      const ev = await liveEvent(deps, { endAt: 1 }, false);
+      await expectCode(
+        cmd.startEvent(deps, { eventId: ev.eventId, adminSecret: ev.adminSecret }),
+        'VALIDATION',
+      );
+      await expectCode(
+        cmd.updateDraft(deps, {
+          eventId: ev.eventId,
+          adminSecret: ev.adminSecret,
+          name: 'x',
+          expectedVersion: 99,
+        }),
+        'STALE_VERSION',
+      );
+    });
+
+    it('reserves the first submission immediately and previews the queue', async () => {
+      const { deps, ev, submit } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const b = await guest(deps, ev.eventId);
+      const r1 = await submit(a, 1, 'salsa');
+      const r2 = await submit(b, 2, 'bachata');
+      const s = await snap(deps, ev.eventId);
+      expect(s.state(r1.request.id)).toBe('RESERVED_NEXT');
+      expect(s.state(r2.request.id)).toBe('QUEUED');
+      expect(s.event.reservation?.requestId).toBe(r1.request.id);
+      expect(s.event.preview.items.map((i) => i.requestId)).toEqual([r1.request.id, r2.request.id]);
+      expect(s.event.preview.items[1]!.predictedStartMs).toBeGreaterThan(
+        s.event.preview.items[0]!.predictedStartMs!,
+      );
+    });
+
+    it('accepts exactly 5 of 6 concurrent submits from one participant', async () => {
+      const { deps, ev, submit } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const results = await Promise.allSettled([1, 2, 3, 4, 5, 6].map((n) => submit(a, n)));
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(5);
+      const rejected = results.filter((r): r is PromiseRejectedResult => r.status === 'rejected');
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0]!.reason.code).toBe('QUOTA_FULL');
+      const seqs = (await snap(deps, ev.eventId)).requests.map((r) => r.acceptedSeq).sort();
+      expect(seqs).toEqual([1, 2, 3, 4, 5]);
+    });
+
+    it('lets exactly one of two concurrent duplicate submits win, without spending quota', async () => {
+      const { deps, ev, submit } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const b = await guest(deps, ev.eventId);
+      const results = await Promise.allSettled([submit(a, 'same'), submit(b, 'same')]);
+      expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+      const loser = results.findIndex((r) => r.status === 'rejected') === 0 ? a : b;
+      const rej = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')!;
+      expect(rej.reason.code).toBe('DUPLICATE');
+      for (const n of [1, 2, 3, 4, 5]) await submit(loser, n); // all five slots still free
+    });
+
+    it('frees quota and the recording on withdrawal', async () => {
+      const { deps, ev, submit } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const first = await submit(a, 1);
+      for (const n of [2, 3, 4, 5]) await submit(a, n);
+      await expectCode(submit(a, 6), 'QUOTA_FULL');
+      await cmd.withdrawRequest(deps, { ...a, requestId: first.request.id });
+      await submit(a, 6);
+      await submit(await guest(deps, ev.eventId), 1); // withdrawn recording can be requested again
+      expect((await snap(deps, ev.eventId)).state(first.request.id)).toBe('WITHDRAWN');
+    });
+
+    it('enforces ownership and blocks withdrawing a started song', async () => {
+      const { deps, ev, submit, player } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const b = await guest(deps, ev.eventId);
+      const r = await submit(a, 1);
+      await expectCode(cmd.withdrawRequest(deps, { ...b, requestId: r.request.id }), 'NOT_OWNER');
+      await expectCode(
+        cmd.withdrawRequest(deps, { ...a, token: 'x'.repeat(43), requestId: r.request.id }),
+        'UNAUTHORISED',
+      );
+      const p = await player();
+      await p.start();
+      await expectCode(
+        cmd.withdrawRequest(deps, { ...a, requestId: r.request.id }),
+        'ALREADY_STARTED',
+      );
+    });
+
+    it('validates style, event state, and participant on submit', async () => {
+      const { deps, ev, admin, submit } = await setup({ enabledStyles: ['salsa', 'bachata'] });
+      const a = await guest(deps, ev.eventId);
+      await expectCode(
+        cmd.submitRequest(deps, { ...a, style: 'kizomba', track: track(1) }),
+        'VALIDATION',
+      );
+      await cmd.endEvent(deps, admin);
+      await expectCode(submit(a, 1), 'EVENT_ENDED');
+      const draft = await setup({}, false);
+      await expectCode(
+        draft.submit(await guest(draft.deps, draft.ev.eventId), 1),
+        'EVENT_NOT_ACTIVE',
+      );
+    });
+
+    it('plays in fair order, updates history on start, and blocks replays', async () => {
+      const { deps, ev, submit, player } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const b = await guest(deps, ev.eventId);
+      const s1 = await submit(a, 1, 'salsa');
+      const s2 = await submit(a, 2, 'salsa');
+      const b1 = await submit(b, 3, 'bachata');
+      const p = await player();
+      expect(await p.start()).toBe(s1.request.id);
+      let s = await snap(deps, ev.eventId);
+      expect(s.event.history.lastOwnerId).toBe(a.participantId);
+      expect(s.event.history.playedKeys).toEqual(['spotify:track:1']);
+      expect(s.event.nowPlaying?.requestId).toBe(s1.request.id);
+      expect(s.event.reservation).toBeNull(); // nothing is reserved while a song plays
+      await p.finish(s1.request.id);
+      s = await snap(deps, ev.eventId);
+      expect(s.state(s1.request.id)).toBe('PLAYED');
+      expect(s.event.reservation?.requestId).toBe(b1.request.id); // A cannot go twice in a row
+      expect(s.state(s2.request.id)).toBe('QUEUED');
+      await expectCode(submit(b, 1), 'DUPLICATE'); // played recording stays blocked
+      await p.finish(s1.request.id); // idempotent
+      expect(await p.start()).toBe(b1.request.id);
+      await p.finish(b1.request.id);
+      s = await snap(deps, ev.eventId);
+      expect(s.event.reservation?.requestId).toBe(s2.request.id);
+    });
+
+    it('waits, with a reason, when only the last player has songs left', async () => {
+      const { deps, ev, submit, player } = await setup();
+      const a = await guest(deps, ev.eventId);
+      await submit(a, 1);
+      const queued = await submit(a, 2);
+      const p = await player();
+      await p.finish(await p.start());
+      const s = await snap(deps, ev.eventId);
+      expect(s.event.reservation).toBeNull();
+      expect(s.state(queued.request.id)).toBe('INELIGIBLE_TEMPORARILY');
+      expect(s.event.waitingReason).toMatch(/another contributor/);
+      const b = await guest(deps, ev.eventId);
+      const rb = await submit(b, 3, 'bachata');
+      expect((await snap(deps, ev.eventId)).event.reservation?.requestId).toBe(rb.request.id);
+    });
+
+    it('rejects a start for anything but the reservation, and a stale or missing lease', async () => {
+      const { deps, ev, admin, submit, player } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const b = await guest(deps, ev.eventId);
+      await submit(a, 1);
+      const other = await submit(b, 2, 'bachata');
+      const p = await player();
+      await expectCode(
+        cmd.reportStarted(deps, { ...p.lease, requestId: other.request.id }),
+        'STALE_VERSION',
+      );
+      await expectCode(
+        cmd.reportStarted(deps, { ...p.lease, epoch: 99, requestId: other.request.id }),
+        'STALE_LEASE',
+      );
+      await expectCode(cmd.claimLease(deps, admin), 'STALE_LEASE'); // held, no takeover
+    });
+
+    it('fences out a stale player after a takeover', async () => {
+      const { deps, ev, admin, submit, player } = await setup();
+      await submit(await guest(deps, ev.eventId), 1);
+      const old = await player();
+      await cmd.heartbeat(deps, old.lease);
+      const taken = await cmd.claimLease(deps, { ...admin, takeover: true });
+      expect(taken.lease.epoch).toBe(old.lease.epoch + 1);
+      await expectCode(cmd.heartbeat(deps, old.lease), 'STALE_LEASE');
+      await expectCode(old.start(), 'STALE_LEASE');
+      await expectCode(cmd.releaseLease(deps, old.lease), 'STALE_LEASE');
+    });
+
+    it('lets an expired lease be claimed without takeover, and heartbeats do not bump version', async () => {
+      const { deps, ev, admin, player } = await setup();
+      const p = await player();
+      const v = (await snap(deps, ev.eventId)).event.version;
+      deps.clock.advance(10_000);
+      await cmd.heartbeat(deps, p.lease);
+      expect((await snap(deps, ev.eventId)).event.version).toBe(v);
+      deps.clock.advance(31_000);
+      const next = await cmd.claimLease(deps, admin);
+      expect(next.lease.epoch).toBe(p.lease.epoch + 1);
+    });
+
+    it('treats a track left playing at takeover as consumed, never replayed', async () => {
+      const { deps, ev, admin, submit, player } = await setup();
+      const r = await submit(await guest(deps, ev.eventId), 1);
+      const p = await player();
+      await p.start();
+      await cmd.claimLease(deps, { ...admin, takeover: true });
+      const s = await snap(deps, ev.eventId);
+      expect(s.state(r.request.id)).toBe('PLAYED');
+      expect(s.event.nowPlaying).toBeNull();
+    });
+
+    it('counts a failed or skipped started track toward quota and history', async () => {
+      const { deps, ev, admin, submit, player } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const b = await guest(deps, ev.eventId);
+      await expectCode(cmd.skip(deps, admin), 'VALIDATION');
+      const first = await submit(a, 1);
+      await submit(b, 2, 'bachata');
+      const p = await player();
+      await p.start();
+      await cmd.skip(deps, admin);
+      let s = await snap(deps, ev.eventId);
+      expect(s.state(first.request.id)).toBe('SKIPPED');
+      expect(s.event.history.playedKeys).toContain('spotify:track:1');
+      for (const n of [3, 4, 5, 6]) await submit(a, n); // 1 skipped + 4 = 5 used
+      await expectCode(submit(a, 7), 'QUOTA_FULL');
+      const id = await p.start();
+      await p.finish(id, 'FAILED');
+      s = await snap(deps, ev.eventId);
+      expect(s.state(id)).toBe('SKIPPED');
+    });
+
+    it('pause keeps the reservation; resume does not change it', async () => {
+      const { deps, ev, admin, submit } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const b = await guest(deps, ev.eventId);
+      const r = await submit(a, 1);
+      await cmd.pause(deps, admin);
+      await submit(b, 2, 'bachata'); // submissions still accepted while paused
+      let s = await snap(deps, ev.eventId);
+      expect(s.event.state).toBe('PAUSED');
+      expect(s.event.reservation?.requestId).toBe(r.request.id);
+      await cmd.pause(deps, admin); // idempotent
+      await cmd.resume(deps, admin);
+      s = await snap(deps, ev.eventId);
+      expect(s.event.state).toBe('ACTIVE');
+      expect(s.event.reservation?.requestId).toBe(r.request.id);
+    });
+
+    it('does not reserve while paused, and reserves on resume', async () => {
+      const { deps, ev, admin, submit } = await setup();
+      await cmd.pause(deps, admin);
+      const r = await submit(await guest(deps, ev.eventId), 1);
+      expect((await snap(deps, ev.eventId)).event.reservation).toBeNull();
+      await cmd.resume(deps, admin);
+      expect((await snap(deps, ev.eventId)).event.reservation?.requestId).toBe(r.request.id);
+    });
+
+    it('re-selects when the reserved song is withdrawn or removed by the admin', async () => {
+      const { deps, ev, admin, submit } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const b = await guest(deps, ev.eventId);
+      const c = await guest(deps, ev.eventId);
+      const r1 = await submit(a, 1);
+      const r2 = await submit(b, 2, 'bachata');
+      const r3 = await submit(c, 3);
+      await cmd.withdrawRequest(deps, { ...a, requestId: r1.request.id });
+      expect((await snap(deps, ev.eventId)).event.reservation?.requestId).toBe(r2.request.id);
+      await cmd.adminRemove(deps, { ...admin, requestId: r2.request.id, reason: 'not on theme' });
+      const s = await snap(deps, ev.eventId);
+      expect(s.state(r2.request.id)).toBe('REJECTED');
+      expect(s.event.reservation?.requestId).toBe(r3.request.id);
+      // The owner's slot reopened.
+      for (const n of [4, 5, 6, 7]) await submit(b, n);
+      await submit(b, 8);
+    });
+
+    it('does not let the admin erase a played record', async () => {
+      const { deps, ev, admin, submit, player } = await setup();
+      const r = await submit(await guest(deps, ev.eventId), 1);
+      const p = await player();
+      await p.finish(await p.start());
+      await expectCode(
+        cmd.adminRemove(deps, { ...admin, requestId: r.request.id }),
+        'ALREADY_STARTED',
+      );
+    });
+
+    it('marks songs that cannot finish before the end time as OVERFLOW, and recovers on extension', async () => {
+      const { deps, ev, admin, submit } = await setup();
+      const now = deps.clock.now();
+      await cmd.setEndTime(deps, { ...admin, endAt: now + 6 * 60_000 });
+      const a = await guest(deps, ev.eventId);
+      const b = await guest(deps, ev.eventId);
+      const c = await guest(deps, ev.eventId);
+      const r1 = await submit(a, 1, 'salsa', 240_000);
+      const r2 = await submit(b, 2, 'bachata', 240_000);
+      const r3 = await submit(c, 3, 'salsa', 240_000);
+      let s = await snap(deps, ev.eventId);
+      expect(s.state(r1.request.id)).toBe('RESERVED_NEXT');
+      expect(s.state(r2.request.id)).toBe('OVERFLOW');
+      expect(s.state(r3.request.id)).toBe('OVERFLOW');
+      const overflow = s.event.preview.items.filter((i) => i.overflow);
+      expect(overflow).toHaveLength(2);
+      expect(overflow[0]!.predictedStartMs).toBeNull();
+      await expectCode(cmd.setEndTime(deps, { ...admin, endAt: now + 5 * 60_000 }), 'VALIDATION'); // not later
+      await cmd.setEndTime(deps, { ...admin, endAt: now + 60 * 60_000 });
+      s = await snap(deps, ev.eventId);
+      expect(s.state(r2.request.id)).toBe('QUEUED');
+      expect(s.event.preview.items.some((i) => i.overflow)).toBe(false);
+      await expectCode(cmd.setEndTime(deps, { ...admin, endAt: now - 1 }), 'VALIDATION');
+    });
+
+    it('holds starts during a break and resumes after it', async () => {
+      const { deps, ev, admin, submit, player } = await setup({
+        breaks: [{ label: 'Class', durationSec: 600 }],
+      });
+      const brk = (await snap(deps, ev.eventId)).event.breaks[0]!;
+      await submit(await guest(deps, ev.eventId), 1);
+      const p = await player();
+      await cmd.startBreak(deps, { ...admin, breakId: brk.id });
+      await expectCode(cmd.startBreak(deps, { ...admin, breakId: brk.id }), 'VALIDATION');
+      await expectCode(p.start(), 'EVENT_NOT_ACTIVE');
+      await cmd.endBreak(deps, { ...admin, breakId: brk.id });
+      await p.start();
+      await expectCode(cmd.endBreak(deps, { ...admin, breakId: brk.id }), 'VALIDATION');
+    });
+
+    it('replays an idempotent submit without spending quota twice', async () => {
+      const { deps, ev } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const input = { ...a, style: 'salsa' as const, track: track(1), idempotencyKey: 'key-1' };
+      const first = await cmd.submitRequest(deps, input);
+      const again = await cmd.submitRequest(deps, input);
+      expect(again.request.id).toBe(first.request.id);
+      expect((await snap(deps, ev.eventId)).requests).toHaveLength(1);
+      for (const n of [2, 3, 4, 5])
+        await cmd.submitRequest(deps, { ...a, style: 'salsa', track: track(n) });
+    });
+
+    it('resolves pending metadata into the queue, or marks it unavailable', async () => {
+      const { deps, ev } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const pending = await cmd.submitRequest(deps, {
+        ...a,
+        style: 'salsa',
+        track: { ...track(1), metadataPending: true },
+      });
+      const dead = await cmd.submitRequest(deps, {
+        ...a,
+        style: 'salsa',
+        track: { ...track(2), metadataPending: true },
+      });
+      let s = await snap(deps, ev.eventId);
+      expect(s.state(pending.request.id)).toBe('PENDING_METADATA');
+      expect(s.event.reservation).toBeNull();
+      await cmd.resolveMetadata(deps, {
+        eventId: ev.eventId,
+        requestId: pending.request.id,
+        metadata: { durationMs: 200_000 },
+      });
+      await cmd.resolveMetadata(deps, {
+        eventId: ev.eventId,
+        requestId: dead.request.id,
+        metadata: null,
+      });
+      s = await snap(deps, ev.eventId);
+      expect(s.state(pending.request.id)).toBe('RESERVED_NEXT');
+      expect(s.state(dead.request.id)).toBe('UNAVAILABLE');
+      for (const n of [3, 4, 5, 6])
+        await cmd.submitRequest(deps, { ...a, style: 'salsa', track: track(n) }); // UNAVAILABLE freed a slot
+    });
+
+    it('hands over admin: old secret dies at once, code is single-use and expires', async () => {
+      const { deps, ev, admin, submit, player } = await setup();
+      await submit(await guest(deps, ev.eventId), 1);
+      const p = await player();
+      await p.start();
+      const offer = await cmd.createHandoverOffer(deps, admin);
+      expect((await snap(deps, ev.eventId)).event.state).toBe('TRANSFERRING');
+      await expectCode(
+        cmd.claimHandover(deps, { eventId: ev.eventId, code: 'WRONGWRONGWRONG0' }),
+        'UNAUTHORISED',
+      );
+      const claimed = await cmd.claimHandover(deps, { eventId: ev.eventId, code: offer.code });
+      const s = await snap(deps, ev.eventId);
+      expect(s.event.state).toBe('PAUSED');
+      expect(s.event.nowPlaying).toBeNull(); // the partly played song is consumed
+      expect(s.event.lease).toBeNull();
+      await expectCode(cmd.pause(deps, admin), 'UNAUTHORISED');
+      await expectCode(
+        cmd.claimHandover(deps, { eventId: ev.eventId, code: offer.code }),
+        'UNAUTHORISED',
+      );
+      await expectCode(cmd.heartbeat(deps, p.lease), 'STALE_LEASE');
+      await cmd.resume(deps, { eventId: ev.eventId, adminSecret: claimed.adminSecret });
+      // recovery secret survives handover and can take control back
+      const rec = await cmd.recoverAdmin(deps, {
+        eventId: ev.eventId,
+        recoverySecret: ev.recoverySecret,
+      });
+      await expectCode(
+        cmd.pause(deps, { eventId: ev.eventId, adminSecret: claimed.adminSecret }),
+        'UNAUTHORISED',
+      );
+      await cmd.pause(deps, { eventId: ev.eventId, adminSecret: rec.adminSecret });
+    });
+
+    it('rejects an expired handover code, and a cancelled one', async () => {
+      const { deps, ev, admin } = await setup();
+      const offer = await cmd.createHandoverOffer(deps, admin);
+      deps.clock.advance(11 * 60_000);
+      await expectCode(
+        cmd.claimHandover(deps, { eventId: ev.eventId, code: offer.code }),
+        'UNAUTHORISED',
+      );
+      const second = await cmd.createHandoverOffer(deps, admin);
+      await cmd.resume(deps, admin); // cancels the transfer
+      expect((await snap(deps, ev.eventId)).event.state).toBe('ACTIVE');
+      await expectCode(
+        cmd.claimHandover(deps, { eventId: ev.eventId, code: second.code }),
+        'UNAUTHORISED',
+      );
+    });
+
+    it('ends terminally with a carry-over list, then archives', async () => {
+      const { deps, ev, admin, submit, player } = await setup();
+      const a = await guest(deps, ev.eventId);
+      const b = await guest(deps, ev.eventId);
+      await submit(a, 1);
+      await submit(b, 2, 'bachata');
+      await submit(a, 3);
+      const p = await player();
+      await p.start();
+      const ended = await cmd.endEvent(deps, admin);
+      expect(ended.carryOver.map((c) => c.title)).toEqual(['Song 2', 'Song 3']);
+      const s = await snap(deps, ev.eventId);
+      expect(s.event.state).toBe('ENDED');
+      expect(s.event.nowPlaying).toBeNull();
+      expect(s.event.preview.items).toEqual([]);
+      await expectCode(cmd.resume(deps, admin), 'EVENT_ENDED');
+      await expectCode(cmd.endEvent(deps, admin), 'EVENT_ENDED');
+      await expectCode(cmd.claimLease(deps, admin), 'EVENT_ENDED');
+      await cmd.archive(deps, admin);
+      expect((await snap(deps, ev.eventId)).event.state).toBe('ARCHIVED');
+    });
+
+    it('imports a snapshot as seeded system requests with reproducible per-style shuffle', async () => {
+      const { deps, ev, admin } = await setup();
+      const rules = (await snap(deps, ev.eventId)).event.rules;
+      const recommendations = Array.from({ length: 8 }, (_, i) => ({
+        title: `Seed ${i}`,
+        artist: 'X',
+        style: (i % 2 ? 'bachata' : 'salsa') as 'salsa' | 'bachata',
+        durationMs: 200_000,
+        sourceUrl: null,
+      }));
+      const snapshot = { formatVersion: 1 as const, name: 'Old night', rules, recommendations };
+      const order = async (seed: number) => {
+        const r = await cmd.importSnapshot(deps, {
+          snapshot,
+          shuffle: true,
+          seed,
+          timezone: 'UTC',
+        });
+        const s = await snap(deps, r.eventId);
+        return { r, s, titles: s.requests.map((q) => q.title) };
+      };
+      const one = await order(7);
+      const two = await order(7);
+      const other = await order(8);
+      expect(one.titles).toEqual(two.titles);
+      expect(one.titles).not.toEqual(other.titles);
+      expect(one.s.requests.every((q) => q.ownerId === 'system-seed')).toBe(true);
+      // Style slots keep their positions.
+      expect(one.s.requests.map((q) => q.style)).toEqual(recommendations.map((q) => q.style));
+      expect(one.s.event.state).toBe('DRAFT');
+      expect(one.s.event.importSeed).toBe(7);
+      expect(one.r.adminSecret).not.toBe(admin.adminSecret);
+
+      // Seeds obey owner spacing like anyone else: one seed plays, then it waits for a real guest.
+      const started = { eventId: one.r.eventId, adminSecret: one.r.adminSecret };
+      await cmd.startEvent(deps, started);
+      const p = await cmd.claimLease(deps, started);
+      const lease = { eventId: one.r.eventId, leaseToken: p.leaseToken, epoch: p.lease.epoch };
+      let s = await snap(deps, one.r.eventId);
+      const first = s.event.reservation!.requestId;
+      await cmd.reportStarted(deps, { ...lease, requestId: first });
+      await cmd.reportFinished(deps, { ...lease, requestId: first, outcome: 'PLAYED' });
+      s = await snap(deps, one.r.eventId);
+      expect(s.event.reservation).toBeNull();
+      expect(s.event.waitingReason).toMatch(/another contributor/);
+      const g = await guest(deps, one.r.eventId);
+      await cmd.submitRequest(deps, { ...g, style: 'salsa', track: track('live') });
+      expect((await snap(deps, one.r.eventId)).event.reservation).not.toBeNull();
+    });
+
+    it('imports only selected, enabled-style songs and de-duplicates them', async () => {
+      const { deps, ev } = await setup();
+      const rules = (await snap(deps, ev.eventId)).event.rules;
+      const song = (title: string, style: 'salsa' | 'kizomba') => ({
+        title,
+        artist: null,
+        style,
+        durationMs: null,
+        sourceUrl: null,
+      });
+      const r = await cmd.importSnapshot(deps, {
+        snapshot: {
+          formatVersion: 1,
+          name: 'n',
+          rules,
+          recommendations: [
+            song('A', 'salsa'),
+            song('a', 'salsa'),
+            song('B', 'kizomba'),
+            song('C', 'salsa'),
+          ],
+        },
+        selectedIndexes: [0, 1, 2],
+        timezone: 'UTC',
+      });
+      expect(r.seeded).toBe(1);
+    });
+
+    it('never writes secrets to the audit trail', async () => {
+      const { deps, ev, admin, submit, player } = await setup();
+      const g = await guest(deps, ev.eventId);
+      await submit(g, 1);
+      const p = await player();
+      await cmd.createHandoverOffer(deps, admin);
+      const text = JSON.stringify(await deps.repo.listAudit(ev.eventId));
+      for (const secret of [ev.adminSecret, ev.recoverySecret, g.token, p.lease.leaseToken]) {
+        expect(text).not.toContain(secret);
+      }
+      expect(text).toContain('request.submit');
+    });
+  });
+}

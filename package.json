@@ -25,6 +25,7 @@
     "@eslint/js": "9.39.5",
     "eslint": "9.39.5",
     "eslint-plugin-react-hooks": "7.1.1",
+    "firebase-tools": "15.34.2",
     "globals": "17.13.0",
     "prettier": "3.9.10",
     "sharp": "0.35.5",

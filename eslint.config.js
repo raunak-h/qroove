@@ -20,6 +20,33 @@ export default tseslint.config(
     rules: { '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }] },
   },
   {
+    files: ['apps/server/src/**/*.ts'],
+    ignores: ['apps/server/src/db/firestore/**'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['firebase-admin', 'firebase-admin/*'],
+              message: 'Only apps/server/src/db/firestore may import firebase-admin.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ['apps/server/src/domain/**/*.ts'],
+    ignores: ['apps/server/src/domain/clock.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        { object: 'Date', property: 'now', message: 'Use the injected Clock.' },
+      ],
+    },
+  },
+  {
     files: ['apps/web/**/*.{ts,tsx}'],
     languageOptions: { globals: { ...globals.browser } },
     plugins: { 'react-hooks': reactHooks },

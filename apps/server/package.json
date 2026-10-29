@@ -9,14 +9,18 @@
     "build": "tsup",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
-    "test:integration": "vitest run --passWithNoTests test/integration"
+    "test:integration": "vitest run --passWithNoTests test/integration",
+    "test:emulator": "firebase emulators:exec --project qroove-test --only firestore \"vitest run test/integration/firestore.test.ts\""
   },
   "dependencies": {
     "@fastify/compress": "9.2.2",
     "@fastify/helmet": "13.2.0",
     "@fastify/static": "10.1.6",
     "@qroove/config": "workspace:*",
+    "@qroove/contracts": "workspace:*",
+    "@qroove/scheduler": "workspace:*",
     "fastify": "5.12.7",
+    "firebase-admin": "14.5.0",
     "zod": "4.6.7"
   },
   "devDependencies": {

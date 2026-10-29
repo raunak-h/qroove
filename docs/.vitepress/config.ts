@@ -64,6 +64,7 @@ export default defineConfig({
           { text: '0003 AGPL', link: '/adr/0003-agpl' },
           { text: '0004 No ageing bonus', link: '/adr/0004-no-ageing-bonus' },
           { text: '0005 Quota counts played', link: '/adr/0005-quota-counts-played' },
+          { text: '0006 Aggregate event doc', link: '/adr/0006-aggregate-event-doc' },
         ],
       },
       {
