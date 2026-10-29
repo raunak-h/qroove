@@ -116,6 +116,8 @@ export const AdminRequestView = z.object({
   acceptedSeq: z.number().int(),
   possibleDuplicate: z.boolean(),
   removedReason: z.string().nullable(),
+  /** The requester's pasted link (admin and player only), for manual playback. */
+  sourceUrl: z.string().nullable(),
 });
 export type AdminRequestView = z.infer<typeof AdminRequestView>;
 export const AdminState = z.object({

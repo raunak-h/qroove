@@ -1,3 +1,57 @@
 # Player guide
 
-Documented in Phase 7.
+The player is the one device that makes sound. Open it at `/player/<event id>` (the organiser page has a
+button). It needs organiser access on that device, because taking the player role is an organiser action.
+
+## Set up before doors open
+
+1. **Take the player role.** Press _Use this device as the player_. If another device is already the
+   player you will be asked to take over. Taking over stops the other device; whatever it was playing counts
+   as played, and you start the next song yourself.
+2. **Sound check.** Press _Play test chime_ and listen in the room. Starting a song is blocked until you
+   have done this once.
+3. **Choose your music.** Pick files (or a whole folder where the browser supports it). They are read in
+   the browser and **never uploaded**; Qroove never streams, hosts or copies recordings.
+
+Each requested song is matched to a file by the same artist/title/version fingerprint the server uses for
+duplicates, so `Marc Anthony - Vivir Mi Vida.mp3` matches a request for "Vivir Mi Vida (feat. X)" by Marc
+Anthony. Embedded tags are read first, with the file name (`Artist - Title`) as the fallback. If either side
+has no artist the match is shown as _probable (title only)_. A "Live" or "Remix" version never matches the
+studio request. You can also pick a file for a single song by hand.
+
+## Playing
+
+- The song reserved next is shown with its match status. Press **Start** once: the first tap unlocks audio
+  on phones and tablets. After that, the next reserved songs start by themselves.
+- A song counts as played only when audio actually begins (the browser's `playing` event) and is finished
+  when the file ends. A file that fails to play after starting is recorded as skipped; before starting, the
+  card falls back to manual mode.
+- **Manual mode** (no matching file): open the requester's link, play it however you are allowed to, then
+  press **Mark started** and, when it finishes, **Mark ended**. A manually started song counts for fairness
+  and duplicates like any other. Qroove never marks a song ended because a timer ran out, and it cannot
+  promise ad-free playback for a link.
+- The lock screen and Bluetooth headset buttons can play and pause, and the screen is kept awake while a
+  song plays where the browser allows it.
+
+## Lease and handover
+
+The player holds a lease that it renews every 10 seconds. If another device claims it, this one stops
+immediately and says _Another device took over playback_. A song cannot be handed over mid-track, because
+the file may exist only on the old device; the new device starts at the next song once its owner has
+checked it has the music. Reloading the page keeps the lease for the browser tab.
+
+## Tips
+
+- **Bluetooth:** connect and choose the output in the device's own settings before the sound check; the
+  browser cannot choose or fix the route. Disable sleep and keep the device charging.
+- **iPhone and iPad:** audio only starts after a tap, and playback can be suspended if the screen locks or
+  the tab is in the background. A laptop with local files is more reliable than a phone.
+- **Remember on this device** copies the files into the browser's private storage so you need not choose
+  them again. Only use it if the music owner allows copies, and untick it to delete them. Browsers may
+  remove stored files at any time; just choose them again.
+
+## Rights
+
+Only play recordings you are licensed to play at the venue. Public performance may need licences beyond
+owning the file or having a streaming subscription; check with the society or venue before using Qroove at
+a live event.

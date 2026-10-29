@@ -39,3 +39,8 @@ versioning: [SemVer](https://semver.org/).
 ### Changed
 - `hashRules`/`canonicalJson` moved to `@qroove/contracts/hash` so the contracts index is browser-safe.
 - Licence switched from MIT to AGPL-3.0-only.
+
+- Player (`/player/:eventId`): lease claim/takeover with 10 s heartbeat and immediate stop on `STALE_LEASE`, required sound check, local-file library (files or folder, tags via lazily loaded `music-metadata`, filename fallback), optional IndexedDB "remember on this device", automatic start/finish reporting with auto-advance, manual mode (source link, Mark started/ended), Media Session and Wake Lock.
+- `@qroove/contracts/normalise`: `norm`/fingerprint shared by the server and the player.
+- Admin state includes each request's `sourceUrl` for manual playback.
+- Docs: player guide.

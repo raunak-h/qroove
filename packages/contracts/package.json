@@ -6,7 +6,8 @@
   "license": "AGPL-3.0-only",
   "exports": {
     ".": "./src/index.ts",
-    "./hash": "./src/hash.ts"
+    "./hash": "./src/hash.ts",
+    "./normalise": "./src/normalise.ts"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json",

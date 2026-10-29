@@ -69,6 +69,7 @@ const state = (over: Record<string, unknown> = {}, viewOver: Record<string, unkn
       acceptedSeq: 1,
       possibleDuplicate: false,
       removedReason: null,
+      sourceUrl: null,
     },
     {
       id: 'r2',
@@ -81,6 +82,7 @@ const state = (over: Record<string, unknown> = {}, viewOver: Record<string, unkn
       acceptedSeq: 2,
       possibleDuplicate: true,
       removedReason: null,
+      sourceUrl: null,
     },
     {
       id: 'r3',
@@ -93,6 +95,7 @@ const state = (over: Record<string, unknown> = {}, viewOver: Record<string, unkn
       acceptedSeq: 0,
       possibleDuplicate: false,
       removedReason: null,
+      sourceUrl: null,
     },
   ],
   view: {

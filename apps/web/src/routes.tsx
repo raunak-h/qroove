@@ -9,6 +9,7 @@ const CreateEvent = lazy(() => import('./admin/CreateEvent'));
 const AdminEntry = lazy(() => import('./admin/AdminEntry'));
 const AdminPage = lazy(() => import('./admin/AdminPage'));
 const Historical = lazy(() => import('./admin/Historical'));
+const PlayerPage = lazy(() => import('./player/PlayerPage'));
 
 export function AppRoutes() {
   return (
@@ -23,6 +24,7 @@ export function AppRoutes() {
           <Route path="/claim/:eventId" element={<AdminEntry mode="claim" />} />
           <Route path="/admin/:eventId" element={<AdminPage />} />
           <Route path="/h/:slug" element={<Historical />} />
+          <Route path="/player/:eventId" element={<PlayerPage />} />
           <Route path="*" element={<Landing />} />
         </Routes>
       </Suspense>

@@ -2,8 +2,8 @@
 
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
-**Current phase:** 7
-**Next session starts with:** Phase 7 (Player). Phases 0–6 done.
+**Current phase:** 8
+**Next session starts with:** Phase 8 (Hardening, e2e, a11y, perf). Phases 0–7 done.
 
 ## Phases
 
@@ -14,7 +14,7 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - [x] 4 — HTTP API, auth, realtime, metadata
 - [x] 5 — Attendee UI
 - [x] 6 — Admin UI
-- [ ] 7 — Player
+- [x] 7 — Player
 - [ ] 8 — Hardening, e2e, a11y, perf
 - [ ] 9 — Deploy (Railway + Cloudflare + Firestore)
 - [ ] 10 — Release 0.1.0 + transfer readiness
@@ -97,3 +97,10 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - Bug caught by tests: number inputs that clamped on every keystroke turned "4" into "14"; they now keep raw text and clamp on submit.
 - Bundle: attendee initial JS ≈ 80 KB gz (+0.6 KB vs Phase 5); AdminPage 4.6 KB, CreateEvent 10.4 KB (includes the shared widgets + QR), others <1 KB, all lazy.
 - Not done: editing a DRAFT after creation from the UI (the `PATCH admin/draft` API exists; the form is create-only); admin page does not show participants' counts; pre-start seed removal for imported events is possible via Remove once started, not in DRAFT view since DRAFT has no moderation-specific tools beyond Remove.
+
+### Phase 7 (2026-10-29)
+
+- `apps/web/src/player/*` (lazy route `/player/:eventId`, 5.4 KB gz + `music-metadata` 12.2.1 as a separate on-demand chunk; attendee initial JS unchanged at ≈ 80 KB gz). `norm`/fingerprint moved to `@qroove/contracts/normalise` (server `domain/keys.ts` re-exports). `AdminRequestView.sourceUrl` added. 9 new web tests (matching, lease/start/finish flow, manual mode, stale lease).
+- Player uses the admin state stream (needs the admin cookie and CSRF for `claim` only); the reserved song is the request in `RESERVED_NEXT`. Lease creds live in memory + `sessionStorage` (reload resumes via heartbeat).
+- Decisions: Start is blocked until lease held + sound check done; auto-advance only after one successful user-initiated `play()`; a refused autoplay drops back to the Start button; audio load error before start → manual mode, after start → `FAILED` (counts as skipped); release/takeover leaves any playing track to the server's claim rule (closed as played); exact match = same fingerprint, title-only match is allowed when either artist is missing and is labelled "probable"; the per-request file choice is local only (no availability reported to the server).
+- Not done: availability per request sent to the server (SPEC §5 "mapping availability"; MVP shows it locally only); `pagehide` release (reload must keep the lease); real-browser audio is untested in CI (jsdom stubs) — Phase 8 e2e should cover it with a generated WAV and Chromium's fake audio; the server has no "media unavailable before start" command.

@@ -61,3 +61,30 @@ export function commands(id: string, csrf: string) {
   };
 }
 export type Commands = ReturnType<typeof commands>;
+
+export interface LeaseCreds {
+  leaseToken: string;
+  epoch: number;
+}
+
+const player = (id: string) => `/api/events/${id}/player`;
+
+/** Player calls are authorised by the lease token (claim needs the admin cookie). */
+export const playerApi = {
+  claim: (id: string, csrf: string, takeover: boolean) =>
+    request<{ leaseToken: string; lease: { epoch: number; expiresAt: number } }>(
+      'POST',
+      `${player(id)}/claim`,
+      { body: { takeover }, csrf },
+    ),
+  heartbeat: (id: string, l: LeaseCreds) =>
+    request<{ ok?: true }>('POST', `${player(id)}/heartbeat`, { body: l }),
+  started: (id: string, l: LeaseCreds, requestId: string, durationMs: number | null) =>
+    request<{ ok: true }>('POST', `${player(id)}/started`, {
+      body: { ...l, requestId, ...(durationMs ? { durationMs: Math.round(durationMs) } : {}) },
+    }),
+  finished: (id: string, l: LeaseCreds, requestId: string, outcome: 'PLAYED' | 'FAILED') =>
+    request<{ ok: true }>('POST', `${player(id)}/finished`, { body: { ...l, requestId, outcome } }),
+  release: (id: string, l: LeaseCreds) =>
+    request<{ ok: true }>('POST', `${player(id)}/release`, { body: l }),
+};

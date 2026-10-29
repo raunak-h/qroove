@@ -130,6 +130,7 @@ export function adminState(agg: EventAggregate, now: number): AdminState {
     acceptedSeq: r.acceptedSeq,
     possibleDuplicate: r.possibleDuplicate,
     removedReason: r.removedReason,
+    sourceUrl: r.sourceUrl,
   }));
   const l = agg.event.lease;
   return {
