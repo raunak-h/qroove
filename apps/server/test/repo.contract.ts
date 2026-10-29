@@ -15,7 +15,7 @@ export function runRepoContract(name: string, make: () => Promise<Repository>, s
         name: 'Contract',
         timezone: 'UTC',
         rules: buildRules({}),
-        endAt: null,
+        plannedDurationMin: null,
         breaks: [],
       });
       expect(await repo.createEvent({ event: d.event, adminGrants: d.adminGrants })).toBe(true);
@@ -50,7 +50,7 @@ export function runRepoContract(name: string, make: () => Promise<Repository>, s
         name: 'x',
         timezone: 'UTC',
         rules: buildRules({}),
-        endAt: null,
+        plannedDurationMin: null,
         breaks: [],
       });
       clash.event.publicSlug = event.publicSlug;

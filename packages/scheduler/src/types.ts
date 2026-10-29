@@ -17,6 +17,11 @@ export interface HistoryState {
   lastOwnerId: string | null;
   transitionCount: number;
   ownerLastPlayTransition: Readonly<Record<string, number>>;
+  /**
+   * Single-genre nights only: after owner p plays, the recordings of other people's songs (oldest
+   * first, the first half of those waiting) that must be played before p's next song may start.
+   */
+  ownerGate: Readonly<Record<string, readonly string[]>>;
   playedKeys: ReadonlySet<string>;
 }
 
@@ -29,6 +34,7 @@ export interface SchedulerRules {
 export type Ineligibility =
   | 'SAME_OWNER_ADJACENT'
   | 'NEEDS_STYLE_TRANSITION'
+  | 'NEEDS_OTHERS_PLAYED'
   | 'RUN_CAP'
   | 'ALREADY_PLAYED'
   | 'STYLE_DISABLED'
@@ -40,6 +46,8 @@ export type Eligibility = { ok: true } | { ok: false; reason: Ineligibility };
 export interface EligibilityContext {
   /** Playable window left (ms) when a fixed end time is enforced; null/absent = unbounded. */
   remainingMs?: number | null;
+  /** Recordings still waiting in the pool; a gated song that left the pool (withdrawn) stops blocking. */
+  poolKeys?: ReadonlySet<string>;
 }
 
 /** Duration assumed (and flagged uncertain) when a recording's length is unknown. */
@@ -54,5 +62,6 @@ export const EMPTY_HISTORY: HistoryState = {
   lastOwnerId: null,
   transitionCount: 0,
   ownerLastPlayTransition: {},
+  ownerGate: {},
   playedKeys: new Set(),
 };

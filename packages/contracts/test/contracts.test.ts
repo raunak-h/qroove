@@ -6,26 +6,50 @@ import {
   ERROR_COPY,
   RulesSnapshot,
   SubmitRequestBody,
+  breakSlots,
   defaultRules,
+  validateBreaks,
 } from '../src/index.js';
 
 describe('rules', () => {
-  it('defaults match SPEC §3.1 and validate', () => {
+  it('defaults validate; the master number applies to every genre', () => {
     const r = defaultRules();
     expect(RulesSnapshot.parse(r)).toEqual(r);
-    expect(r).toMatchObject({ submissionLimit: 5, runCaps: { salsa: 2, bachata: 2 } });
+    expect(r).toMatchObject({
+      rulesVersion: 2,
+      submissionLimit: 5,
+      masterRunCap: 2,
+      runCaps: { salsa: 2, bachata: 2 },
+    });
   });
-  it('other styles default to cap 1', () => {
-    expect(defaultRules(['salsa', 'bachata', 'kizomba']).runCaps['kizomba']).toBe(1);
+  it('caps are per genre: salsa and non-Latin salsa-compatible share one', () => {
+    const r = defaultRules(['salsa', 'salsa_nl', 'bachata', 'chacha_nl'], 3);
+    expect(r.runCaps).toEqual({ salsa: 3, bachata: 3, chacha: 3 });
+    expect(RulesSnapshot.safeParse(r).success).toBe(true);
   });
-  it('rejects missing caps, duplicates and single-style events', () => {
+  it('allows a single genre, but not duplicates or a missing cap', () => {
     const r = defaultRules();
+    expect(RulesSnapshot.safeParse(defaultRules(['salsa'])).success).toBe(true);
+    expect(RulesSnapshot.safeParse(defaultRules(['salsa', 'salsa_nl'])).success).toBe(true);
     expect(RulesSnapshot.safeParse({ ...r, runCaps: { salsa: 2 } }).success).toBe(false);
     expect(RulesSnapshot.safeParse({ ...r, enabledStyles: ['salsa', 'salsa'] }).success).toBe(
       false,
     );
-    expect(RulesSnapshot.safeParse({ ...r, enabledStyles: ['salsa'] }).success).toBe(false);
     expect(RulesSnapshot.safeParse({ ...r, submissionLimit: 0 }).success).toBe(false);
+  });
+  it('ratios go up to 1:5 and 1:1:5; a genre can never fall below 1 part in 10', () => {
+    const ok = (parts: number[]) =>
+      RulesSnapshot.safeParse(
+        defaultRules(['salsa', 'bachata', 'chacha'].slice(0, parts.length) as never, 2, {
+          salsa: parts[0]!,
+          bachata: parts[1]!,
+          ...(parts[2] ? { chacha: parts[2] } : {}),
+        }),
+      ).success;
+    expect(ok([1, 5])).toBe(true);
+    expect(ok([1, 1, 5])).toBe(true);
+    expect(ok([1, 5, 5])).toBe(false); // 1 part in 11
+    expect(ok([1, 6])).toBe(false); // above the 1:5 ratio limit
   });
   it('hash is stable under key/style order and changes with any rule', () => {
     const r = defaultRules();
@@ -60,5 +84,24 @@ describe('api bodies', () => {
       true,
     );
     expect(SubmitRequestBody.safeParse({ style: 'polka', url: 'https://a.b' }).success).toBe(false);
+  });
+});
+
+describe('breaks', () => {
+  it('centres breaks on even points of the planned time', () => {
+    expect(breakSlots(120, [10])).toEqual([{ startMin: 55, durationMin: 10 }]);
+    expect(breakSlots(120, [20, 20])).toEqual([
+      { startMin: 30, durationMin: 20 },
+      { startMin: 70, durationMin: 20 },
+    ]);
+  });
+  it('enforces the hard limits', () => {
+    expect(validateBreaks(120, [10])).toBeNull();
+    expect(validateBreaks(120, [30, 30])).toMatch(/between breaks/); // back to back
+    expect(validateBreaks(120, [30, 30, 30])).toMatch(/half/);
+    expect(validateBreaks(120, [15])).toMatch(/steps of 10/);
+    expect(validateBreaks(null, [10])).toMatch(/planned time/);
+    expect(validateBreaks(120, [10, 10, 10, 10])).toMatch(/At most/);
+    expect(validateBreaks(null, [])).toBeNull();
   });
 });

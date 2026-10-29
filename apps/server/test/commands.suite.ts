@@ -40,7 +40,7 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
       const { deps, ev, admin } = await setup({}, false);
       expect(ev.slug).toHaveLength(6);
       expect((await snap(deps, ev.eventId)).event.state).toBe('DRAFT');
-      await cmd.updateDraft(deps, { ...admin, submissionLimit: 3, runCaps: { salsa: 3 } });
+      await cmd.updateDraft(deps, { ...admin, submissionLimit: 3, masterRunCap: 3 });
       await cmd.startEvent(deps, admin);
       const { event } = await snap(deps, ev.eventId);
       expect(event.state).toBe('ACTIVE');
@@ -66,13 +66,13 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
       );
     });
 
-    it('refuses a start time in the past and a stale expectedVersion', async () => {
+    it('starts the planned-time clock at start and refuses a stale expectedVersion', async () => {
       const deps = makeDeps(await make());
-      const ev = await liveEvent(deps, { endAt: 1 }, false);
-      await expectCode(
-        cmd.startEvent(deps, { eventId: ev.eventId, adminSecret: ev.adminSecret }),
-        'VALIDATION',
-      );
+      const ev = await liveEvent(deps, { plannedDurationMin: 120 }, false);
+      expect((await snap(deps, ev.eventId)).event.endAt).toBeNull();
+      deps.clock.advance(5 * 60_000);
+      await cmd.startEvent(deps, { eventId: ev.eventId, adminSecret: ev.adminSecret });
+      expect((await snap(deps, ev.eventId)).event.endAt).toBe(deps.clock.now() + 120 * 60_000);
       await expectCode(
         cmd.updateDraft(deps, {
           eventId: ev.eventId,
@@ -158,7 +158,7 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
       const { deps, ev, admin, submit } = await setup({ enabledStyles: ['salsa', 'bachata'] });
       const a = await guest(deps, ev.eventId);
       await expectCode(
-        cmd.submitRequest(deps, { ...a, style: 'kizomba', track: track(1) }),
+        cmd.submitRequest(deps, { ...a, style: 'chacha', track: track(1) }),
         'VALIDATION',
       );
       await cmd.endEvent(deps, admin);
@@ -370,6 +370,7 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
 
     it('holds starts during a break and resumes after it', async () => {
       const { deps, ev, admin, submit, player } = await setup({
+        plannedDurationMin: 120,
         breaks: [{ label: 'Class', durationSec: 600 }],
       });
       const brk = (await snap(deps, ev.eventId)).event.breaks[0]!;
@@ -519,6 +520,7 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
           shuffle: true,
           seed,
           timezone: 'UTC',
+          plannedDurationMin: 240,
         });
         const s = await snap(deps, r.eventId);
         return { r, s, titles: s.requests.map((q) => q.title) };
@@ -555,7 +557,7 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
     it('imports only selected, enabled-style songs and de-duplicates them', async () => {
       const { deps, ev } = await setup();
       const rules = (await snap(deps, ev.eventId)).event.rules;
-      const song = (title: string, style: 'salsa' | 'kizomba') => ({
+      const song = (title: string, style: 'salsa' | 'chacha') => ({
         title,
         artist: null,
         style,
@@ -570,14 +572,127 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
           recommendations: [
             song('A', 'salsa'),
             song('a', 'salsa'),
-            song('B', 'kizomba'),
+            song('B', 'chacha'),
             song('C', 'salsa'),
           ],
         },
         selectedIndexes: [0, 1, 2],
         timezone: 'UTC',
+        plannedDurationMin: 120,
       });
       expect(r.seeded).toBe(1);
+    });
+
+    it('refuses a join without the QR secret', async () => {
+      const deps = makeDeps(await make());
+      const ev = await liveEvent(deps);
+      await expectCode(cmd.joinEvent(deps, { eventId: ev.eventId }), 'JOIN_KEY_REQUIRED');
+      await expectCode(
+        cmd.joinEvent(deps, { eventId: ev.eventId, joinKey: 'wrong' }),
+        'JOIN_KEY_REQUIRED',
+      );
+    });
+
+    it('enforces the break limits: half of the time, spacing, steps of ten minutes', async () => {
+      const deps = makeDeps(await make());
+      const mk = (planned: number | undefined, mins: number[]) =>
+        cmd.createEvent(deps, {
+          name: 'B',
+          timezone: 'UTC',
+          ...(planned ? { plannedDurationMin: planned } : {}),
+          breaks: mins.map((m) => ({ label: `${m} min`, durationSec: m * 60 })),
+        });
+      await mk(120, [10]);
+      await mk(120, [20, 20]); // two breaks, 20 minutes of music between them
+      await expectCode(mk(120, [30, 30]), 'VALIDATION'); // back to back: only 10 minutes between
+      await expectCode(mk(120, [30, 30, 30]), 'VALIDATION'); // over half
+      await expectCode(mk(undefined, [10]), 'VALIDATION'); // needs a planned time
+      await expectCode(mk(120, [15]), 'VALIDATION'); // not a ten-minute step
+      await mk(60, [20]);
+      await expectCode(mk(60, [30]), 'VALIDATION'); // only 15 minutes of music before it
+    });
+
+    it('stops reserving songs that would run into a break, and resumes after it', async () => {
+      // 2 h event, 10 min break centred on the midpoint: music until 0:55, break 0:55-1:05.
+      const { deps, ev, admin, submit, player } = await setup({
+        plannedDurationMin: 120,
+        breaks: [{ label: 'Break', durationSec: 600 }],
+      });
+      const brk = (await snap(deps, ev.eventId)).event.breaks[0]!;
+      expect(brk.startsAt).toBe(deps.clock.now() + 55 * 60_000);
+      deps.clock.advance(52 * 60_000);
+      await submit(await guest(deps, ev.eventId), 1, 'salsa', 240_000); // 4 min: ends 0:56 > 0:55
+      let s = await snap(deps, ev.eventId);
+      expect(s.event.reservation).toBeNull();
+      expect(s.event.waitingReason).toMatch(/break/i);
+      expect(
+        s.event.preview.items.some((i) => i.predictedStartMs! >= brk.startsAt! + 600_000),
+      ).toBe(true);
+      deps.clock.advance(4 * 60_000); // 0:56
+      await cmd.startBreak(deps, { ...admin, breakId: brk.id });
+      deps.clock.advance(10 * 60_000);
+      await cmd.endBreak(deps, { ...admin, breakId: brk.id });
+      s = await snap(deps, ev.eventId);
+      expect(s.event.reservation).not.toBeNull();
+      await (await player()).start();
+    });
+
+    it('treats salsa and non-Latin salsa-compatible as one genre', async () => {
+      const { deps, ev } = await setup({ enabledStyles: ['salsa', 'salsa_nl', 'bachata'] });
+      const a = await guest(deps, ev.eventId);
+      const b = await guest(deps, ev.eventId);
+      const c = await guest(deps, ev.eventId);
+      await cmd.submitRequest(deps, { ...a, style: 'salsa', track: track(1) });
+      await cmd.submitRequest(deps, { ...b, style: 'salsa_nl', track: track(2) });
+      await cmd.submitRequest(deps, { ...c, style: 'salsa', track: track(3) });
+      const admin = { eventId: ev.eventId, adminSecret: ev.adminSecret };
+      const claim = await cmd.claimLease(deps, admin);
+      const lease = { eventId: ev.eventId, leaseToken: claim.leaseToken, epoch: claim.lease.epoch };
+      for (let i = 0; i < 2; i++) {
+        const id = (await snap(deps, ev.eventId)).event.reservation!.requestId;
+        await cmd.reportStarted(deps, { ...lease, requestId: id });
+        await cmd.reportFinished(deps, { ...lease, requestId: id, outcome: 'PLAYED' });
+      }
+      const h = (await snap(deps, ev.eventId)).event.history;
+      expect(h.lastStyle).toBe('salsa'); // the genre, not the style
+      expect(h.runLength).toBe(2);
+      expect(h.transitionCount).toBe(0);
+      // Run cap of 2 is reached by two salsa-genre songs: a third waits for another genre.
+      expect((await snap(deps, ev.eventId)).event.reservation).toBeNull();
+    });
+
+    it('single genre: a returning requester waits for half of the others’ songs', async () => {
+      const { deps, ev, admin } = await setup({
+        enabledStyles: ['salsa'],
+        masterRunCap: 5,
+      });
+      const a = await guest(deps, ev.eventId);
+      const others = [
+        await guest(deps, ev.eventId),
+        await guest(deps, ev.eventId),
+        await guest(deps, ev.eventId),
+        await guest(deps, ev.eventId),
+      ];
+      const ra1 = await cmd.submitRequest(deps, { ...a, style: 'salsa', track: track('a1') });
+      const ra2 = await cmd.submitRequest(deps, { ...a, style: 'salsa', track: track('a2') });
+      const rs = [];
+      for (const [i, g] of others.entries()) {
+        rs.push(await cmd.submitRequest(deps, { ...g, style: 'salsa', track: track(`o${i}`) }));
+      }
+      const claim = await cmd.claimLease(deps, admin);
+      const lease = { eventId: ev.eventId, leaseToken: claim.leaseToken, epoch: claim.lease.epoch };
+      const playNext = async () => {
+        const id = (await snap(deps, ev.eventId)).event.reservation!.requestId;
+        await cmd.reportStarted(deps, { ...lease, requestId: id });
+        await cmd.reportFinished(deps, { ...lease, requestId: id, outcome: 'PLAYED' });
+        return id;
+      };
+      const order = [];
+      for (let i = 0; i < 5; i++) order.push(await playNext()); // the run cap of 5 ends the run here
+      expect(order[0]).toBe(ra1.request.id);
+      // A's second song is older than every other song, yet A waits: of the four others who were
+      // waiting after A's first song, the oldest two (half) play before A returns.
+      expect(order.slice(1, 4)).toEqual([rs[0]!.request.id, rs[1]!.request.id, ra2.request.id]);
     });
 
     it('never writes secrets to the audit trail', async () => {

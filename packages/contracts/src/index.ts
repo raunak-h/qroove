@@ -4,3 +4,4 @@ export * from './event.js';
 export * from './request.js';
 export * from './player.js';
 export * from './api.js';
+export * from './breaks.js';

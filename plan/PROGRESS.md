@@ -3,7 +3,7 @@
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
 **Current phase:** — (all phases done)
-**Next session starts with:** Pilot follow-up: the user-side items under "Blocked / needs user", then the pilot validation questions below. Phases 0–10 done; v0.1.0 tagged.
+**Next session starts with:** Pilot follow-up: the user-side items under "Blocked / needs user", then the pilot validation questions below. Phases 0–10 done, plus Phase 11 (pilot feedback); v0.2.0 tagged.
 
 ## Phases
 
@@ -152,3 +152,13 @@ Qroove 0.1.0 is live at https://qroove.sataklela.com: fair queue scheduler, atte
 4. Do organisers prefer local-file playback or manual mode, and which devices and Bluetooth setups actually work?
 5. Is the 30-day retention and anonymous nickname model acceptable to the society and its members?
 6. Does the venue/society have the public-performance licences needed for the music played?
+
+### Phase 11 — pilot feedback (2026-10-29, v0.2.0)
+
+- Done as planned in `/home/codespace/.claude/plans/flickering-wiggling-map.md` (genre groups + ratios, planned-time timer, break windows, QR-secret join, landing code boxes, one-screen organiser console, two-tap end, right-click lock, header logo/menu), plus the follow-up request: **playlist import** replaces the JSON import (`ingestion/playlist.ts`).
+- Decisions (ADRs 0007–0010): scheduler "style" = genre; ratio parts 1–5 with a 1-in-10 floor; single-genre spacing = wait for half of the others' waiting songs (snapshotted at the owner's play, as canonical keys); breaks centred on even points of the plan, ≤ half of it, ≥ 20 min of music around each, max 3, set before start; organiser starts/ends breaks manually; join key stored on the event doc and carried in the QR fragment; room code can view the queue but not join.
+- Logo is top-left (home link) because the brief also put the rules menu top-right; confirmed with the user.
+- Playlist import is **scraping of public pages**, not an API: Spotify embed page (`__NEXT_DATA__`, ~50 tracks), Apple Music page (`serialized-server-data`, ~50 tracks), YouTube playlist page (`ytInitialData`, ~100 videos; YouTube Music links map to the same playlist id; titles are cleaned and the channel is used as artist). Verified against live pages from the dev sandbox on 2026-10-29, covered by fixture tests only, and likely to break when those sites change; long playlists are truncated to what the page shows. A public "Spotify playlist" via API keys was not used (the embed needs none). Hosts added to the SSRF allowlist: `music.apple.com`. Songs get one organiser-chosen style, so imported songs are always one style.
+- Rules snapshot is v2 and prod's earlier throw-away "Smoke" draft (v1 rules) is unreadable; the purge deletes it after 7 days.
+- Not done: automatic break timer; rotating the join key; "Lock this device" / idle auto-lock for organiser sessions (right-click lock is cosmetic only); editing a draft's settings after creation; iPhone/WebKit e2e; playlist import for YouTube/Apple beyond the first page of tracks.
+- Tests: scheduler 27 (+property), contracts 10, server 125 (+emulator 46), web 45, e2e 3 (flow, 360×640 no-scroll, light theme) incl. axe.

@@ -13,7 +13,7 @@ const STYLES = ['salsa', 'bachata', 'chacha', 'kizomba'];
 
 const scenario = fc.record({
   owners: fc.integer({ min: 1, max: 8 }),
-  styleCount: fc.integer({ min: 1, max: 4 }),
+  styleCount: fc.integer({ min: 2, max: 4 }),
   caps: fc.array(fc.integer({ min: 1, max: 3 }), { minLength: 4, maxLength: 4 }),
   reqs: fc.array(
     fc.record({
@@ -53,7 +53,7 @@ describe('projection invariants', () => {
           nowMs: 0,
           endAtMs,
           currentRemainingMs: null,
-          breaksRemainingSec: 0,
+          breaks: [],
           overheadSec: 5,
           horizon: 100,
         };
@@ -91,4 +91,61 @@ describe('projection invariants', () => {
       { numRuns },
     );
   }, 600_000);
+});
+
+describe('single-genre invariants', () => {
+  it('never plays one owner twice in a row or exceeds the cap, and waits for half of the others', () => {
+    fc.assert(
+      fc.property(scenario, (sc) => {
+        const rules: SchedulerRules = { enabledStyles: ['salsa'], runCaps: { salsa: sc.caps[0]! } };
+        const cands: Candidate[] = sc.reqs.map((r, i) => ({
+          requestId: `r${String(i).padStart(3, '0')}`,
+          ownerId: `o${r.o % sc.owners}`,
+          style: 'salsa',
+          acceptedSeq: i,
+          canonicalKey: `k${r.key}`,
+          durationMs: 180_000,
+          playable: true,
+        }));
+        const p = projectQueue({
+          candidates: cands,
+          history: EMPTY_HISTORY,
+          rules,
+          nowMs: 0,
+          endAtMs: null,
+          currentRemainingMs: null,
+          breaks: [],
+          overheadSec: 5,
+          horizon: 100,
+        });
+        const byId = new Map(cands.map((c) => [c.requestId, c]));
+        const order = p.items.filter((i) => !i.overflow).map((i) => byId.get(i.requestId)!);
+        const seen = new Set<string>();
+        order.forEach((c, idx) => {
+          if (idx > 0) expect(c.ownerId).not.toBe(order[idx - 1]!.ownerId);
+          expect(seen.has(c.canonicalKey)).toBe(false);
+          seen.add(c.canonicalKey);
+          // Returning owner: at least ceil(half) of the others' songs that were waiting at their
+          // previous play have been played by now.
+          const prevIdx = order
+            .slice(0, idx)
+            .map((o) => o.ownerId)
+            .lastIndexOf(c.ownerId);
+          if (prevIdx >= 0) {
+            const playedBefore = new Set(order.slice(0, prevIdx + 1).map((o) => o.canonicalKey));
+            const waiting = cands.filter(
+              (o) => o.ownerId !== c.ownerId && !playedBefore.has(o.canonicalKey),
+            );
+            const need = Math.ceil(waiting.length / 2);
+            const oldest = [...waiting]
+              .sort((a, b) => a.acceptedSeq - b.acceptedSeq)
+              .slice(0, need);
+            const nowPlayed = new Set(order.slice(0, idx).map((o) => o.canonicalKey));
+            for (const o of oldest) expect(nowPlayed.has(o.canonicalKey)).toBe(true);
+          }
+        });
+      }),
+      { numRuns: Number(process.env.PROPERTY_RUNS ?? 2000) },
+    );
+  });
 });

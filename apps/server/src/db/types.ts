@@ -16,6 +16,7 @@ export interface HistoryDoc {
   lastOwnerId: string | null;
   transitionCount: number;
   ownerLastPlayTransition: Record<string, number>;
+  ownerGate: Record<string, string[]>;
   playedKeys: string[];
 }
 
@@ -38,6 +39,10 @@ export interface EventDoc {
   startedAt: number | null;
   endedAt: number | null;
   endAt: number | null;
+  /** Planned time in minutes (oven-timer style); `endAt` is derived from it when the event starts. */
+  plannedDurationMin: number | null;
+  /** Secret carried by the organiser's QR code; required to join. Never sent to participants' views. */
+  joinKey: string;
   breaks: BreakSpec[];
   rules: RulesSnapshot;
   rulesHash: string | null;

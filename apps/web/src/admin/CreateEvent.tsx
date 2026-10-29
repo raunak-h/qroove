@@ -1,20 +1,22 @@
-import { RULE_DEFAULTS, STYLE_PRESETS, DEFAULT_ENABLED_STYLES } from '@qroove/config';
-import type { StyleId } from '@qroove/contracts';
+import {
+  DEFAULT_ENABLED_STYLES,
+  EVENT_LIMITS,
+  GENRES,
+  RULE_DEFAULTS,
+  STYLE_PRESETS,
+  genreOf,
+  genresOf,
+  type GenreId,
+  type StyleId,
+} from '@qroove/config';
+import { breakSlots, ratioProblem, validateBreaks } from '@qroove/contracts/breaks';
 import { useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import { ApiError } from '../shared/api';
-import { CopyButton } from '../shared/widgets';
-import { fromLocalInput, toLocalInput } from '../shared/time';
 import { adminApi, type Created } from './adminApi';
 import { ErrorLine } from './useAction';
 
-const clamp = (v: string, lo: number, hi: number, dflt: number) => {
-  const n = Math.round(Number(v));
-  return v.trim() === '' || !Number.isFinite(n) ? dflt : Math.min(hi, Math.max(lo, n));
-};
-const defaultCap = (s: StyleId) => RULE_DEFAULTS.runCaps[s] ?? RULE_DEFAULTS.otherStyleRunCap;
-
-/** The admin link is shown exactly once; losing it means falling back to the recovery secret. */
+/** The organiser link is shown exactly once; losing it means falling back to the recovery secret. */
 export function CreatedPanel({ created }: { created: Created }) {
   const u = new URL(created.adminUrl);
   return (
@@ -26,7 +28,6 @@ export function CreatedPanel({ created }: { created: Created }) {
       </p>
       <p className="mono">{created.adminUrl}</p>
       <div className="row">
-        <CopyButton text={created.adminUrl} label="Copy organiser link" />
         <Link className="btn primary" to={`${u.pathname}${u.hash}`}>
           Open organiser page
         </Link>
@@ -38,57 +39,104 @@ export function CreatedPanel({ created }: { created: Created }) {
           from the link.
         </p>
         <p className="mono">{created.recoverySecret}</p>
-        <CopyButton text={created.recoverySecret} label="Copy recovery secret" />
       </details>
-      <p>
-        Attendees join with code <strong className="code">{created.slug}</strong> or{' '}
-        <span className="mono">{created.joinUrl}</span>.
+      <p className="muted">
+        {created.seeded ? `${created.seeded} songs from your playlist are queued. ` : ''}
+        Guests join by scanning the QR code on your organiser page.
       </p>
     </section>
   );
 }
 
-const TEMPLATES = [
-  {
-    label: 'Friday Social',
-    make: () => {
-      const d = new Date();
-      d.setHours(21, 0, 0, 0);
-      return {
-        name: 'Friday Social',
-        end: d.getTime() > Date.now() ? d.getTime() : null,
-        breaks: [] as Brk[],
-      };
-    },
-  },
-  ...[10, 20].map((m) => ({
-    label: `Dance break (${m} min)`,
-    make: () => ({
-      name: `Dance break (${m} min)`,
-      end: Date.now() + m * 60_000,
-      breaks: [] as Brk[],
-    }),
-  })),
-];
-type Brk = { label: string; durationSec: number };
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** Oven-timer style: hours (0–8) and minutes in steps of ten, never more than eight hours. */
+function TimerPicker({ minutes, onChange }: { minutes: number; onChange: (m: number) => void }) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  const clampTotal = (total: number) =>
+    Math.min(EVENT_LIMITS.maxDurationMin, Math.max(EVENT_LIMITS.minDurationMin, total));
+  return (
+    <fieldset className="timer-picker">
+      <legend>Planned time</legend>
+      <div className="timer-display" role="status" aria-live="polite">
+        {h}
+        <small> h </small>
+        {pad(m)}
+        <small> min</small>
+      </div>
+      <div className="timer-buttons">
+        <div className="row">
+          <button
+            type="button"
+            className="btn"
+            aria-label="Fewer hours"
+            onClick={() => onChange(clampTotal(minutes - 60))}
+            disabled={minutes - 60 < EVENT_LIMITS.minDurationMin}
+          >
+            − hour
+          </button>
+          <button
+            type="button"
+            className="btn"
+            aria-label="More hours"
+            onClick={() => onChange(clampTotal(minutes + 60))}
+            disabled={minutes + 60 > EVENT_LIMITS.maxDurationMin}
+          >
+            + hour
+          </button>
+        </div>
+        <div className="row">
+          <button
+            type="button"
+            className="btn"
+            aria-label="Ten minutes less"
+            onClick={() => onChange(clampTotal(minutes - 10))}
+            disabled={minutes - 10 < EVENT_LIMITS.minDurationMin}
+          >
+            − 10 min
+          </button>
+          <button
+            type="button"
+            className="btn"
+            aria-label="Ten minutes more"
+            onClick={() => onChange(clampTotal(minutes + 10))}
+            disabled={minutes + 10 > EVENT_LIMITS.maxDurationMin}
+          >
+            + 10 min
+          </button>
+        </div>
+      </div>
+    </fieldset>
+  );
+}
 
 export default function CreateEvent() {
-  const [mountedAt] = useState(() => Date.now());
+  const loc = useLocation();
   const [name, setName] = useState('');
-  const [end, setEnd] = useState('');
-  const [breaks, setBreaks] = useState<Brk[]>([]);
+  const [planned, setPlanned] = useState(120);
   const [styles, setStyles] = useState<Set<StyleId>>(new Set(DEFAULT_ENABLED_STYLES));
-  const [caps, setCaps] = useState<Partial<Record<StyleId, string>>>({});
+  const [master, setMaster] = useState<number>(RULE_DEFAULTS.masterRunCap);
+  const [useRatio, setUseRatio] = useState(false);
+  const [ratio, setRatio] = useState<Partial<Record<GenreId, number>>>({});
   const [limit, setLimit] = useState(String(RULE_DEFAULTS.submissionLimit));
+  const [breaks, setBreaks] = useState<number[]>([]);
+  const [playlistUrl, setPlaylistUrl] = useState('');
+  const [playlistStyle, setPlaylistStyle] = useState<StyleId | ''>('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [created, setCreated] = useState<Created | null>(null);
 
   if (created) return <CreatedPanel created={created} />;
 
-  const endMs = fromLocalInput(end);
-  const endBad = end !== '' && (endMs === null || endMs <= mountedAt);
-  const ready = name.trim() !== '' && styles.size >= 2 && !endBad && !busy;
+  const enabled = STYLE_PRESETS.filter((s) => styles.has(s.id)).map((s) => s.id);
+  const genres = genresOf(enabled);
+  const single = genres.length === 1;
+  const parts = genres.map((g) => ratio[g] ?? master);
+  const ratioIssue = useRatio ? ratioProblem(parts) : null;
+  const breakIssue = validateBreaks(planned, breaks);
+  const pStyle = playlistStyle && styles.has(playlistStyle) ? playlistStyle : (enabled[0] ?? '');
+  const ready = name.trim() !== '' && enabled.length >= 1 && !ratioIssue && !breakIssue && !busy;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -96,18 +144,26 @@ export default function CreateEvent() {
     setBusy(true);
     setError(null);
     try {
-      const enabled = STYLE_PRESETS.filter((s) => styles.has(s.id)).map((s) => s.id);
       setCreated(
         await adminApi.create({
           name: name.trim(),
           timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
           enabledStyles: enabled,
-          runCaps: Object.fromEntries(
-            enabled.map((s) => [s, clamp(caps[s] ?? '', 1, 10, defaultCap(s))]),
+          masterRunCap: master,
+          ...(useRatio
+            ? { ratio: Object.fromEntries(genres.map((g) => [g, ratio[g] ?? master])) }
+            : {}),
+          submissionLimit: Math.min(
+            20,
+            Math.max(1, Math.round(Number(limit)) || RULE_DEFAULTS.submissionLimit),
           ),
-          submissionLimit: clamp(limit, 1, 20, RULE_DEFAULTS.submissionLimit),
-          ...(endMs ? { endAt: endMs } : {}),
-          ...(breaks.length ? { breaks } : {}),
+          plannedDurationMin: planned,
+          ...(breaks.length
+            ? { breaks: breaks.map((m) => ({ label: `${m}-minute break`, durationSec: m * 60 })) }
+            : {}),
+          ...(playlistUrl.trim() && pStyle
+            ? { playlist: { url: playlistUrl.trim(), style: pStyle } }
+            : {}),
         }),
       );
     } catch (err) {
@@ -117,48 +173,20 @@ export default function CreateEvent() {
     }
   }
 
+  const slots = breakSlots(planned, breaks);
+
   return (
     <form className="card stack" onSubmit={(e) => void submit(e)} noValidate>
       <h1>Create an event</h1>
-      <fieldset className="chips">
-        <legend>Start from a template</legend>
-        {TEMPLATES.map((t) => (
-          <button
-            key={t.label}
-            type="button"
-            className="btn"
-            onClick={() => {
-              const v = t.make();
-              setName(v.name);
-              setEnd(v.end ? toLocalInput(v.end) : '');
-              setBreaks(v.breaks);
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </fieldset>
-
       <div>
         <label htmlFor="ev-name">Event name</label>
         <input id="ev-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={80} />
       </div>
-      <div>
-        <label htmlFor="ev-end">Planned end time (optional, your device’s time zone)</label>
-        <input
-          id="ev-end"
-          type="datetime-local"
-          value={end}
-          onChange={(e) => setEnd(e.target.value)}
-          aria-invalid={endBad}
-        />
-        {endBad ? (
-          <p className="error">Pick a time in the future, or leave it blank for no fixed end.</p>
-        ) : null}
-      </div>
+
+      <TimerPicker minutes={planned} onChange={setPlanned} />
 
       <fieldset className="chips">
-        <legend>Dance styles (at least two)</legend>
+        <legend>Dance styles</legend>
         {STYLE_PRESETS.map((s) => (
           <label key={s.id} className={`chip${styles.has(s.id) ? ' on' : ''}`}>
             <input
@@ -176,24 +204,74 @@ export default function CreateEvent() {
             {s.label}
           </label>
         ))}
+        <p className="muted small">
+          Salsa and its non-Latin-compatible style count as one genre; so do bachata and cha-cha
+          with theirs. Choosing one genre changes the spacing rule: someone plays again only after
+          half of the other people’s waiting songs have played.
+        </p>
       </fieldset>
 
-      <fieldset className="caps">
-        <legend>Most songs in a row, per style</legend>
-        {STYLE_PRESETS.filter((s) => styles.has(s.id)).map((s) => (
-          <div key={s.id}>
-            <label htmlFor={`cap-${s.id}`}>{s.label}</label>
+      <div>
+        <label htmlFor="ev-master">Most songs in a row, per genre</label>
+        <input
+          id="ev-master"
+          type="number"
+          min={1}
+          max={RULE_DEFAULTS.maxRunCap}
+          value={master}
+          onChange={(e) =>
+            setMaster(
+              Math.min(
+                RULE_DEFAULTS.maxRunCap,
+                Math.max(1, Math.round(Number(e.target.value)) || 1),
+              ),
+            )
+          }
+        />
+      </div>
+
+      {!single ? (
+        <details>
+          <summary>Advanced: set a ratio between genres</summary>
+          <label className="check">
             <input
-              id={`cap-${s.id}`}
-              type="number"
-              min={1}
-              max={10}
-              value={caps[s.id] ?? String(defaultCap(s.id))}
-              onChange={(e) => setCaps({ ...caps, [s.id]: e.target.value })}
+              type="checkbox"
+              checked={useRatio}
+              onChange={(e) => setUseRatio(e.target.checked)}
             />
-          </div>
-        ))}
-      </fieldset>
+            <span>Use a ratio instead of one number</span>
+          </label>
+          {useRatio ? (
+            <div className="row">
+              {GENRES.filter((g) => genres.includes(g.id)).map((g) => (
+                <div key={g.id}>
+                  <label htmlFor={`ratio-${g.id}`}>{g.label}</label>
+                  <select
+                    id={`ratio-${g.id}`}
+                    value={ratio[g.id] ?? master}
+                    onChange={(e) => setRatio({ ...ratio, [g.id]: Number(e.target.value) })}
+                  >
+                    {[1, 2, 3, 4, 5].map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+          ) : null}
+          <p className="muted small">
+            Ratio {parts.join(':')}. Parts go up to 5, and no genre may get less than 1 part in{' '}
+            {RULE_DEFAULTS.minGenreShareOf}.
+          </p>
+          {ratioIssue ? (
+            <p className="error" role="alert">
+              {ratioIssue}
+            </p>
+          ) : null}
+        </details>
+      ) : null}
 
       <div>
         <label htmlFor="ev-limit">Accepted songs per person</label>
@@ -206,18 +284,31 @@ export default function CreateEvent() {
           onChange={(e) => setLimit(e.target.value)}
         />
       </div>
-      <p className="muted">
-        Spacing rule (fixed): someone cannot play twice in a row, and not again until the style has
-        changed at least once. These rules are locked when you start the event.
-      </p>
 
       <fieldset>
         <legend>Breaks (optional)</legend>
+        <p className="muted small">
+          Breaks sit on the midpoint of the planned time (several are spread evenly) and take at
+          most half of it. Songs only start if they can finish before a break.
+        </p>
+        <div className="timeline" aria-hidden="true">
+          {slots.map((s, i) => (
+            <span
+              key={i}
+              className="timeline-break"
+              style={{
+                left: `${(s.startMin / planned) * 100}%`,
+                width: `${(s.durationMin / planned) * 100}%`,
+              }}
+            />
+          ))}
+        </div>
         <ul className="list">
           {breaks.map((b, i) => (
             <li key={i}>
               <span className="title">
-                {b.label}, {b.durationSec / 60} min
+                {b} min, from {Math.round(slots[i]!.startMin)} to{' '}
+                {Math.round(slots[i]!.startMin + b)} min
               </span>
               <button
                 type="button"
@@ -230,20 +321,53 @@ export default function CreateEvent() {
           ))}
         </ul>
         <div className="row">
-          {[10, 20].map((m) => (
+          {[10, 20, 30].map((m) => (
             <button
               key={m}
               type="button"
               className="btn"
-              onClick={() =>
-                setBreaks([...breaks, { label: `${m}-minute break`, durationSec: m * 60 }])
-              }
+              disabled={breaks.length >= EVENT_LIMITS.maxBreaks}
+              onClick={() => setBreaks([...breaks, m])}
             >
               Add {m}-minute break
             </button>
           ))}
         </div>
+        {breakIssue ? (
+          <p className="error" role="alert">
+            {breakIssue}
+          </p>
+        ) : null}
       </fieldset>
+
+      <details id="playlist" open={loc.hash === '#playlist' || undefined}>
+        <summary>Start from a playlist (optional)</summary>
+        <p className="muted small">
+          Paste a public Spotify, YouTube Music, YouTube or Apple Music playlist link. Its songs are
+          queued in order, up to one minute less than the planned time. Public pages show only the
+          first part of long playlists.
+        </p>
+        <label htmlFor="pl-url">Playlist link</label>
+        <input
+          id="pl-url"
+          type="url"
+          inputMode="url"
+          value={playlistUrl}
+          onChange={(e) => setPlaylistUrl(e.target.value)}
+        />
+        <label htmlFor="pl-style">Count these songs as</label>
+        <select
+          id="pl-style"
+          value={pStyle}
+          onChange={(e) => setPlaylistStyle(e.target.value as StyleId)}
+        >
+          {enabled.map((s) => (
+            <option key={s} value={s}>
+              {STYLE_PRESETS.find((p) => p.id === s)!.label} ({genreOf(s)})
+            </option>
+          ))}
+        </select>
+      </details>
 
       <ErrorLine error={error} />
       <button type="submit" className="btn primary" disabled={!ready}>

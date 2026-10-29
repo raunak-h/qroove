@@ -9,7 +9,7 @@ const base = (over: Partial<ProjectInput>): ProjectInput => ({
   nowMs: 0,
   endAtMs: null,
   currentRemainingMs: null,
-  breaksRemainingSec: 0,
+  breaks: [],
   overheadSec: 5,
   ...over,
 });
@@ -59,10 +59,34 @@ describe('projectQueue', () => {
     const cs = Array.from({ length: 8 }, (_, i) => cand(`O${i}`, i % 2 ? 'bachata' : 'salsa', i));
     expect(projectQueue(base({ candidates: cs })).overflowIds).toEqual([]);
   });
-  it('reserved breaks shrink the window', () => {
+  it('a break before the end leaves too little room for a song', () => {
     const cs = [cand('A', 'salsa', 1)];
-    const p = projectQueue(base({ candidates: cs, endAtMs: 200_000, breaksRemainingSec: 60 }));
-    expect(p.overflowIds).toEqual(['A-s1']);
+    const p = projectQueue(
+      base({ candidates: cs, endAtMs: 300_000, breaks: [{ startMs: 100_000, endMs: 160_000 }] }),
+    );
+    expect(p.overflowIds).toEqual(['A-s1']); // 180 s does not fit before the break, nor after it
+  });
+  it('songs end before a break and music resumes after it', () => {
+    // 2 h event, 10 min break centred on the midpoint: 55-65 min, three-minute songs.
+    const min = 60_000;
+    const cs = Array.from({ length: 30 }, (_, i) =>
+      cand(`o${i}`, i % 2 ? 'bachata' : 'salsa', i + 1),
+    );
+    const p = projectQueue(
+      base({
+        candidates: cs,
+        endAtMs: 120 * min,
+        breaks: [{ startMs: 55 * min, endMs: 65 * min }],
+        horizon: 100,
+      }),
+    );
+    const by = new Map(cs.map((c) => [c.requestId, c]));
+    for (const it of p.items.filter((i) => !i.overflow)) {
+      const start = it.predictedStartMs!;
+      const end = start + by.get(it.requestId)!.durationMs!;
+      expect(end <= 55 * min || start >= 65 * min).toBe(true);
+    }
+    expect(p.items.some((i) => i.predictedStartMs! >= 65 * min)).toBe(true);
   });
   it('respects the horizon and does not mutate inputs', () => {
     const cs = Array.from({ length: 10 }, (_, i) => cand(`O${i}`, i % 2 ? 'bachata' : 'salsa', i));

@@ -31,8 +31,9 @@ afterEach(() => {
 });
 
 const rules = {
-  rulesVersion: 1,
+  rulesVersion: 2,
   enabledStyles: ['salsa', 'bachata'],
+  masterRunCap: 2,
   runCaps: { salsa: 2, bachata: 2 },
   submissionLimit: 5,
   minStyleTransitions: 1,
@@ -56,6 +57,8 @@ const state = (over: Record<string, unknown> = {}, viewOver: Record<string, unkn
   csrf: 'csrf-token',
   rulesHash: 'abcdef0123456789',
   rules,
+  plannedDurationMin: 120,
+  joinUrl: 'http://x/e/ABC123#j=JOINKEYJOINKEYJOINKEY',
   lease: null,
   requests: [
     {
@@ -139,45 +142,100 @@ const page = (path = '/admin/ev1') =>
   );
 
 describe('CreateEvent', () => {
-  it('needs two styles, sends the chosen rules, and shows the admin link once with a warning', async () => {
-    respond = () => ({
-      status: 201,
-      body: {
-        eventId: 'ev1',
-        slug: 'ABC123',
-        joinUrl: 'http://x/e/ABC123',
-        adminUrl: 'http://x/a/ev1#k=SECRETSECRET',
-        recoverySecret: 'RECOVERYRECOVERY',
-        rules,
-      },
-    });
+  const created = {
+    status: 201,
+    body: {
+      eventId: 'ev1',
+      slug: 'ABC123',
+      joinUrl: 'http://x/e/ABC123#j=JOINKEYJOINKEYJOINKEY',
+      adminUrl: 'http://x/a/ev1#k=SECRETSECRET',
+      recoverySecret: 'RECOVERYRECOVERY',
+      rules,
+      seeded: 0,
+    },
+  };
+
+  it('sets time like an oven timer, validates breaks and ratios, and shows the admin link once', async () => {
+    respond = () => created;
     const user = userEvent.setup();
     page('/new');
     expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled(); // no name
-    await user.click(screen.getByRole('button', { name: 'Friday Social' }));
-    expect(screen.getByLabelText('Event name')).toHaveValue('Friday Social');
-    await user.click(screen.getByRole('checkbox', { name: 'Bachata' })); // drop to one style
-    expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
+    await user.type(screen.getByLabelText('Event name'), 'Friday Social');
+
+    // 2 h to start; + hour, + 10 min steps, never past 8 h
+    expect(screen.getByRole('status', { name: '' })).toBeDefined();
+    for (let i = 0; i < 8; i++)
+      await user.click(screen.getByRole('button', { name: 'More hours' }));
+    expect(screen.getByRole('button', { name: 'More hours' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Ten minutes more' })).toBeDisabled(); // 8 h is the ceiling
+    for (let i = 0; i < 6; i++)
+      await user.click(screen.getByRole('button', { name: 'Fewer hours' }));
+    await user.click(screen.getByRole('button', { name: 'Ten minutes more' }));
+
+    // six styles, one is enough
+    expect(screen.getAllByRole('checkbox').length).toBeGreaterThanOrEqual(6);
     await user.click(screen.getByRole('checkbox', { name: 'Bachata' }));
+    expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled(); // single genre is allowed
+    await user.click(screen.getByRole('checkbox', { name: 'Bachata' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Non-Latin salsa-compatible' }));
+
+    // breaks: limits shown live
+    await user.click(screen.getByRole('button', { name: 'Add 30-minute break' }));
+    await user.click(screen.getByRole('button', { name: 'Add 30-minute break' }));
+    expect(await screen.findByText(/between breaks|half of the planned/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0]!);
+    await user.click(screen.getAllByRole('button', { name: 'Remove' })[0]!);
     await user.click(screen.getByRole('button', { name: 'Add 10-minute break' }));
+
     await user.clear(screen.getByLabelText('Accepted songs per person'));
     await user.type(screen.getByLabelText('Accepted songs per person'), '4');
-    expect(screen.getByText(/Spacing rule \(fixed\)/)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Create event' }));
     expect(
       await screen.findByText(/Save this link — it is the only way to control the event/),
     ).toBeInTheDocument();
     expect(screen.getByText('http://x/a/ev1#k=SECRETSECRET')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Open organiser page' })).toHaveAttribute(
-      'href',
-      '/a/ev1#k=SECRETSECRET',
-    );
+    expect(document.body.textContent).not.toContain('JOINKEY'); // the QR secret is never shown
     expect(calls[0]!.body).toMatchObject({
       name: 'Friday Social',
-      enabledStyles: ['salsa', 'bachata'],
+      enabledStyles: ['salsa', 'salsa_nl', 'bachata'],
+      masterRunCap: 2,
       submissionLimit: 4,
-      runCaps: { salsa: 2, bachata: 2 },
+      plannedDurationMin: 130,
       breaks: [{ label: '10-minute break', durationSec: 600 }],
+    });
+  });
+
+  it('refuses a ratio below one part in ten', async () => {
+    respond = () => created;
+    const user = userEvent.setup();
+    page('/new');
+    await user.type(screen.getByLabelText('Event name'), 'X');
+    await user.click(screen.getByRole('checkbox', { name: 'Cha-cha' })); // three genres
+    await user.click(screen.getByText(/Advanced: set a ratio/));
+    await user.click(screen.getByRole('checkbox', { name: 'Use a ratio instead of one number' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Salsa' }), '1');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Bachata' }), '5');
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Cha-cha' }), '5');
+    expect(await screen.findByText(/at least 1 part in 10/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Cha-cha' }), '1'); // 1:5:1
+    expect(screen.queryByText(/at least 1 part in 10/)).toBeNull();
+  });
+
+  it('sends a playlist link with the chosen style', async () => {
+    respond = () => created;
+    const user = userEvent.setup();
+    page('/new#playlist');
+    await user.type(screen.getByLabelText('Event name'), 'X');
+    await user.type(
+      screen.getByLabelText('Playlist link'),
+      'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
+    );
+    await user.click(screen.getByRole('button', { name: 'Create event' }));
+    await screen.findByText(/Save this link/);
+    expect(calls[0]!.body).toMatchObject({
+      playlist: { url: 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M', style: 'salsa' },
     });
   });
 });
@@ -211,20 +269,26 @@ describe('AdminPage', () => {
       extra?.(c) ?? (c.method === 'GET' ? { body: state() } : { body: { ok: true, version: 6 } });
   };
 
-  it('shows playback, the run indicator, overflow, moderation, rules and a QR for the public link only', async () => {
+  it('is one screen with tabs; the QR is the only invitation and nothing can be copied', async () => {
     ok();
+    const user = userEvent.setup();
     page();
     expect(await screen.findByText('Playing Now')).toBeInTheDocument();
-    expect(screen.getByText(/Salsa run: 1 of 2/)).toBeInTheDocument();
-    expect(screen.getByText(/1 song would run past the end time/)).toBeInTheDocument();
-    expect(screen.getByText(/Next:/).parentElement).toHaveTextContent('Next Song');
-    expect(
-      screen.getByRole('img', { name: /QR code that opens .*\/e\/ABC123$/ }),
-    ).toBeInTheDocument();
-    const rules = screen.getByRole('heading', { name: 'Rules' }).closest('section')!;
-    expect(rules).toHaveTextContent('abcdef012345');
-    expect(rules).toHaveTextContent('Salsa (max 2 in a row)');
-    expect(screen.queryByText(/change rules/i)).toBeNull();
+    expect(screen.getByText(/Salsa run 1\/2/)).toBeInTheDocument();
+    expect(screen.getByText(/1 song would run past the end/)).toBeInTheDocument();
+    expect(screen.getByText(/Next: Next Song/)).toBeInTheDocument();
+    expect(document.body.textContent).not.toContain('ABC123'); // no room code on the organiser screen
+    await user.click(screen.getByRole('tab', { name: 'Invite' }));
+    expect(screen.getByRole('img', { name: /QR code to join Friday Social/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /copy/i })).toBeNull();
+    expect(document.body.textContent).not.toContain('JOINKEY');
+    expect(document.body.textContent).not.toContain('/e/ABC123');
+    await user.click(screen.getByRole('tab', { name: 'More' }));
+    await user.click(screen.getByRole('button', { name: 'Rules' }));
+    expect(screen.getByText(/abcdef012345/)).toBeInTheDocument();
+    expect(screen.getByText(/Most songs in a row:/).closest('li')).toHaveTextContent(
+      'Salsa 2 · Bachata 2',
+    );
     expect(document.body.textContent).not.toContain('csrf-token');
   });
 
@@ -239,7 +303,7 @@ describe('AdminPage', () => {
     );
     await user.click(screen.getByRole('button', { name: 'Skip' }));
     expect(calls.some((c) => c.url.endsWith('/admin/skip'))).toBe(false);
-    await user.click(screen.getByRole('button', { name: 'Yes, skip this song' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, skip' }));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith('/admin/skip'))).toBe(true));
   });
 
@@ -260,15 +324,16 @@ describe('AdminPage', () => {
     expect(screen.queryByRole('button', { name: /Remove Old Song/ })).toBeNull(); // played songs stay
   });
 
-  it('ends the event only after typing END', async () => {
+  it('ends the event with two distinct clicks and no typing', async () => {
     ok();
     const user = userEvent.setup();
     page();
-    const end = await screen.findByRole('button', { name: 'End event' });
-    expect(end).toBeDisabled();
-    await user.type(screen.getByLabelText('Type END to confirm'), 'end');
-    expect(end).toBeEnabled();
-    await user.click(end);
+    await user.click(await screen.findByRole('tab', { name: 'More' }));
+    await user.click(screen.getByRole('button', { name: 'End the event' })); // opens the section
+    expect(screen.queryByRole('textbox')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'End event' })); // click 1
+    expect(calls.some((c) => c.url.endsWith('/admin/end'))).toBe(false);
+    await user.click(screen.getByRole('button', { name: 'Yes, end the event now' })); // click 2
     await waitFor(() => expect(calls.some((c) => c.url.endsWith('/admin/end'))).toBe(true));
   });
 
@@ -280,9 +345,12 @@ describe('AdminPage', () => {
     );
     const user = userEvent.setup();
     page();
-    await user.click(await screen.findByRole('button', { name: 'Hand over admin' }));
+    await user.click(await screen.findByRole('tab', { name: 'More' }));
+    await user.click(screen.getByRole('button', { name: 'Hand over' }));
+    await user.click(screen.getByRole('button', { name: 'Hand over admin' }));
     await user.click(screen.getByRole('button', { name: 'Yes, create a handover link' }));
     expect(await screen.findByText(/\/claim\/ev1#c=ABCD1234EFGH5678/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Time' }));
     const input = screen.getByLabelText('Set an end time');
     await user.type(input, '2001-01-01T10:00');
     expect(screen.getByText(/Pick a real time later than now/)).toBeInTheDocument();
@@ -323,7 +391,7 @@ describe('AdminPage', () => {
     expect(await screen.findByText('Left Over')).toBeInTheDocument();
     expect(screen.getByLabelText('Shuffle within each style')).toBeChecked();
     expect(screen.queryByRole('button', { name: 'Start break' })).toBeNull(); // ended: no break controls
-    expect(screen.queryByRole('heading', { name: 'End the event' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'End event' })).toBeNull();
     const user = userEvent.setup();
     respond = (c) =>
       c.url.endsWith('/events/import')
@@ -362,6 +430,7 @@ describe('AdminPage', () => {
       shuffle: true,
       selectedIndexes: [0],
       name: 'Friday Social (next)',
+      plannedDurationMin: 120,
     });
     expect(await screen.findByText(/Save this link/)).toBeInTheDocument();
     void within;

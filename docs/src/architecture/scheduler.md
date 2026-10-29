@@ -45,8 +45,8 @@ list of blocked requests with their reasons. With no pick, the reason is `NO_CAN
 ## Projection
 
 `projectQueue` repeatedly runs `selectNext` + `applyPlay` on a copy of the history, advancing a simulated clock by each
-song's duration plus transition overhead, starting after the current song's remaining time. With a concrete end time the
-window is `endAt − reserved breaks`; a song that cannot finish inside it is reported as **overflow** (listed, greyed
+song's duration plus transition overhead, starting after the current song's remaining time. Breaks are windows: a song must end at or before the next break starts, and when nothing fits the clock resumes at the
+break's end. With a concrete end time a song that cannot finish inside the music windows is reported as **overflow** (listed, greyed
 out, never claimed unreachable — withdrawals, shorter songs or an extension can change that). Requests that are blocked
 only by fairness are **waiting**, not overflow. The result carries `stoppedReason`: `EXHAUSTED`, `WAITING_FAIRNESS` or
 `HORIZON` (default horizon: 50 songs). With no end time nothing is ever overflow.
@@ -73,3 +73,8 @@ repeats a canonical recording; starts or ends a non-overflow song after the end 
 `pnpm test` runs 2,000 cases; `pnpm --filter @qroove/scheduler test:property` runs 100,000.
 
 See [ADR 0004](/adr/0004-no-ageing-bonus) and [ADR 0005](/adr/0005-quota-counts-played).
+
+## Genres and single-genre spacing
+
+The scheduler's `style` is the **genre** (the server maps each request's style with `genreOf`). With exactly one genre
+enabled, `NEEDS_STYLE_TRANSITION` is replaced by `NEEDS_OTHERS_PLAYED`; see [ADR 0009](/adr/0009-single-genre-spacing).

@@ -5,6 +5,7 @@ import { playerApi, type LeaseCreds } from '../admin/adminApi';
 import { useAdminStream } from '../admin/useAdminStream';
 import { ErrorLine } from '../admin/useAction';
 import { ApiError } from '../shared/api';
+import { useLockedPage } from '../shared/useLockedPage';
 import { formatCountdown } from '../shared/time';
 import {
   findMatch,
@@ -42,6 +43,7 @@ function writeLease(id: string, l: LeaseCreds | null) {
 
 export default function PlayerPage() {
   const { eventId = '' } = useParams();
+  useLockedPage();
   const stream = useAdminStream(eventId);
   const { state: s, csrf } = stream;
 

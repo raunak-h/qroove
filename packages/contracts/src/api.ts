@@ -12,14 +12,20 @@ const Ms = z.number().int().nonnegative();
 export const CreateEventBody = z.object({
   name: z.string().trim().min(1).max(80),
   timezone: z.string().min(1).max(64),
-  enabledStyles: z.array(StyleId).min(2).optional(),
-  runCaps: z.partialRecord(StyleId, z.number().int().min(1).max(10)).optional(),
+  enabledStyles: z.array(StyleId).min(1).optional(),
+  /** "Most songs in a row", the same for every genre unless `ratio` is given. */
+  masterRunCap: z.number().int().min(1).max(5).optional(),
+  /** Optional per-genre ratio parts (1–5); keys are genre ids. */
+  ratio: z.partialRecord(StyleId, z.number().int().min(1).max(5)).optional(),
   submissionLimit: z.number().int().min(1).max(20).optional(),
-  endAt: Ms.nullable().optional(),
+  /** Planned time like an oven timer: multiples of 10 min, 10 min to 8 h. The clock starts with the event. */
+  plannedDurationMin: z.number().int().min(10).max(480).multipleOf(10).optional(),
   breaks: z
     .array(BreakSpec.pick({ label: true, durationSec: true }))
-    .max(10)
+    .max(3)
     .optional(),
+  /** Pre-queue songs from a public Spotify, YouTube (Music) or Apple Music playlist. */
+  playlist: z.object({ url: z.string().url().max(500), style: StyleId }).optional(),
 });
 export type CreateEventBody = z.infer<typeof CreateEventBody>;
 export const CreateEventResponse = z.object({
@@ -42,7 +48,11 @@ export type OkResponse = z.infer<typeof OkResponse>;
 export const PublicResponse = EventPublicView;
 
 // POST /api/events/:id/join
-export const JoinBody = z.object({ nickname: Nickname.optional() });
+export const JoinBody = z.object({
+  nickname: Nickname.optional(),
+  /** The secret from the organiser's QR code. */
+  joinKey: z.string().min(16).max(128).optional(),
+});
 export const JoinResponse = z.object({ participantId: Id, token: z.string() });
 export type JoinResponse = z.infer<typeof JoinResponse>;
 
@@ -126,6 +136,9 @@ export const AdminState = z.object({
   lease: Lease.nullable(),
   rulesHash: z.string().nullable(),
   rules: RulesSnapshot,
+  plannedDurationMin: z.number().int().nullable(),
+  /** Carried only by the QR code; never shown as text. */
+  joinUrl: z.string(),
   /** Only on `GET /admin/state`: the page cannot read the cookie (its path is the API's), so it is echoed here. */
   csrf: z.string().optional(),
 });

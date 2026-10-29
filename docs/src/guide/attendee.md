@@ -1,14 +1,13 @@
 # Attendee guide
 
-You do not need an account or an app. Open the event link or QR code, or go to the home page and type the
-six-character event code.
+You do not need an account or an app. Scan the organiser's QR code with your phone camera. The home page's six code boxes
+show whether an event exists, but **a code alone cannot join**: joining needs the secret inside the QR code.
 
 ![The home page with the join-by-code box](/screens/landing.png){width=280}
 
 ## Joining
 
-The event page is visible to everyone straight away: what is playing and the queue. To add songs, tap
-**Join this event**. Your device gets a private pass for this event only, kept in your browser. You can add a
+The queue is visible to anyone with the code. To add songs, scan the QR code, then tap **Join this event**. Your device gets a private pass for this event only, kept in your browser. You can add a
 nickname first (optional); it is shown next to your songs. Other attendees' names are not shown in the queue.
 
 ![The event page before joining](/screens/attendee-join.png){width=280}

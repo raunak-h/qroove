@@ -5,6 +5,30 @@ versioning: [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-29
+
+Changes from the first pilot feedback.
+
+### Added
+- Six dance styles in three genres (salsa, bachata, cha-cha, each with a non-Latin-compatible variant); style changes and run caps count per genre. One master "most songs in a row" number, with an optional ratio (parts 1–5) and a hard floor of 1 part in 10 per genre.
+- Single-genre spacing: a returning requester waits for half of the other people's waiting songs.
+- Planned time like an oven timer (hours up to 8, minutes in steps of 10); breaks (10/20/30 min, at most 3) centred on the planned time, at most half of it, never back to back, shown in the attendee queue; songs never run into a break.
+- Playlist import: start an event from a public Spotify, YouTube Music/YouTube or Apple Music playlist link, queued up to one minute less than the planned time.
+- Joining needs the secret in the organiser's QR code; a room code alone no longer joins.
+- Landing page with six single-character code boxes (auto-advance, paste, backspace), header with the logo (home link) and a menu with session rules and theme.
+- Organiser console that fits one screen (Queue / Invite / Player / More tabs; only the queue scrolls).
+- Right-click and text selection are disabled on organiser, attendee and player pages (a deterrent).
+
+### Changed
+- Ending an event is two distinct taps with nothing to type.
+- The organiser screen shows only the QR code: no room code, join link or copy button.
+- Carry-over keeps the previous planned time and fits songs within it minus one minute.
+- Rules snapshot is version 2.
+
+### Removed
+- Pasting or uploading a JSON export to start an event, and the JSON download on past events.
+- Kizomba, merengue and "other" styles; free-form planned end time at creation; creation templates.
+
 ## [0.1.0] - 2026-10-29
 
 First release, ready for the pilot.

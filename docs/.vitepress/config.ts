@@ -65,6 +65,10 @@ export default defineConfig({
           { text: '0004 No ageing bonus', link: '/adr/0004-no-ageing-bonus' },
           { text: '0005 Quota counts played', link: '/adr/0005-quota-counts-played' },
           { text: '0006 Aggregate event doc', link: '/adr/0006-aggregate-event-doc' },
+          { text: '0007 Genre groups and ratios', link: '/adr/0007-genre-groups-and-ratios' },
+          { text: '0008 QR-only join', link: '/adr/0008-qr-only-join' },
+          { text: '0009 Single-genre spacing', link: '/adr/0009-single-genre-spacing' },
+          { text: '0010 Break windows', link: '/adr/0010-break-windows' },
         ],
       },
       {

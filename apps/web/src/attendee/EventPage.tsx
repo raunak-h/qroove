@@ -2,7 +2,9 @@ import type { MyRequests as Mine } from '@qroove/contracts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { api, ApiError, type Creds } from '../shared/api';
-import { clearCreds, loadCreds } from '../shared/storage';
+import { useMenuRules } from '../shared/menu';
+import { clearCreds, loadCreds, takeJoinKey } from '../shared/storage';
+import { useLockedPage } from '../shared/useLockedPage';
 import { useEventStream, useTick } from '../shared/useEventStream';
 import { AddSong } from './AddSong';
 import { ConnectionBadge } from './ConnectionBadge';
@@ -14,6 +16,7 @@ import { UpNext } from './UpNext';
 
 export function EventPage() {
   const { slug = '' } = useParams();
+  useLockedPage();
   // Keyed by slug, so a result for an old slug is never shown for a new one.
   const [found, setFound] = useState<{
     slug: string;
@@ -56,6 +59,8 @@ export function EventPage() {
 
 function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
   const { view, connection, error, clockOffset } = useEventStream(eventId, slug);
+  useMenuRules(view?.rules);
+  const [joinKey] = useState(() => takeJoinKey(slug));
   const [creds, setCreds] = useState<Creds | null>(() => loadCreds(eventId));
   const [mine, setMine] = useState<Mine | null>(null);
   const now = useTick(1000);
@@ -110,7 +115,6 @@ function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
               : view.state === 'PAUSED' || view.state === 'TRANSFERRING'
                 ? 'Session paused.'
                 : 'Live.'}{' '}
-          Event code <strong className="code">{view.slug}</strong>
         </p>
         <ConnectionBadge connection={connection} />
       </header>
@@ -126,7 +130,7 @@ function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
           onAdded={reload}
         />
       ) : ended ? null : (
-        <JoinCard eventId={eventId} onJoined={setCreds} />
+        <JoinCard eventId={eventId} joinKey={joinKey} onJoined={setCreds} />
       )}
       {creds && mine ? (
         <MyRequests

@@ -4,7 +4,9 @@ import { request } from '../shared/api';
 export interface Created {
   eventId: string;
   slug: string;
+  /** Carries the QR secret: never display it as text. */
   joinUrl: string;
+  seeded?: number;
   adminUrl: string;
   recoverySecret: string;
 }
@@ -38,6 +40,7 @@ export const adminApi = {
     shuffle: boolean;
     selectedIndexes: number[];
     name: string;
+    plannedDurationMin: number;
   }) => request<Created & { seeded: number }>('POST', '/api/events/import', { body }),
 };
 

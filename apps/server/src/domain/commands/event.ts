@@ -1,5 +1,10 @@
 import { hashRules } from '@qroove/contracts/hash';
-import { DomainError, type CreateEventBody, type RulesSnapshot } from '@qroove/contracts';
+import {
+  DomainError,
+  breakSlots,
+  type CreateEventBody,
+  type RulesSnapshot,
+} from '@qroove/contracts';
 import {
   audit,
   commit,
@@ -9,7 +14,15 @@ import {
   type CommandOpts,
   type Deps,
 } from '../context.js';
-import { buildBreaks, buildRules, insertDraft, newDraft, type RuleInput } from '../draft.js';
+import {
+  buildBreaks,
+  buildRules,
+  insertDraft,
+  newDraft,
+  seedRows,
+  type RuleInput,
+  type SeedSong,
+} from '../draft.js';
 import { closePlaying, readPlaying, requireLive } from '../lifecycle.js';
 import { breakInProgress } from '../recompute.js';
 
@@ -24,25 +37,47 @@ export interface CreatedEvent {
   adminSecret: string;
   recoverySecret: string;
   rules: RulesSnapshot;
+  joinKey: string;
 }
 
-export async function createEvent(deps: Deps, body: CreateEventBody): Promise<CreatedEvent> {
+export interface CreateOptions {
+  /** Songs to pre-queue (already resolved and capped to the playing time). */
+  seeds?: readonly SeedSong[];
+  importSeed?: number | null;
+}
+
+export async function createEvent(
+  deps: Deps,
+  body: CreateEventBody,
+  opts: CreateOptions = {},
+): Promise<CreatedEvent & { seeded: number }> {
   const rules = buildRules(body);
-  const breaks = buildBreaks(deps, body.breaks);
+  const planned = body.plannedDurationMin ?? null;
+  const breaks = buildBreaks(deps, body.breaks, planned);
+  const seeds = opts.seeds ?? [];
+  for (const s of seeds) {
+    if (!rules.enabledStyles.includes(s.style)) {
+      throw new DomainError('VALIDATION', 'Imported songs need one of the event’s styles.');
+    }
+  }
   const { bundle, secrets } = await insertDraft(deps, () => {
     const d = newDraft(deps, {
       name: body.name,
       timezone: body.timezone,
       rules,
-      endAt: body.endAt ?? null,
+      plannedDurationMin: planned,
       breaks,
+      importSeed: opts.importSeed ?? null,
     });
-    return { event: d.event, adminGrants: d.adminGrants, secrets: d.secrets };
+    const rows = seeds.length ? seedRows(deps, d.event, seeds) : {};
+    return { event: d.event, adminGrants: d.adminGrants, secrets: d.secrets, ...rows };
   });
   return {
     eventId: bundle.event.id,
     slug: bundle.event.publicSlug,
     rules: bundle.event.rules,
+    joinKey: bundle.event.joinKey,
+    seeded: seeds.length,
     ...secrets,
   };
 }
@@ -50,7 +85,7 @@ export async function createEvent(deps: Deps, body: CreateEventBody): Promise<Cr
 export interface UpdateDraftInput extends AdminInput, RuleInput {
   name?: string | undefined;
   timezone?: string | undefined;
-  endAt?: number | null | undefined;
+  plannedDurationMin?: number | null | undefined;
   breaks?: ReadonlyArray<{ label: string; durationSec: number }> | undefined;
 }
 
@@ -62,8 +97,17 @@ export function updateDraft(deps: Deps, input: UpdateDraftInput) {
     const e = { ...c.event };
     if (input.name !== undefined) e.name = input.name;
     if (input.timezone !== undefined) e.timezone = input.timezone;
-    if (input.endAt !== undefined) e.endAt = input.endAt;
-    if (input.breaks !== undefined) e.breaks = buildBreaks(deps, input.breaks);
+    if (input.plannedDurationMin !== undefined) e.plannedDurationMin = input.plannedDurationMin;
+    if (input.breaks !== undefined || input.plannedDurationMin !== undefined) {
+      e.breaks =
+        input.breaks !== undefined
+          ? buildBreaks(deps, input.breaks, e.plannedDurationMin)
+          : buildBreaks(
+              deps,
+              e.breaks.map((b) => ({ label: b.label, durationSec: b.durationSec })),
+              e.plannedDurationMin,
+            );
+    }
     e.rules = buildRules(input, c.event.rules);
     audit(c, 'draft.update', 'admin');
     return { ok: true as const, version: c.tx.putEvent(e) };
@@ -79,14 +123,25 @@ export function startEvent(deps: Deps, input: AdminInput) {
       }
       throw new DomainError('VALIDATION', 'This event has already started.');
     }
-    if (c.event.endAt !== null && c.event.endAt <= c.now) {
-      throw new DomainError('VALIDATION', 'The end time must be in the future.');
-    }
     const w = await loadWork(c);
+    // The planned time starts counting now; breaks are centred on their points of that span.
+    const planned = c.event.plannedDurationMin;
+    const slots =
+      planned === null
+        ? []
+        : breakSlots(
+            planned,
+            c.event.breaks.map((b) => b.durationSec / 60),
+          );
     w.event = {
       ...c.event,
       state: 'ACTIVE',
       startedAt: c.now,
+      endAt: planned === null ? null : c.now + planned * 60_000,
+      breaks: c.event.breaks.map((b, i) => ({
+        ...b,
+        startsAt: slots[i] ? c.now + Math.round(slots[i]!.startMin * 60_000) : null,
+      })),
       rulesHash: hashRules(c.event.rules),
     };
     audit(c, 'event.start', 'admin', { rulesHash: w.event.rulesHash });

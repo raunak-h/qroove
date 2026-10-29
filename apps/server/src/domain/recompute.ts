@@ -5,6 +5,8 @@ import {
   DEFAULT_DURATION_MS,
   projectQueue,
   selectNext,
+  isSingleGenre,
+  type BreakWindow,
   type Candidate,
 } from '@qroove/scheduler';
 import type { RequestDoc } from '../db/types.js';
@@ -18,15 +20,36 @@ import {
 
 const POOL_STATES: ReadonlySet<string> = new Set(['QUEUED', 'INELIGIBLE_TEMPORARILY', 'OVERFLOW']);
 
-/** Seconds of break time still to come, counting the unelapsed part of one in progress. */
-export function breaksRemainingSec(w: Work, now: number): number {
-  let total = 0;
+/**
+ * Breaks still to come or in progress, as absolute times. A break the organiser never started is
+ * dropped once its slot has fully passed, so a forgotten break cannot block the night.
+ */
+export function breakWindows(w: Work, now: number): BreakWindow[] {
+  const out: BreakWindow[] = [];
   for (const b of w.event.breaks) {
     if (b.actualEnd !== null) continue;
-    if (b.actualStart === null) total += b.durationSec;
-    else total += Math.max(0, b.durationSec - Math.floor((now - b.actualStart) / 1000));
+    const ms = b.durationSec * 1000;
+    if (b.actualStart !== null) out.push({ startMs: b.actualStart, endMs: b.actualStart + ms });
+    else if (b.startsAt !== null && now < b.startsAt + ms) {
+      out.push({ startMs: b.startsAt, endMs: b.startsAt + ms });
+    }
   }
-  return total;
+  return out.sort((x, y) => x.startMs - y.startMs);
+}
+
+/** Time left to play music: until the next break starts, or the planned end. */
+function musicWindowMs(endAt: number | null, windows: readonly BreakWindow[], now: number) {
+  let limit: number | null = endAt;
+  let byBreak = false;
+  for (const b of windows) {
+    if (b.endMs <= now) continue;
+    if (limit === null || b.startMs < limit) {
+      limit = b.startMs;
+      byBreak = true;
+    }
+    break;
+  }
+  return { remainingMs: limit === null ? null : Math.max(0, limit - now), byBreak };
 }
 
 export const breakInProgress = (w: Work) =>
@@ -49,7 +72,7 @@ export function recompute(w: Work, now: number): void {
   const rules = toSchedulerRules(e.rules);
   const history = toSchedulerHistory(e.history);
   const overheadMs = RULE_DEFAULTS.transitionOverheadSec * 1000;
-  const breakSec = breaksRemainingSec(w, now);
+  const windows = breakWindows(w, now);
   const all = [...w.requests.values()];
   let reserved: RequestDoc | undefined = all.find((r) => r.state === 'RESERVED_NEXT');
   const playing = e.nowPlaying;
@@ -63,7 +86,7 @@ export function recompute(w: Work, now: number): void {
       e.waitingReason = 'On a break';
     } else {
       const pool: Candidate[] = all.filter((r) => POOL_STATES.has(r.state)).map(toCandidate);
-      const remainingMs = e.endAt === null ? null : e.endAt - breakSec * 1000 - now;
+      const { remainingMs, byBreak } = musicWindowMs(e.endAt, windows, now);
       const sel = selectNext(pool, history, rules, { remainingMs });
       if (sel.pick) {
         reserved = w.setState(w.requests.get(sel.pick.requestId)!, 'RESERVED_NEXT', now);
@@ -75,7 +98,9 @@ export function recompute(w: Work, now: number): void {
       } else if (pool.length === 0) {
         e.waitingReason = 'Waiting for songs to be requested';
       } else if (sel.blocked.every((b) => b.reason === 'WOULD_EXCEED_END')) {
-        e.waitingReason = 'Beyond planned end — admin must extend';
+        e.waitingReason = byBreak
+          ? 'Break time — start the break'
+          : 'Beyond planned end — admin must extend';
       } else {
         e.waitingReason = sel.reason.replace(/^ALL_BLOCKED_FAIRNESS: /, '');
       }
@@ -115,7 +140,7 @@ export function recompute(w: Work, now: number): void {
     nowMs: now,
     endAtMs: e.endAt,
     currentRemainingMs,
-    breaksRemainingSec: breakSec,
+    breaks: windows,
     overheadSec: RULE_DEFAULTS.transitionOverheadSec,
   });
   for (const it of proj.items) {
@@ -143,7 +168,11 @@ export function recompute(w: Work, now: number): void {
 
 /** Applies a started play to the event's stored history. */
 export function recordPlay(w: Work, r: RequestDoc): void {
+  const pool = [...w.requests.values()]
+    .filter((x) => x.id !== r.id && POOL_STATES.has(x.state))
+    .map(toCandidate);
+  const gate = isSingleGenre(toSchedulerRules(w.event.rules));
   w.event.history = fromSchedulerHistory(
-    applyPlay(toSchedulerHistory(w.event.history), toCandidate(r)),
+    applyPlay(toSchedulerHistory(w.event.history), toCandidate(r), { pool, gate }),
   );
 }

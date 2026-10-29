@@ -1,4 +1,4 @@
-import { applyPlay } from './eligibility.js';
+import { applyPlay, isSingleGenre } from './eligibility.js';
 import { selectNext } from './select.js';
 import {
   DEFAULT_DURATION_MS,
@@ -15,9 +15,15 @@ export interface ProjectInput {
   endAtMs: number | null;
   /** Time left on the song currently playing; null when nothing is playing. */
   currentRemainingMs: number | null;
-  breaksRemainingSec: number;
+  /** Breaks still to come (or in progress), as absolute times. Songs must end before one starts. */
+  breaks: readonly BreakWindow[];
   overheadSec: number;
   horizon?: number;
+}
+
+export interface BreakWindow {
+  startMs: number;
+  endMs: number;
 }
 
 export interface ProjectedItem {
@@ -39,7 +45,8 @@ export interface Projection {
 export function projectQueue(input: ProjectInput): Projection {
   const horizon = input.horizon ?? 50;
   const overheadMs = input.overheadSec * 1000;
-  const endEff = input.endAtMs === null ? null : input.endAtMs - input.breaksRemainingSec * 1000;
+  const breaks = [...input.breaks].sort((a, b) => a.startMs - b.startMs);
+  const gate = isSingleGenre(input.rules);
   let remaining = [...input.candidates];
   let history = input.history;
   let t =
@@ -58,10 +65,34 @@ export function projectQueue(input: ProjectInput): Projection {
       stoppedReason = 'HORIZON';
       break;
     }
+    // Find the stretch of music we are in: skip a break we are inside, stop at the next one.
+    let windowEnd: number | null = input.endAtMs;
+    let limitedBy: BreakWindow | null = null;
+    for (const b of breaks) {
+      if (b.endMs <= t) continue;
+      if (b.startMs <= t) {
+        t = b.endMs;
+        continue;
+      }
+      if (windowEnd === null || b.startMs < windowEnd) {
+        windowEnd = b.startMs;
+        limitedBy = b;
+      }
+      break;
+    }
     const sel = selectNext(remaining, history, input.rules, {
-      remainingMs: endEff === null ? null : endEff - t,
+      remainingMs: windowEnd === null ? null : windowEnd - t,
     });
     if (!sel.pick) {
+      // Nothing fits before the break: the room waits, and music resumes after it.
+      if (
+        limitedBy &&
+        sel.blocked.length > 0 &&
+        sel.blocked.every((b) => b.reason === 'WOULD_EXCEED_END')
+      ) {
+        t = limitedBy.endMs;
+        continue;
+      }
       terminalBlocked = sel.blocked;
       break;
     }
@@ -75,8 +106,8 @@ export function projectQueue(input: ProjectInput): Projection {
     });
     if (c.durationMs === null) uncertain = true;
     t += (c.durationMs ?? DEFAULT_DURATION_MS) + overheadMs;
-    history = applyPlay(history, c);
     remaining = remaining.filter((r) => r.requestId !== c.requestId);
+    history = applyPlay(history, c, { pool: remaining, gate });
   }
 
   const overflowIds: string[] = [];

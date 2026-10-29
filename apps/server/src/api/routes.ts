@@ -23,6 +23,9 @@ import {
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import * as cmd from '../domain/commands/index.js';
+import { SESSION_HEADROOM_MS } from '../domain/commands/import.js';
+import { MAX_SEEDS, type SeedSong } from '../domain/draft.js';
+import { capPlaytime } from '../ingestion/playlist.js';
 import { verifyAdmin, verifyParticipant } from '../domain/queries.js';
 import { HOUR, MINUTE } from '../security/rateLimit.js';
 import {
@@ -72,7 +75,7 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
     const { slug } = parse(z.object({ slug: z.string().min(1).max(16) }), req.params);
     const e = await deps.repo.findEventBySlug(slug.toUpperCase());
     if (!e) throw new DomainError('NOT_FOUND');
-    return { eventId: e.id, slug: e.publicSlug };
+    return { eventId: e.id, slug: e.publicSlug, name: e.name };
   });
 
   // `:id` is a slug here, per SPEC §8 (`/api/events/:slug/public`).
@@ -141,10 +144,12 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
     adminSecret: string;
     recoverySecret: string;
     rules: unknown;
+    joinKey: string;
   }) => ({
     eventId: r.eventId,
     slug: r.slug,
-    joinUrl: `${base}/e/${r.slug}`,
+    // The key rides in the fragment (never logged); only the QR code should carry this URL.
+    joinUrl: `${base}/e/${r.slug}#j=${r.joinKey}`,
     // The secret lives in the fragment, which browsers never send to a server.
     adminUrl: `${base}/a/${r.eventId}#k=${r.adminSecret}`,
     recoverySecret: r.recoverySecret,
@@ -153,9 +158,29 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
 
   app.post('/api/events', async (req, reply) => {
     limit(`create:${req.ip}`, 5, HOUR);
-    const r = await cmd.createEvent(deps, parse(CreateEventBody, req.body));
+    const { playlist, ...body } = parse(CreateEventBody, req.body);
+    let seeds: SeedSong[] = [];
+    if (playlist) {
+      if (!body.plannedDurationMin) {
+        throw new DomainError('VALIDATION', 'Set a planned time before importing a playlist.');
+      }
+      limit(`playlist:${req.ip}`, 10, HOUR);
+      const pl = await ingestion.resolvePlaylist(playlist.url);
+      seeds = capPlaytime(
+        pl.tracks.map((t) => ({ ...t, style: playlist.style })),
+        body.plannedDurationMin * 60_000 - SESSION_HEADROOM_MS,
+        MAX_SEEDS,
+      );
+      if (seeds.length === 0) {
+        throw new DomainError(
+          'VALIDATION',
+          'None of the playlist’s songs fit in the planned time.',
+        );
+      }
+    }
+    const r = await cmd.createEvent(deps, body, { seeds });
     reply.header('cache-control', 'no-store');
-    return reply.code(201).send(created(r));
+    return reply.code(201).send({ ...created(r), seeded: r.seeded });
   });
 
   app.post('/api/events/import', async (req, reply) => {
@@ -165,12 +190,14 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
         timezone: z.string().min(1).max(64),
         shuffle: z.boolean().optional(),
         name: z.string().trim().min(1).max(80).optional(),
+        plannedDurationMin: z.number().int().min(10).max(480).multipleOf(10),
       }),
       req.body,
     );
     const r = await cmd.importSnapshot(deps, {
       snapshot: body.snapshot,
       timezone: body.timezone,
+      plannedDurationMin: body.plannedDurationMin,
       ...(body.selectedIndexes ? { selectedIndexes: body.selectedIndexes } : {}),
       ...(body.shuffle !== undefined ? { shuffle: body.shuffle } : {}),
       ...(body.name ? { name: body.name } : {}),
@@ -195,7 +222,10 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
     const a = admin(req, id);
     await verifyAdmin(deps, id, a.adminSecret);
     reply.header('cache-control', 'no-store');
-    return { ...adminState(await agg(id), deps.clock.now()), csrf: sec.csrfFor(a.adminSecret) };
+    return {
+      ...adminState(await agg(id), deps.clock.now(), base),
+      csrf: sec.csrfFor(a.adminSecret),
+    };
   });
 
   // Unplayed songs as an importable snapshot, for "create the next event from these".
@@ -237,7 +267,7 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
     const { id } = parse(idParams, req.params);
     const a = admin(req, id);
     await verifyAdmin(deps, id, a.adminSecret);
-    await openStream(req, reply, bus, id, (x) => adminState(x, deps.clock.now()));
+    await openStream(req, reply, bus, id, (x) => adminState(x, deps.clock.now(), base));
   });
 
   // ---- admin commands ----------------------------------------------------------------------
@@ -331,9 +361,9 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
   app.post('/api/events/:id/join', async (req, reply) => {
     const { id } = parse(idParams, req.params);
     limit(`join:${req.ip}`, 20, MINUTE);
-    const { nickname } = parse(JoinBody, req.body ?? {});
+    const { nickname, joinKey } = parse(JoinBody, req.body ?? {});
     reply.header('cache-control', 'no-store');
-    return cmd.joinEvent(deps, { eventId: id, ...(nickname ? { nickname } : {}) });
+    return cmd.joinEvent(deps, { eventId: id, joinKey, ...(nickname ? { nickname } : {}) });
   });
 
   app.post('/api/events/:id/requests', async (req) => {

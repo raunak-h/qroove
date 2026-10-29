@@ -14,6 +14,7 @@ export const ERROR_CODES = [
   'METADATA_UNAVAILABLE',
   'RATE_LIMITED',
   'UNAUTHORISED',
+  'JOIN_KEY_REQUIRED',
   'NOT_FOUND',
   'VALIDATION',
 ] as const;
@@ -92,6 +93,11 @@ export const ERROR_COPY: Record<ErrorCode, ErrorCopy> = {
     message: 'You do not have permission to do that.',
     action: 'Open the link you were given, or ask the organiser.',
     http: 401,
+  },
+  JOIN_KEY_REQUIRED: {
+    message: 'You need the organiser’s QR code to join.',
+    action: 'Scan the QR code shown by the organiser with your phone camera.',
+    http: 403,
   },
   NOT_FOUND: {
     message: 'We could not find that.',

@@ -7,6 +7,7 @@ import { parseLink, type Platform } from './parseLink.js';
 import { ItunesProvider } from './providers/itunes.js';
 import { OEmbedProvider } from './providers/oembed.js';
 import { SpotifyApiProvider } from './providers/spotify.js';
+import { fetchPlaylist, type Playlist } from './playlist.js';
 import { suggestStyle } from './style.js';
 import type { MetadataProvider, TrackMetadata } from './types.js';
 
@@ -17,6 +18,8 @@ export interface ResolvedTrack {
 }
 
 export interface Ingestion {
+  /** Public playlist page → tracks. Best effort: these pages are not a stable API. */
+  resolvePlaylist(url: string): Promise<Playlist>;
   resolveUrl(url: string): Promise<ResolvedTrack>;
   resolveManual(m: {
     title: string;
@@ -63,6 +66,7 @@ export function createIngestion(opts: IngestionOptions): Ingestion {
     youtube: [oembed],
   };
   return {
+    resolvePlaylist: (url) => fetchPlaylist(opts.fetch, url),
     async resolveUrl(url) {
       const link = parseLink(url);
       let last: unknown;

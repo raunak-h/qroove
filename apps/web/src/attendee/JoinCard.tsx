@@ -2,7 +2,15 @@ import { useState } from 'react';
 import { api, ApiError, type Creds } from '../shared/api';
 import { saveCreds } from '../shared/storage';
 
-export function JoinCard({ eventId, onJoined }: { eventId: string; onJoined: (c: Creds) => void }) {
+export function JoinCard({
+  eventId,
+  joinKey,
+  onJoined,
+}: {
+  eventId: string;
+  joinKey: string | null;
+  onJoined: (c: Creds) => void;
+}) {
   const [nickname, setNickname] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
@@ -11,7 +19,7 @@ export function JoinCard({ eventId, onJoined }: { eventId: string; onJoined: (c:
     setBusy(true);
     setError(null);
     try {
-      const j = await api.join(eventId, nickname.trim() || undefined);
+      const j = await api.join(eventId, joinKey!, nickname.trim() || undefined);
       const c = { participantId: j.participantId, token: j.token };
       saveCreds(eventId, c);
       onJoined(c);
@@ -22,6 +30,17 @@ export function JoinCard({ eventId, onJoined }: { eventId: string; onJoined: (c:
     }
   }
 
+  if (!joinKey) {
+    return (
+      <section className="card" aria-labelledby="jn-h">
+        <h2 id="jn-h">Scan to join</h2>
+        <p>
+          You can watch the queue, but joining needs the organiser’s QR code. Scan it with your
+          phone camera.
+        </p>
+      </section>
+    );
+  }
   return (
     <section className="card" aria-labelledby="jn-h">
       <h2 id="jn-h">Join to add songs</h2>

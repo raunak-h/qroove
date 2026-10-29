@@ -27,13 +27,11 @@ with them.
 ## Backups
 
 Scheduled Firestore exports (`gcloud firestore export`) need the Blaze plan, which this project does not use.
-The free alternative is per-event JSON, which contains songs, styles and order and no people:
+The free alternative is the event's played-and-unplayed song list, which has songs, styles and order and no people:
 
-- Organiser: the played-and-unplayed list from `GET /api/events/:id/export` (also the "Download as JSON"
-  button on a past event's page `/h/<code>`).
-- Restoring: `/import` accepts that file and creates a new event with the chosen songs (they follow the
-  normal fairness rules; played history is not restored).
+- Organiser: songs that never played are offered as **Carry over to a new event** when an event ends, and the read-only
+  list of an ended event is at `/h/<code>`. The API behind them is `GET /api/events/:id/export`.
+- Starting a new event from a streaming playlist link is covered in the organiser guide.
 
-A deleted or lost live event cannot be restored to its exact state; the export is a playlist, not a
-database dump. If that is not acceptable for a given event, export the JSON before it starts and again
-when it ends. To move to Blaze later, add a scheduled `gcloud firestore export` to a Cloud Storage bucket.
+A deleted or lost live event cannot be restored to its exact state; the carry-over list is a playlist, not a database
+dump. To move to Blaze later, add a scheduled `gcloud firestore export` to a Cloud Storage bucket.

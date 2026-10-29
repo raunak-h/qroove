@@ -84,7 +84,7 @@ export async function request<T>(
 
 export const api = {
   bySlug: (slug: string) =>
-    request<{ eventId: string; slug: string }>(
+    request<{ eventId: string; slug: string; name: string }>(
       'GET',
       `/api/events/by-slug/${encodeURIComponent(slug)}`,
     ),
@@ -94,9 +94,9 @@ export const api = {
       `/api/events/${encodeURIComponent(slug)}/public`,
       signal ? { signal } : {},
     ),
-  join: (eventId: string, nickname?: string) =>
+  join: (eventId: string, joinKey: string, nickname?: string) =>
     request<JoinResponse>('POST', `/api/events/${eventId}/join`, {
-      body: nickname ? { nickname } : {},
+      body: { joinKey, ...(nickname ? { nickname } : {}) },
     }),
   myRequests: (eventId: string, creds: Creds) =>
     request<MyRequests>('GET', `/api/events/${eventId}/my-requests`, { creds }),

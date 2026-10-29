@@ -25,9 +25,11 @@ export function selectNext(
   ctx: EligibilityContext = {},
 ): Selection {
   const blocked: Selection['blocked'] = [];
+  const poolKeys = new Set(candidates.map((c) => c.canonicalKey));
+  const ectx = { ...ctx, poolKeys };
   const eligibleByStyle = new Map<string, Candidate[]>();
   for (const c of candidates) {
-    const e = checkEligibility(c, history, rules, ctx);
+    const e = checkEligibility(c, history, rules, ectx);
     if (e.ok) {
       const list = eligibleByStyle.get(c.style) ?? [];
       list.push(c);
@@ -67,6 +69,7 @@ const label = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 function summarise(blocked: Selection['blocked']): string {
   const reasons = new Set(blocked.map((b) => b.reason));
+  if (reasons.has('NEEDS_OTHERS_PLAYED')) return 'Waiting for other people’s songs to play first';
   if (reasons.has('SAME_OWNER_ADJACENT') || reasons.has('NEEDS_STYLE_TRANSITION')) {
     return 'Waiting for another contributor or a style change';
   }

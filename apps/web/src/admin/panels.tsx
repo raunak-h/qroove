@@ -1,10 +1,10 @@
-import { STYLE_PRESETS } from '@qroove/config';
 import type { AdminRequestView, ExportSnapshot } from '@qroove/contracts';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { styleLabel } from '../attendee/NowPlaying';
 import { ApiError } from '../shared/api';
 import { formatClock, fromLocalInput, pluralise, toLocalInput } from '../shared/time';
+import { RulesList } from '../shared/menu';
 import { ConfirmButton, CopyButton, QrCode } from '../shared/widgets';
 import { adminApi, type AdminStateResponse, type Commands, type Created } from './adminApi';
 import { CreatedPanel } from './CreateEvent';
@@ -23,30 +23,32 @@ export function PlaybackPanel({ s, cmd, refresh }: PanelProps) {
   const v = s.view;
   const next = v.queue.find((q) => !q.overflow);
   const overflow = v.preview.items.filter((i) => i.overflow).length;
+  const live = LIVE.has(v.state);
+  // The break to act on: the one in progress, else the next one that has not started.
+  const brk =
+    v.breaks.find((b) => b.actualStart !== null && b.actualEnd === null) ??
+    v.breaks.find((b) => b.actualStart === null && b.actualEnd === null);
   return (
-    <section className="card stack" aria-labelledby="pb-h">
-      <h2 id="pb-h">Playback</h2>
+    <section className="card stack compact" aria-label="Playback">
       <p className="big">{v.nowPlaying ? v.nowPlaying.track.title : 'Nothing playing'}</p>
-      {v.nowPlaying ? (
-        <p className="muted">
-          {[v.nowPlaying.track.artist, styleLabel(v.nowPlaying.track.style)]
-            .filter(Boolean)
-            .join(' · ')}
-        </p>
-      ) : null}
-      <p>
-        <strong>Next:</strong> {next ? next.title : 'nothing reserved yet'}
+      <p className="muted small">
+        {v.nowPlaying
+          ? [v.nowPlaying.track.artist, styleLabel(v.nowPlaying.track.style)]
+              .filter(Boolean)
+              .join(' · ')
+          : v.waitingReason
+            ? `Waiting: ${v.waitingReason}`
+            : ''}
+        {v.nowPlaying || v.waitingReason ? ' · ' : ''}
+        Next: {next ? next.title : 'nothing reserved yet'}
+        {v.runIndicator && v.state === 'ACTIVE'
+          ? ` · ${styleLabel(v.runIndicator.style)} run ${v.runIndicator.runLength}/${v.runIndicator.cap}`
+          : ''}
       </p>
-      {v.runIndicator && v.state === 'ACTIVE' ? (
-        <p className="muted">
-          {styleLabel(v.runIndicator.style)} run: {v.runIndicator.runLength} of {v.runIndicator.cap}
-        </p>
-      ) : null}
-      {v.waitingReason ? <p className="notice">Waiting: {v.waitingReason}</p> : null}
       {overflow > 0 ? (
-        <p className="notice">
-          {overflow} {pluralise(overflow, 'song')} would run past the end time. Extend the end time
-          to fit them.
+        <p className="notice small">
+          {overflow} {pluralise(overflow, 'song')} would run past the end. Extend the time under
+          More.
         </p>
       ) : null}
       <div className="row">
@@ -75,19 +77,30 @@ export function PlaybackPanel({ s, cmd, refresh }: PanelProps) {
             {v.state === 'TRANSFERRING' ? 'Cancel handover and resume' : 'Resume'}
           </button>
         ) : null}
-        {LIVE.has(v.state) && v.nowPlaying ? (
-          <ConfirmButton
-            label="Skip"
-            confirmLabel="Yes, skip this song"
-            onConfirm={() => run(cmd.skip)}
-          />
+        {live && v.nowPlaying ? (
+          <ConfirmButton label="Skip" confirmLabel="Yes, skip" onConfirm={() => run(cmd.skip)} />
+        ) : null}
+        {live && brk && brk.actualStart !== null ? (
+          <button
+            type="button"
+            className="btn primary"
+            disabled={busy}
+            onClick={() => void run(() => cmd.endBreak(brk.id))}
+          >
+            End break
+          </button>
+        ) : live && brk ? (
+          <button
+            type="button"
+            className="btn"
+            disabled={busy}
+            onClick={() => void run(() => cmd.startBreak(brk.id))}
+          >
+            Start break
+            {brk.startsAt !== null ? ` (due ${formatClock(brk.startsAt, v.timezone)})` : ''}
+          </button>
         ) : null}
       </div>
-      {v.state === 'DRAFT' ? (
-        <p className="muted">
-          Starting locks the rules below. Attendees can already see the event code.
-        </p>
-      ) : null}
       <ErrorLine error={error} />
     </section>
   );
@@ -139,8 +152,7 @@ export function ModerationPanel({ s, cmd, refresh }: PanelProps) {
     </li>
   );
   return (
-    <section className="card" aria-labelledby="mod-h">
-      <h2 id="mod-h">Moderation</h2>
+    <section aria-label="Queue">
       <ErrorLine error={error} />
       {shown.length === 0 ? (
         <p className="muted">No requests yet.</p>
@@ -169,7 +181,7 @@ export function SchedulePanel({ s, cmd, refresh }: PanelProps) {
   const live = v.state === 'ACTIVE' || v.state === 'PAUSED';
   return (
     <section className="card stack" aria-labelledby="sc-h">
-      <h2 id="sc-h">End time and breaks</h2>
+      <h2 id="sc-h">Time</h2>
       <p>
         {v.endAt ? (
           <>
@@ -207,56 +219,18 @@ export function SchedulePanel({ s, cmd, refresh }: PanelProps) {
           ) : null}
         </div>
       ) : null}
-      {v.breaks.length > 0 ? (
-        <ul className="list">
-          {v.breaks.map((b) => (
-            <li key={b.id}>
-              <span className="title">
-                {b.label} · {Math.round(b.durationSec / 60)} min
-              </span>
-              {b.actualEnd !== null ? (
-                <span className="badge done">Done</span>
-              ) : b.actualStart !== null ? (
-                <button
-                  type="button"
-                  className="btn primary"
-                  disabled={busy}
-                  onClick={() => void run(() => cmd.endBreak(b.id))}
-                >
-                  End break
-                </button>
-              ) : live ? (
-                <button
-                  type="button"
-                  className="btn"
-                  disabled={busy}
-                  onClick={() => void run(() => cmd.startBreak(b.id))}
-                >
-                  Start break
-                </button>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      ) : null}
       <ErrorLine error={error} />
     </section>
   );
 }
 
-export function SharePanel({ slug }: { slug: string }) {
-  const url = `${location.origin}/e/${slug}`;
+/** The QR code is the only way in: no text code, no link, nothing to copy. */
+export function SharePanel({ joinUrl, name }: { joinUrl: string; name: string }) {
   return (
-    <section className="card stack" aria-labelledby="sh-h">
-      <h2 id="sh-h">Invite people</h2>
-      <QrCode text={url} label={`QR code that opens ${url}`} />
-      <p className="big code" aria-label={`Event code ${slug.split('').join(' ')}`}>
-        {slug}
-      </p>
-      <p className="mono">{url}</p>
-      <CopyButton text={url} label="Copy join link" />
+    <section className="share" aria-label="Invite people">
+      <QrCode text={joinUrl} label={`QR code to join ${name}`} />
       <p className="muted small">
-        This is the public join link. It never contains organiser access.
+        Guests scan this with their phone camera to join. There is no code to share.
       </p>
     </section>
   );
@@ -324,76 +298,52 @@ export function PlayerPanel({ s, eventId }: { s: AdminStateResponse; eventId: st
 }
 
 export function RulesPanel({ s }: { s: AdminStateResponse }) {
-  const r = s.rules;
   const frozen = s.view.state !== 'DRAFT';
   return (
-    <section className="card" aria-labelledby="ru-h">
-      <h2 id="ru-h">Rules</h2>
-      <p className="muted">
+    <section className="stack" aria-label="Rules">
+      <p className="muted small">
         {frozen
           ? `Locked since the event started. Fingerprint ${s.rulesHash?.slice(0, 12) ?? ''}.`
           : 'These are locked when you start the event.'}
       </p>
-      <ul className="plain">
-        <li>
-          Styles:{' '}
-          {r.enabledStyles
-            .map(
-              (id) =>
-                `${STYLE_PRESETS.find((p) => p.id === id)?.label ?? id} (max ${r.runCaps[id]} in a row)`,
-            )
-            .join(', ')}
-        </li>
-        <li>Songs per person: {r.submissionLimit}</li>
-        <li>Spacing: nobody twice in a row, and not again until the style has changed once.</li>
-        <li>Each recording once per event. First come, first served within a style.</li>
-      </ul>
+      <RulesList rules={s.rules} />
     </section>
   );
 }
 
 export function EndPanel({ s, cmd, refresh }: PanelProps) {
   const { run, busy, error } = useAction(refresh);
-  const [typed, setTyped] = useState('');
   if (s.view.state === 'ENDED' || s.view.state === 'ARCHIVED') return null;
   return (
-    <section className="card stack" aria-labelledby="en-h">
-      <h2 id="en-h">End the event</h2>
-      <p className="muted">
+    <section className="stack" aria-label="End the event">
+      <p className="muted small">
         Ending is permanent. Songs that did not play can be carried over to a new event.
       </p>
-      <label htmlFor="end-confirm">Type END to confirm</label>
-      <input
-        id="end-confirm"
-        value={typed}
-        onChange={(e) => setTyped(e.target.value)}
-        autoComplete="off"
+      <ConfirmButton
+        label="End event"
+        confirmLabel="Yes, end the event now"
+        disabled={busy}
+        onConfirm={() => run(cmd.end)}
       />
-      <button
-        type="button"
-        className="btn danger"
-        disabled={busy || typed.trim().toUpperCase() !== 'END'}
-        onClick={() => void run(cmd.end)}
-      >
-        End event
-      </button>
       <ErrorLine error={error} />
     </section>
   );
 }
 
-/** Song picker + "create event from these"; shared by carry-over and the JSON import page. */
+/** Song picker + "create event from these" for carry-over; queued songs fit the new time minus one minute. */
 export function ImportPicker({
   snapshot,
   timezone,
   name,
   intro,
+  plannedDurationMin,
   onCreated,
 }: {
   snapshot: ExportSnapshot;
   timezone: string;
   name: string;
   intro: string;
+  plannedDurationMin: number;
   onCreated: (c: Created) => void;
 }) {
   const [picked, setPicked] = useState<Set<number>>(
@@ -449,6 +399,7 @@ export function ImportPicker({
               shuffle,
               selectedIndexes: [...picked],
               name,
+              plannedDurationMin,
             })
             .then(onCreated)
             .catch((e: unknown) => setError(e instanceof ApiError ? e : null))
@@ -494,6 +445,7 @@ export function CarryOverPanel({ s, eventId }: { s: AdminStateResponse; eventId:
           snapshot={songs}
           timezone={s.view.timezone}
           name={`${s.view.name} (next)`.slice(0, 80)}
+          plannedDurationMin={s.plannedDurationMin ?? 120}
           intro="These songs never played. They join the new event owned by a neutral “system” contributor and follow the same fairness rules; you can remove any of them before starting."
           onCreated={setCreated}
         />

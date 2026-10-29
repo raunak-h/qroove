@@ -83,3 +83,39 @@ describe('quota', () => {
       expect(countsTowardQuota(s)).toBe(false);
   });
 });
+
+describe('single-genre spacing', () => {
+  const single = { enabledStyles: ['salsa'], runCaps: { salsa: 10 } };
+  it('holds a returning requester until half of the others’ waiting songs have played', () => {
+    const a1 = cand('A', 'salsa', 1);
+    const a2 = cand('A', 'salsa', 5);
+    const others = [2, 3, 4, 6].map((n) => cand(`B${n}`, 'salsa', n));
+    // A's first song starts with four others waiting: the oldest two must play first.
+    let h = applyPlay(EMPTY_HISTORY, a1, { pool: [a2, ...others], gate: true });
+    const pool = [a2, ...others];
+    const blocked = (hist: typeof h) =>
+      checkEligibility(a2, hist, single, { poolKeys: new Set(pool.map((c) => c.canonicalKey)) });
+    h = applyPlay(h, others[0]!, { pool, gate: true }); // B2 plays: adjacency aside, A still waits
+    expect(blocked(h)).toEqual({ ok: false, reason: 'NEEDS_OTHERS_PLAYED' });
+    h = applyPlay(h, others[1]!, { pool, gate: true }); // B3 plays: half done
+    expect(blocked(h)).toEqual({ ok: true });
+  });
+  it('stops waiting for a song that was withdrawn', () => {
+    const a1 = cand('A', 'salsa', 1);
+    const a2 = cand('A', 'salsa', 4);
+    const b = cand('B', 'salsa', 2);
+    const c = cand('C', 'salsa', 3);
+    let h = applyPlay(EMPTY_HISTORY, a1, { pool: [a2, b, c], gate: true });
+    h = applyPlay(h, cand('D', 'salsa', 9)); // someone else plays in between
+    const withoutB = new Set([a2, c].map((x) => x.canonicalKey));
+    expect(checkEligibility(a2, h, single, { poolKeys: withoutB })).toEqual({ ok: true });
+  });
+  it('does not use the style-transition rule', () => {
+    const a1 = cand('A', 'salsa', 1);
+    const a2 = cand('A', 'salsa', 3);
+    const b = cand('B', 'salsa', 2);
+    let h = applyPlay(EMPTY_HISTORY, a1);
+    h = applyPlay(h, b);
+    expect(checkEligibility(a2, h, single)).toEqual({ ok: true });
+  });
+});

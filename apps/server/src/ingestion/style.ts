@@ -4,8 +4,6 @@ const CUES: Array<[RegExp, StyleId]> = [
   [/\bbachata\b/i, 'bachata'],
   [/\bsalsa\b/i, 'salsa'],
   [/\bcha[\s-]?cha(?:[\s-]?ch[aá])?\b/i, 'chacha'],
-  [/\bkizomba\b/i, 'kizomba'],
-  [/\bmerengue\b/i, 'merengue'],
 ];
 
 /**

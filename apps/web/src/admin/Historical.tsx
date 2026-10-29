@@ -46,25 +46,6 @@ export default function Historical() {
     <section className="card">
       <h1>{cur.snap.name}</h1>
       <p className="muted">A read-only list of the songs requested at this event.</p>
-      <p>
-        <button
-          type="button"
-          className="btn"
-          onClick={() => {
-            const blob = new Blob([JSON.stringify(cur.snap, null, 2)], {
-              type: 'application/json',
-            });
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob);
-            a.download = `${cur.slug}.json`;
-            a.click();
-            URL.revokeObjectURL(a.href);
-          }}
-        >
-          Download as JSON
-        </button>{' '}
-        <Link to="/import">Start a new event from a saved playlist</Link>
-      </p>
       <ol className="list">
         {cur.snap.recommendations.map((r, i) => (
           <li key={i}>

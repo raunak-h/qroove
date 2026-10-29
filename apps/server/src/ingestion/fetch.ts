@@ -7,6 +7,7 @@ export const ALLOWED_HOSTS: ReadonlySet<string> = new Set([
   'open.spotify.com',
   'itunes.apple.com',
   'www.youtube.com',
+  'music.apple.com',
 ]);
 
 export const TIMEOUT_MS = 3000;

@@ -13,7 +13,13 @@ const baseView = {
   endAt: null,
   serverNow: Date.now(),
   version: 1,
-  rules: { enabledStyles: ['salsa', 'bachata'], submissionLimit: 5 },
+  rules: {
+    rulesVersion: 2,
+    enabledStyles: ['salsa', 'bachata'],
+    masterRunCap: 2,
+    runCaps: { salsa: 2, bachata: 2 },
+    submissionLimit: 5,
+  },
   nowPlaying: null,
   waitingReason: null,
   runIndicator: null,
@@ -49,8 +55,11 @@ type Handler = (url: string, init: RequestInit) => { status?: number; body: unkn
 let handler: Handler;
 const calls: Array<{ url: string; init: RequestInit }> = [];
 
+const KEY = 'K'.repeat(24);
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
+  sessionStorage.setItem('qroove:jk:ABC123', KEY);
   calls.length = 0;
   vi.stubGlobal('EventSource', undefined);
   vi.stubGlobal('crypto', { randomUUID: () => 'uuid-1' });
@@ -84,6 +93,84 @@ describe('EventPage', () => {
     expect(screen.queryByText(/Secret Name/)).toBeNull();
     expect(screen.getByText('After end time')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Join this event' })).toBeInTheDocument();
+  });
+
+  it('cannot join without the QR secret, but can still watch the queue', async () => {
+    sessionStorage.clear();
+    handler = (url) =>
+      url.includes('by-slug') ? { body: { eventId: 'ev1', slug: 'ABC123' } } : { body: baseView };
+    renderPage();
+    expect(await screen.findByText('Someone Else')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Join this event' })).toBeNull();
+    expect(screen.getByText(/joining needs the organiser’s QR code/i)).toBeInTheDocument();
+  });
+
+  it('takes the join secret from the QR link and removes it from the address bar', async () => {
+    sessionStorage.clear();
+    window.location.hash = '#j=' + KEY;
+    const joined: unknown[] = [];
+    handler = (url, init) => {
+      if (url.includes('by-slug')) return { body: { eventId: 'ev1', slug: 'ABC123' } };
+      if (url.endsWith('/join')) {
+        joined.push(JSON.parse(init.body as string));
+        return { body: { participantId: 'p1', token: 'tok'.repeat(10) } };
+      }
+      if (url.endsWith('/my-requests')) return { body: { accepted: 0, limit: 5, requests: [] } };
+      return { body: baseView };
+    };
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Join this event' }));
+    await waitFor(() => expect(joined).toEqual([{ joinKey: KEY }]));
+    expect(window.location.hash).toBe('');
+  });
+
+  it('shows a break in the queue where it falls', async () => {
+    handler = (url) =>
+      url.includes('by-slug')
+        ? { body: { eventId: 'ev1', slug: 'ABC123' } }
+        : {
+            body: {
+              ...baseView,
+              breaks: [
+                {
+                  id: 'b1',
+                  label: 'Break',
+                  durationSec: 600,
+                  startsAt: 5_000,
+                  actualStart: null,
+                  actualEnd: null,
+                },
+              ],
+              preview: {
+                revision: 1,
+                items: [
+                  {
+                    requestId: 'q1',
+                    position: 1,
+                    predictedStartMs: 1_000,
+                    uncertain: false,
+                    overflow: false,
+                  },
+                  {
+                    requestId: 'q2',
+                    position: 2,
+                    predictedStartMs: 9_000,
+                    uncertain: false,
+                    overflow: false,
+                  },
+                ],
+                stoppedReason: 'EXHAUSTED',
+                computedAt: 0,
+              },
+            },
+          };
+    renderPage();
+    await screen.findByText('Someone Else');
+    const items = screen.getAllByRole('listitem').map((li) => li.textContent ?? '');
+    const at = items.findIndex((t) => /Break · 10 min/.test(t));
+    expect(at).toBeGreaterThan(items.findIndex((t) => t.includes('Someone Else')));
+    expect(at).toBeLessThan(items.findIndex((t) => t.includes('Late Song')));
   });
 
   it('shows a clear message for an unknown event', async () => {

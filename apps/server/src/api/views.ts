@@ -118,7 +118,7 @@ export function myRequests(agg: EventAggregate, participantId: string): MyReques
   };
 }
 
-export function adminState(agg: EventAggregate, now: number): AdminState {
+export function adminState(agg: EventAggregate, now: number, baseUrl: string): AdminState {
   const requests: AdminRequestView[] = agg.requests.map((r) => ({
     id: r.id,
     state: r.state,
@@ -139,5 +139,7 @@ export function adminState(agg: EventAggregate, now: number): AdminState {
     lease: l ? { epoch: l.epoch, expiresAt: l.expiresAt } : null,
     rulesHash: agg.event.rulesHash,
     rules: agg.event.rules,
+    plannedDurationMin: agg.event.plannedDurationMin,
+    joinUrl: `${baseUrl}/e/${agg.event.publicSlug}#j=${agg.event.joinKey}`,
   };
 }
