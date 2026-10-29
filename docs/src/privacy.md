@@ -16,7 +16,8 @@ No audio is stored, uploaded or streamed by Qroove. There are no advertising or 
 
 ## Retention
 
-Participant records and nicknames are purged 30 days after an event ends; the purge job arrives in Phase 8.
+Participant records (token hashes) and nicknames are deleted 30 days after an event ends, abandoned drafts after
+7 days and audit records after 90 days. A purge job runs on the server at start-up and every 6 hours.
 Exported snapshots contain songs only, never people. Organisers can end an event at any time, which makes it
 read-only.
 

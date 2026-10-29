@@ -50,7 +50,8 @@ export function Landing() {
       <p>
         <Link to="/new" className="btn">
           Create an event
-        </Link>
+        </Link>{' '}
+        <Link to="/import">Start from a saved playlist</Link>
       </p>
       <p className="muted small">
         {BRAND.initiative} by{' '}

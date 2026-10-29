@@ -296,7 +296,9 @@ summary:focus-visible,
   overflow-wrap: anywhere;
 }
 .list li.overflow {
-  opacity: 0.6;
+  /* Not opacity: faded text fails WCAG contrast. */
+  border-left: 3px dashed var(--muted);
+  padding-left: 0.5rem;
 }
 ol.list {
   counter-reset: q;

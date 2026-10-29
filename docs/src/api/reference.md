@@ -43,15 +43,16 @@ that carry a secret are not replayable and send `Cache-Control: no-store`.
 
 ## Discovery and public
 
-| Route                           | Auth | Notes                                                                                                                                                            |
-| ------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/health`               | –    | `{ ok, version, commit }`                                                                                                                                        |
-| `GET /api/events/by-slug/:slug` | –    | `{ eventId, slug }`                                                                                                                                              |
-| `GET /api/events/:slug/public`  | –    | Sanitised view: state, now playing, queue (request ids, titles, nicknames), preview, `waitingReason`, `runIndicator`, `serverNow`. No participant ids or tokens. |
-| `GET /api/events/:id/stream`    | –    | Server-Sent Events, see [Realtime](/architecture/realtime)                                                                                                       |
-| `GET /api/events/:id/export`    | –    | `ExportSnapshot`: unplayed and played songs, no people                                                                                                           |
-| `POST /api/resolve-link`        | –    | `{ url }` → title, artist, duration, artwork, `confidence`, `suggestedStyle`. No side effects. 20/min/IP.                                                        |
-| `GET /api/spotify/callback`     | –    | Reserved for a future user-auth adapter; returns 204                                                                                                             |
+| Route                           | Auth            | Notes                                                                                                                                                            |
+| ------------------------------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/health`               | –               | `{ ok, version, commit }`                                                                                                                                        |
+| `GET /api/events/by-slug/:slug` | –               | `{ eventId, slug }`                                                                                                                                              |
+| `GET /api/events/:slug/public`  | –               | Sanitised view: state, now playing, queue (request ids, titles, nicknames), preview, `waitingReason`, `runIndicator`, `serverNow`. No participant ids or tokens. |
+| `GET /api/events/:id/stream`    | –               | Server-Sent Events, see [Realtime](/architecture/realtime)                                                                                                       |
+| `GET /api/events/:id/export`    | –               | `ExportSnapshot`: unplayed and played songs, no people                                                                                                           |
+| `POST /api/internal/purge`      | `x-cron-secret` | Retention purge; returns a count per category. 404 when `CRON_SECRET` is unset, 401 for a wrong secret                                                           |
+| `POST /api/resolve-link`        | –               | `{ url }` → title, artist, duration, artwork, `confidence`, `suggestedStyle`. No side effects. 20/min/IP.                                                        |
+| `GET /api/spotify/callback`     | –               | Reserved for a future user-auth adapter; returns 204                                                                                                             |
 
 ## Creating and joining
 

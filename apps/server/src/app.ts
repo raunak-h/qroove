@@ -10,6 +10,7 @@ import { randomIds } from './domain/ids.js';
 import { registerErrors } from './api/errors.js';
 import { registerRoutes } from './api/routes.js';
 import { parseEnv, type Env } from './env.js';
+import { runPurge, schedulePurge, secretMatches } from './maintenance/purge.js';
 import { createIngestion } from './ingestion/index.js';
 import type { FetchLike } from './ingestion/fetch.js';
 import { EventBus } from './realtime/bus.js';
@@ -25,6 +26,8 @@ export interface AppOverrides {
   repo?: Repository;
   clock?: Clock;
   fetch?: FetchLike;
+  /** Run the retention purge now and every 6 h (the entry point turns this on). */
+  schedulePurge?: boolean;
 }
 
 export async function buildApp(
@@ -97,6 +100,7 @@ export async function buildApp(
           secret: env.SPOTIFY_CLIENT_SECRET,
         }
       : undefined;
+  const bus = new EventBus(repo);
   registerErrors(app);
   registerRoutes(app, {
     deps: { repo, clock, ids: randomIds },
@@ -106,7 +110,7 @@ export async function buildApp(
       now: () => clock.now(),
       spotify,
     }),
-    bus: new EventBus(repo),
+    bus,
     sec: createSecurity({
       publicBaseUrl: env.PUBLIC_BASE_URL,
       production: env.NODE_ENV === 'production',
@@ -114,7 +118,24 @@ export async function buildApp(
     }),
     limiter,
   });
+  // Internal: external schedulers (or an operator) can trigger retention with the shared secret.
+  app.post('/api/internal/purge', async (req, reply) => {
+    const h = req.headers['x-cron-secret'];
+    if (!env.CRON_SECRET) return reply.code(404).send({ error: { code: 'NOT_FOUND' } });
+    if (!secretMatches(typeof h === 'string' ? h : undefined, env.CRON_SECRET)) {
+      return reply
+        .code(401)
+        .send({ error: { code: 'UNAUTHORISED', message: 'Not allowed.', action: '' } });
+    }
+    return runPurge(repo, clock);
+  });
+  let stopPurge: (() => void) | undefined;
+  app.addHook('onReady', async () => {
+    if (overrides.schedulePurge) stopPurge = schedulePurge(repo, clock, app.log);
+  });
   app.addHook('onClose', async () => {
+    stopPurge?.();
+    bus.close();
     limiter.close();
     await repo.close();
   });

@@ -74,6 +74,12 @@ export class EventBus {
     }
   }
 
+  /** Drops every repository subscription (shutdown); the Firestore client refuses to close otherwise. */
+  close(): void {
+    for (const t of this.topics.values()) t.unsubscribe();
+    this.topics.clear();
+  }
+
   get activeTopics() {
     return this.topics.size;
   }

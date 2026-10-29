@@ -196,5 +196,83 @@ export function runRepoContract(name: string, make: () => Promise<Repository>, s
       });
       expect(await repo.getEventPublic('missing-event')).toBeNull();
     });
+
+    it('purges per the cut-offs and keeps what is still inside retention', async () => {
+      const { repo, event } = await fresh();
+      const old = 1_000;
+      const recent = 5_000_000;
+      await repo.runInTransaction(event.id, async (tx) => {
+        const e = (await tx.getEvent())!;
+        tx.putEvent({ ...e, state: 'ENDED', endedAt: old });
+        tx.putParticipant({
+          id: 'p',
+          tokenHash: 'h',
+          nickname: 'N',
+          joinedAt: old,
+          lastSeenAt: old,
+          acceptedCount: 0,
+        });
+        tx.appendAudit({
+          action: 'old',
+          actorRole: 'system',
+          at: old,
+          payload: {},
+          idempotencyKey: null,
+        });
+        tx.appendAudit({
+          action: 'new',
+          actorRole: 'system',
+          at: recent,
+          payload: {},
+          idempotencyKey: null,
+        });
+        tx.putIdempotency({ key: 'old', response: {}, at: old });
+        tx.putIdempotency({ key: 'new', response: {}, at: recent });
+      });
+      const report = await repo.purge({
+        draftsBefore: 0,
+        participantsEndedBefore: 2_000,
+        auditBefore: 2_000,
+        idempotencyBefore: 2_000,
+      });
+      // Adapters may share a database with other tests, so counts are lower bounds.
+      expect(report.participantsDeleted).toBeGreaterThanOrEqual(1);
+      expect(report.auditDeleted).toBeGreaterThanOrEqual(1);
+      expect(report.idempotencyDeleted).toBeGreaterThanOrEqual(1);
+      expect((await repo.listAudit(event.id)).map((a) => a.action)).toEqual(['new']);
+      expect((await repo.getEventPublic(event.id))!.nicknames).toEqual({});
+      await repo.runInTransaction(event.id, async (tx) => {
+        expect(await tx.getIdempotency('old')).toBeNull();
+        expect(await tx.getIdempotency('new')).not.toBeNull();
+      });
+      // Idempotent: a second run finds nothing left to delete.
+      const again = await repo.purge({
+        draftsBefore: 0,
+        participantsEndedBefore: 2_000,
+        auditBefore: 2_000,
+        idempotencyBefore: 2_000,
+      });
+      expect(again).toMatchObject({
+        participantsDeleted: 0,
+        auditDeleted: 0,
+        idempotencyDeleted: 0,
+      });
+    });
+
+    it('deletes abandoned drafts and frees their slug', async () => {
+      const { repo, event } = await fresh();
+      const cut = {
+        draftsBefore: event.createdAt,
+        participantsEndedBefore: 0,
+        auditBefore: 0,
+        idempotencyBefore: 0,
+      };
+      expect((await repo.purge(cut)).draftsDeleted).toBe(0); // not older than the cut-off
+      expect(
+        (await repo.purge({ ...cut, draftsBefore: event.createdAt + 1 })).draftsDeleted,
+      ).toBeGreaterThanOrEqual(1);
+      expect(await repo.getEventPublic(event.id)).toBeNull();
+      expect(await repo.findEventBySlug(event.publicSlug)).toBeNull();
+    });
   });
 }

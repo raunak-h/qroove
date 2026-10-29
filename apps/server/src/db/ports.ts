@@ -6,6 +6,8 @@ import type {
   HandoverOfferDoc,
   IdempotencyDoc,
   NewEventBundle,
+  PurgeCutoffs,
+  PurgeReport,
   ParticipantDoc,
   PlaybackDoc,
   RecordingKeyDoc,
@@ -60,6 +62,8 @@ export interface Repository {
   getEventPublic(eventId: string): Promise<EventAggregate | null>;
   /** Called after each committed change to the event doc. */
   subscribe(eventId: string, cb: (event: EventDoc) => void): () => void;
+  /** Retention: removes expired data across all events. Safe to run repeatedly. */
+  purge(cutoffs: PurgeCutoffs): Promise<PurgeReport>;
   close(): Promise<void>;
   /** Audit trail, for tests and the runbook. */
   listAudit(eventId: string): Promise<AuditDoc[]>;

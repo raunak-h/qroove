@@ -2,8 +2,8 @@
 
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
-**Current phase:** 8
-**Next session starts with:** Phase 8 (Hardening, e2e, a11y, perf). Phases 0–7 done.
+**Current phase:** 9
+**Next session starts with:** Phase 9 (Deploy: Railway + Cloudflare + Firestore prod). Phases 0–8 done.
 
 ## Phases
 
@@ -15,7 +15,7 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - [x] 5 — Attendee UI
 - [x] 6 — Admin UI
 - [x] 7 — Player
-- [ ] 8 — Hardening, e2e, a11y, perf
+- [x] 8 — Hardening, e2e, a11y, perf
 - [ ] 9 — Deploy (Railway + Cloudflare + Firestore)
 - [ ] 10 — Release 0.1.0 + transfer readiness
 
@@ -104,3 +104,14 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - Player uses the admin state stream (needs the admin cookie and CSRF for `claim` only); the reserved song is the request in `RESERVED_NEXT`. Lease creds live in memory + `sessionStorage` (reload resumes via heartbeat).
 - Decisions: Start is blocked until lease held + sound check done; auto-advance only after one successful user-initiated `play()`; a refused autoplay drops back to the Start button; audio load error before start → manual mode, after start → `FAILED` (counts as skipped); release/takeover leaves any playing track to the server's claim rule (closed as played); exact match = same fingerprint, title-only match is allowed when either artist is missing and is labelled "probable"; the per-request file choice is local only (no availability reported to the server).
 - Not done: availability per request sent to the server (SPEC §5 "mapping availability"; MVP shows it locally only); `pagehide` release (reload must keep the lease); real-browser audio is untested in CI (jsdom stubs) — Phase 8 e2e should cover it with a generated WAV and Chromium's fake audio; the server has no "media unavailable before start" command.
+
+### Phase 8 (2026-10-29)
+
+- Retention: `Repository.purge(cutoffs)` (memory + Firestore, contract-tested on both) and `maintenance/purge.ts` (policy constants, 6 h timer started from `main.ts` only, `POST /api/internal/purge` with `x-cron-secret`; 404 without `CRON_SECRET`). Participants' docs are deleted but requests keep their pseudonymous `ownerId`; admin grants are kept so an organiser can still carry over after 30 days.
+- Import UI: `/import` (paste/upload) and a shared `ImportPicker` also used by carry-over. Export UI: "Download as JSON" on `/h/:slug`.
+- E2E: `playwright.config.ts`, `tests/e2e/{flow,theme}.spec.ts` (Playwright 1.64.1, axe-core/playwright 4.13.0; 4.14.0 is under 14 days old). Runs against the built server (`pnpm build` first) with memory repo on port 3100; `RATE_LIMIT_OFF=1` (ignored in production). Pixel 8 Chromium runs; iPhone 15 WebKit is opt-in (`E2E_WEBKIT=1`, needs `playwright install webkit`) and was **not run** here. Browsers: `pnpm exec playwright install chromium`.
+- A11y: one real violation found and fixed (opacity-faded rows failed contrast). Axe checks cover `/`, `/new`, `/import`, `/privacy`, `/e/:slug`, `/admin/:id` (draft and ended), `/player/:id`, `/h/:slug`; light theme on the public pages only.
+- Load (`pnpm load`, contributors staggered over 3 s with 0.3–1.5 s think time): memory p50 6 ms / p95 13 ms; Firestore emulator p50 0.9 s / p95 1.4 s (budget 2 s). Finding: unqueued transactions on one event aborted each other (p95 > 50 s); the Firestore adapter now queues per event in-process, bounding throughput to roughly 13 mutations/s per event on the emulator (a fully simultaneous 25-person burst still reaches p95 ≈ 2.2 s).
+- Also fixed: the SSE bus never released Firestore listeners on close (client refused to terminate); SIGTERM/SIGINT handlers added.
+- CI: separate `integration-emulator` and `e2e` jobs. Not verified on GitHub yet (first run happens on push).
+- Not done: webkit e2e run; real-audio e2e for the player (manual mode only); e2e on a second mobile viewport beyond Pixel 8; multi-instance behaviour is untested.

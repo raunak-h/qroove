@@ -9,6 +9,8 @@ import type {
   HandoverOfferDoc,
   IdempotencyDoc,
   NewEventBundle,
+  PurgeCutoffs,
+  PurgeReport,
   ParticipantDoc,
   PlaybackDoc,
   RecordingKeyDoc,
@@ -32,7 +34,29 @@ export class FirestoreRepository implements Repository {
     return this.db.collection('events').doc(id);
   }
 
-  async runInTransaction<T>(eventId: string, fn: (tx: EventTx) => Promise<T>): Promise<T> {
+  /**
+   * Transactions on one event are queued in-process first. Every command rewrites the same event
+   * document, so concurrent transactions would just abort and retry each other (measured: p95 > 50 s
+   * with 25 simultaneous submitters). Production runs one instance, so the queue removes the
+   * contention; Firestore transactions still guarantee correctness if a second instance appears.
+   */
+  private readonly tails = new Map<string, Promise<unknown>>();
+
+  runInTransaction<T>(eventId: string, fn: (tx: EventTx) => Promise<T>): Promise<T> {
+    const prev = this.tails.get(eventId) ?? Promise.resolve();
+    const run = prev.then(() => this.transact(eventId, fn));
+    const tail = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    this.tails.set(eventId, tail);
+    void tail.then(() => {
+      if (this.tails.get(eventId) === tail) this.tails.delete(eventId);
+    });
+    return run;
+  }
+
+  private async transact<T>(eventId: string, fn: (tx: EventTx) => Promise<T>): Promise<T> {
     const ref = this.event(eventId);
     return this.db.runTransaction(
       async (t) => {
@@ -97,6 +121,51 @@ export class FirestoreRepository implements Repository {
   async listAudit(eventId: string): Promise<AuditDoc[]> {
     const snap = await this.event(eventId).collection('audit').get();
     return snap.docs.map((d) => d.data() as AuditDoc).sort((a, b) => a.at - b.at);
+  }
+
+  async purge(c: PurgeCutoffs): Promise<PurgeReport> {
+    const r: PurgeReport = {
+      draftsDeleted: 0,
+      participantsDeleted: 0,
+      auditDeleted: 0,
+      idempotencyDeleted: 0,
+    };
+    const events = await this.db
+      .collection('events')
+      .select('state', 'createdAt', 'endedAt', 'publicSlug')
+      .get();
+    for (const doc of events.docs) {
+      const e = doc.data() as Pick<EventDoc, 'state' | 'createdAt' | 'endedAt' | 'publicSlug'>;
+      const ref = doc.ref;
+      if (e.state === 'DRAFT' && e.createdAt < c.draftsBefore) {
+        await this.db.recursiveDelete(ref);
+        await this.db.collection('slugs').doc(e.publicSlug).delete();
+        r.draftsDeleted++;
+        continue;
+      }
+      if (e.endedAt !== null && e.endedAt < c.participantsEndedBefore) {
+        r.participantsDeleted += await this.deleteAll(ref.collection('participants'));
+      }
+      r.auditDeleted += await this.deleteAll(
+        ref.collection('audit').where('at', '<', c.auditBefore),
+      );
+      r.idempotencyDeleted += await this.deleteAll(
+        ref.collection('idempotency').where('at', '<', c.idempotencyBefore),
+      );
+    }
+    return r;
+  }
+
+  private async deleteAll(q: Query): Promise<number> {
+    let n = 0;
+    for (;;) {
+      const snap = await q.limit(400).get();
+      if (snap.empty) return n;
+      const batch = this.db.batch();
+      for (const d of snap.docs) batch.delete(d.ref);
+      await batch.commit();
+      n += snap.size;
+    }
   }
 
   async close(): Promise<void> {

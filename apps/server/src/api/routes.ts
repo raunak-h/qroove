@@ -52,7 +52,9 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
     eventId: id,
     adminSecret: adminFromRequest(sec, req, id),
   });
-  const limit = (key: string, max: number, windowMs: number) => limiter.check(key, max, windowMs);
+  const unlimited = env.RATE_LIMIT_OFF === '1' && env.NODE_ENV !== 'production';
+  const limit = (key: string, max: number, windowMs: number) =>
+    unlimited ? undefined : limiter.check(key, max, windowMs);
 
   // Global per-IP budget for the whole API.
   app.addHook('onRequest', async (req) => {

@@ -10,6 +10,8 @@ const schema = z.object({
   GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
   FIRESTORE_EMULATOR_HOST: z.string().optional(),
   COOKIE_SECRET: z.string().optional(),
+  /** Test rigs only (ignored in production): e2e and load runs share one IP. */
+  RATE_LIMIT_OFF: z.enum(['1']).optional(),
   CRON_SECRET: z.string().optional(),
   SPOTIFY_CLIENT_ID: z.string().optional(),
   SPOTIFY_CLIENT_SECRET: z.string().optional(),

@@ -1,5 +1,5 @@
 import { STYLE_PRESETS } from '@qroove/config';
-import type { AdminRequestView } from '@qroove/contracts';
+import type { AdminRequestView, ExportSnapshot } from '@qroove/contracts';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { styleLabel } from '../attendee/NowPlaying';
@@ -382,13 +382,90 @@ export function EndPanel({ s, cmd, refresh }: PanelProps) {
   );
 }
 
-export function CarryOverPanel({ s, eventId }: { s: AdminStateResponse; eventId: string }) {
-  const [songs, setSongs] = useState<Awaited<ReturnType<typeof adminApi.carryOver>> | null>(null);
-  const [picked, setPicked] = useState<Set<number>>(new Set());
+/** Song picker + "create event from these"; shared by carry-over and the JSON import page. */
+export function ImportPicker({
+  snapshot,
+  timezone,
+  name,
+  intro,
+  onCreated,
+}: {
+  snapshot: ExportSnapshot;
+  timezone: string;
+  name: string;
+  intro: string;
+  onCreated: (c: Created) => void;
+}) {
+  const [picked, setPicked] = useState<Set<number>>(
+    () => new Set(snapshot.recommendations.map((_, i) => i)),
+  );
   const [shuffle, setShuffle] = useState(true);
   const [error, setError] = useState<ApiError | null>(null);
-  const [created, setCreated] = useState<Created | null>(null);
   const [busy, setBusy] = useState(false);
+  return (
+    <>
+      <p className="muted">{intro}</p>
+      <ul className="list">
+        {snapshot.recommendations.map((r, i) => (
+          <li key={i}>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={picked.has(i)}
+                onChange={(e) =>
+                  setPicked((cur) => {
+                    const n = new Set(cur);
+                    if (e.target.checked) n.add(i);
+                    else n.delete(i);
+                    return n;
+                  })
+                }
+              />
+              <span>
+                <strong>{r.title}</strong>{' '}
+                <span className="muted small">
+                  {[r.artist, styleLabel(r.style)].filter(Boolean).join(' · ')}
+                </span>
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      <label className="check">
+        <input type="checkbox" checked={shuffle} onChange={(e) => setShuffle(e.target.checked)} />
+        <span>Shuffle within each style</span>
+      </label>
+      <button
+        type="button"
+        className="btn primary"
+        disabled={busy || picked.size === 0}
+        onClick={() => {
+          setBusy(true);
+          setError(null);
+          adminApi
+            .importSnapshot({
+              snapshot,
+              timezone,
+              shuffle,
+              selectedIndexes: [...picked],
+              name,
+            })
+            .then(onCreated)
+            .catch((e: unknown) => setError(e instanceof ApiError ? e : null))
+            .finally(() => setBusy(false));
+        }}
+      >
+        Create event from these
+      </button>
+      <ErrorLine error={error} />
+    </>
+  );
+}
+
+export function CarryOverPanel({ s, eventId }: { s: AdminStateResponse; eventId: string }) {
+  const [songs, setSongs] = useState<ExportSnapshot | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
+  const [created, setCreated] = useState<Created | null>(null);
   const ended = s.view.state === 'ENDED' || s.view.state === 'ARCHIVED';
 
   useEffect(() => {
@@ -396,11 +473,7 @@ export function CarryOverPanel({ s, eventId }: { s: AdminStateResponse; eventId:
     let live = true;
     adminApi
       .carryOver(eventId)
-      .then((x) => {
-        if (!live) return;
-        setSongs(x);
-        setPicked(new Set(x.recommendations.map((_, i) => i)));
-      })
+      .then((x) => live && setSongs(x))
       .catch((e: unknown) => live && setError(e instanceof ApiError ? e : null));
     return () => {
       live = false;
@@ -417,69 +490,13 @@ export function CarryOverPanel({ s, eventId }: { s: AdminStateResponse; eventId:
         <p className="muted">Everything in the queue was played.</p>
       ) : null}
       {songs && songs.recommendations.length > 0 ? (
-        <>
-          <p className="muted">
-            These songs never played. They join the new event owned by a neutral “system”
-            contributor and follow the same fairness rules; you can remove any of them before
-            starting.
-          </p>
-          <ul className="list">
-            {songs.recommendations.map((r, i) => (
-              <li key={i}>
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={picked.has(i)}
-                    onChange={(e) =>
-                      setPicked((cur) => {
-                        const n = new Set(cur);
-                        if (e.target.checked) n.add(i);
-                        else n.delete(i);
-                        return n;
-                      })
-                    }
-                  />
-                  <span>
-                    <strong>{r.title}</strong>{' '}
-                    <span className="muted small">
-                      {[r.artist, styleLabel(r.style)].filter(Boolean).join(' · ')}
-                    </span>
-                  </span>
-                </label>
-              </li>
-            ))}
-          </ul>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={shuffle}
-              onChange={(e) => setShuffle(e.target.checked)}
-            />
-            <span>Shuffle within each style</span>
-          </label>
-          <button
-            type="button"
-            className="btn primary"
-            disabled={busy || picked.size === 0}
-            onClick={() => {
-              setBusy(true);
-              setError(null);
-              adminApi
-                .importSnapshot({
-                  snapshot: songs,
-                  timezone: s.view.timezone,
-                  shuffle,
-                  selectedIndexes: [...picked],
-                  name: `${s.view.name} (next)`.slice(0, 80),
-                })
-                .then(setCreated)
-                .catch((e: unknown) => setError(e instanceof ApiError ? e : null))
-                .finally(() => setBusy(false));
-            }}
-          >
-            Create next event from these
-          </button>
-        </>
+        <ImportPicker
+          snapshot={songs}
+          timezone={s.view.timezone}
+          name={`${s.view.name} (next)`.slice(0, 80)}
+          intro="These songs never played. They join the new event owned by a neutral “system” contributor and follow the same fairness rules; you can remove any of them before starting."
+          onCreated={setCreated}
+        />
       ) : null}
     </section>
   );

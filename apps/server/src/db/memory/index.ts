@@ -7,6 +7,8 @@ import type {
   HandoverOfferDoc,
   IdempotencyDoc,
   NewEventBundle,
+  PurgeCutoffs,
+  PurgeReport,
   ParticipantDoc,
   PlaybackDoc,
   RecordingKeyDoc,
@@ -95,6 +97,39 @@ export class MemoryRepository implements Repository {
 
   async listAudit(eventId: string): Promise<AuditDoc[]> {
     return clone(this.stores.get(eventId)?.audit ?? []);
+  }
+
+  async purge(c: PurgeCutoffs): Promise<PurgeReport> {
+    const r: PurgeReport = {
+      draftsDeleted: 0,
+      participantsDeleted: 0,
+      auditDeleted: 0,
+      idempotencyDeleted: 0,
+    };
+    for (const [id, s] of [...this.stores]) {
+      const e = s.event;
+      if (e.state === 'DRAFT' && e.createdAt < c.draftsBefore) {
+        this.stores.delete(id);
+        this.slugs.delete(e.publicSlug);
+        this.subs.delete(id);
+        r.draftsDeleted++;
+        continue;
+      }
+      if (e.endedAt !== null && e.endedAt < c.participantsEndedBefore) {
+        r.participantsDeleted += s.participants.size;
+        s.participants.clear();
+      }
+      const audit = s.audit.filter((a) => a.at >= c.auditBefore);
+      r.auditDeleted += s.audit.length - audit.length;
+      s.audit = audit;
+      for (const [k, i] of s.idempotency) {
+        if (i.at < c.idempotencyBefore) {
+          s.idempotency.delete(k);
+          r.idempotencyDeleted++;
+        }
+      }
+    }
+    return r;
   }
 
   async close(): Promise<void> {}

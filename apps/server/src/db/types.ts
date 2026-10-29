@@ -163,3 +163,20 @@ export interface NewEventBundle {
   requests?: RequestDoc[];
   recordingKeys?: RecordingKeyDoc[];
 }
+
+/** Absolute cut-offs (epoch ms) computed by the caller, so adapters never read the clock. */
+export interface PurgeCutoffs {
+  /** DRAFT events created before this are deleted entirely. */
+  draftsBefore: number;
+  /** For events that ended before this, participants (token hashes, nicknames) are deleted. */
+  participantsEndedBefore: number;
+  auditBefore: number;
+  idempotencyBefore: number;
+}
+
+export interface PurgeReport {
+  draftsDeleted: number;
+  participantsDeleted: number;
+  auditDeleted: number;
+  idempotencyDeleted: number;
+}

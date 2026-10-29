@@ -44,3 +44,12 @@ versioning: [SemVer](https://semver.org/).
 - `@qroove/contracts/normalise`: `norm`/fingerprint shared by the server and the player.
 - Admin state includes each request's `sourceUrl` for manual playback.
 - Docs: player guide.
+- Retention purge (abandoned drafts 7 d, participants 30 d after end, audit 90 d, idempotency 24 h), run at start-up and every 6 h, and via `POST /api/internal/purge` with `CRON_SECRET`.
+- `/import`: start an event from a pasted or uploaded playlist JSON; "Download as JSON" on past events.
+- Playwright e2e suite with axe accessibility checks on every route (dark and light), a load-sanity script (`pnpm load`), and CI jobs for the Firestore emulator and e2e.
+- Docs: backup and retention runbook.
+
+### Changed
+- Firestore transactions on one event are queued in-process, cutting p95 submit latency under 25 concurrent contributors from over 50 s to about 1 s on the emulator.
+- Faded (opacity) list rows replaced by a dashed marker, which fixes a colour-contrast failure.
+- The server now shuts down cleanly on SIGTERM and releases its Firestore listeners.

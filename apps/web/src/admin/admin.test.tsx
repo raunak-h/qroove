@@ -356,7 +356,7 @@ describe('AdminPage', () => {
               },
             }
           : { body: state({}, { state: 'ENDED' }) };
-    await user.click(screen.getByRole('button', { name: 'Create next event from these' }));
+    await user.click(screen.getByRole('button', { name: 'Create event from these' }));
     const imp = calls.find((c) => c.url.endsWith('/events/import'))!;
     expect(imp.body).toMatchObject({
       shuffle: true,
