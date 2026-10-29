@@ -36,6 +36,8 @@ versioning: [SemVer](https://semver.org/).
 - Docs: organiser guide with screenshots.
 - Docs: API reference, realtime, security, threat model and privacy pages.
 
+- First production deploy on Railway (Firestore-backed) at https://qroove.sataklela.com, with Cloudflare DNS; deploy, DNS and Firebase runbooks.
+
 ### Changed
 - `hashRules`/`canonicalJson` moved to `@qroove/contracts/hash` so the contracts index is browser-safe.
 - Licence switched from MIT to AGPL-3.0-only.

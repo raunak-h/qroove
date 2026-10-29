@@ -2,8 +2,8 @@
 
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
-**Current phase:** 9
-**Next session starts with:** Phase 9 (Deploy: Railway + Cloudflare + Firestore prod). Phases 0–8 done.
+**Current phase:** 10
+**Next session starts with:** Phase 10 (Release 0.1.0 + ownership-transfer readiness). Phases 0–9 done.
 
 ## Phases
 
@@ -16,7 +16,7 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - [x] 6 — Admin UI
 - [x] 7 — Player
 - [x] 8 — Hardening, e2e, a11y, perf
-- [ ] 9 — Deploy (Railway + Cloudflare + Firestore)
+- [x] 9 — Deploy (Railway + Cloudflare + Firestore)
 - [ ] 10 — Release 0.1.0 + transfer readiness
 
 ## Decisions made (during planning, 2026-10-29)
@@ -29,7 +29,8 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
 ## Blocked / needs user
 
-- None.
+- Connect the GitHub repo to the Railway service (Settings → Source; needs the Railway GitHub app authorised) for auto-deploy on `main`. Until then deploy with `railway up --ci --service web`.
+- Two-phone smoke test (checklist in `docs/src/runbook/deploy.md`).
 
 ## Notes per phase
 
@@ -115,3 +116,11 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - Also fixed: the SSE bus never released Firestore listeners on close (client refused to terminate); SIGTERM/SIGINT handlers added.
 - CI: separate `integration-emulator` and `e2e` jobs. Not verified on GitHub yet (first run happens on push).
 - Not done: webkit e2e run; real-audio e2e for the player (manual mode only); e2e on a second mobile viewport beyond Pixel 8; multi-instance behaviour is untested.
+
+### Phase 9 (2026-10-29)
+
+- Deployed with `railway up` (Dockerfile build). Railway domain `web-production-a1be78.up.railway.app`; custom domain `https://qroove.sataklela.com`. Verified: `/api/health`, `/`, `/docs/`, `/docs/changelog`, admin session cookies on the custom domain are `HttpOnly; Secure; SameSite=Strict`, a foreign `Origin` is refused (401). The start-up purge logged against production Firestore, confirming credentials work.
+- Cloudflare (via MCP): `CNAME qroove → jy6odhax.up.railway.app` (DNS only) and TXT `_railway-verify.qroove`. The TXT was missing at first, so the certificate sat at "validating ownership" for about 15 minutes serving `*.up.railway.app`; Railway's CLI does not print the TXT (use `domain-status`). Documented in the DNS runbook.
+- Proxy (orange cloud) intentionally left off; SSE through Cloudflare is untested.
+- A throwaway DRAFT event ("Smoke") was created in production for the cookie check; the purge deletes it after 7 days.
+- Not done: GitHub auto-deploy, phone smoke test (both need the user); `commit` is null in `/api/health` because `railway up` does not set `RAILWAY_GIT_COMMIT_SHA`.
