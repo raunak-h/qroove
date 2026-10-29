@@ -1,9 +1,5 @@
 import { hashRules } from '@qroove/contracts/hash';
-import {
-  DomainError,
-  type CreateEventBody,
-  type RulesSnapshot,
-} from '@qroove/contracts';
+import { DomainError, type CreateEventBody, type RulesSnapshot } from '@qroove/contracts';
 import {
   audit,
   commit,

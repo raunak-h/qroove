@@ -5,7 +5,10 @@ import { Landing } from './landing/Landing';
 import { Privacy } from './landing/Privacy';
 import { Layout } from './shared/Layout';
 
-const Create = lazy(() => import('./landing/Create'));
+const CreateEvent = lazy(() => import('./admin/CreateEvent'));
+const AdminEntry = lazy(() => import('./admin/AdminEntry'));
+const AdminPage = lazy(() => import('./admin/AdminPage'));
+const Historical = lazy(() => import('./admin/Historical'));
 
 export function AppRoutes() {
   return (
@@ -15,7 +18,11 @@ export function AppRoutes() {
           <Route path="/" element={<Landing />} />
           <Route path="/e/:slug" element={<EventPage />} />
           <Route path="/privacy" element={<Privacy />} />
-          <Route path="/create" element={<Create />} />
+          <Route path="/new" element={<CreateEvent />} />
+          <Route path="/a/:eventId" element={<AdminEntry mode="link" />} />
+          <Route path="/claim/:eventId" element={<AdminEntry mode="claim" />} />
+          <Route path="/admin/:eventId" element={<AdminPage />} />
+          <Route path="/h/:slug" element={<Historical />} />
           <Route path="*" element={<Landing />} />
         </Routes>
       </Suspense>

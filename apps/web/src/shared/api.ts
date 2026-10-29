@@ -40,14 +40,21 @@ const OFFLINE = new ApiError(
   0,
 );
 
-async function request<T>(
+export async function request<T>(
   method: string,
   url: string,
-  o: { body?: unknown; creds?: Creds | null; idempotencyKey?: string; signal?: AbortSignal } = {},
+  o: {
+    body?: unknown;
+    creds?: Creds | null;
+    idempotencyKey?: string;
+    signal?: AbortSignal;
+    csrf?: string;
+  } = {},
 ): Promise<T> {
   const headers: Record<string, string> = {};
   if (o.body !== undefined) headers['content-type'] = 'application/json';
   if (o.creds) headers.authorization = `Bearer ${o.creds.participantId}:${o.creds.token}`;
+  if (o.csrf) headers['x-qroove-csrf'] = o.csrf;
   if (o.idempotencyKey) headers['idempotency-key'] = o.idempotencyKey;
   let res: Response;
   try {

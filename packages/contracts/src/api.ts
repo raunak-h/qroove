@@ -124,6 +124,8 @@ export const AdminState = z.object({
   lease: Lease.nullable(),
   rulesHash: z.string().nullable(),
   rules: RulesSnapshot,
+  /** Only on `GET /admin/state`: the page cannot read the cookie (its path is the API's), so it is echoed here. */
+  csrf: z.string().optional(),
 });
 export type AdminState = z.infer<typeof AdminState>;
 

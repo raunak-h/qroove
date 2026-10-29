@@ -48,7 +48,7 @@ export function Landing() {
         </form>
       </section>
       <p>
-        <Link to="/create" className="btn">
+        <Link to="/new" className="btn">
           Create an event
         </Link>
       </p>

@@ -401,3 +401,75 @@ summary {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---- organiser ----------------------------------------------------------------------------- */
+.mono {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.warning {
+  border-left: 4px solid var(--accent);
+  padding: 0.5rem 0.75rem;
+  background: var(--bg);
+  border-radius: 4px;
+  margin: 0;
+}
+.notice {
+  background: var(--bg);
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+  margin: 0;
+}
+.qr {
+  width: min(16rem, 100%);
+  height: auto;
+  background: #fff;
+  border-radius: 8px;
+  display: block;
+}
+.plain {
+  padding-left: 1.1rem;
+  margin: 0.25rem 0 0;
+}
+fieldset {
+  border: 1px solid rgb(128 128 128 / 0.4);
+  border-radius: 8px;
+  margin: 0;
+  padding: 0.5rem 0.75rem 0.75rem;
+}
+fieldset legend {
+  padding: 0 0.25rem;
+}
+.caps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+  gap: 0 0.75rem;
+}
+.caps legend {
+  grid-column: 1 / -1;
+}
+.check {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  margin: 0;
+}
+.check input {
+  position: static;
+  opacity: 1;
+  width: 1.4rem;
+  height: 1.4rem;
+  flex: none;
+}
+.chip input[type='checkbox'] {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+input[type='number'] {
+  max-width: 8rem;
+}

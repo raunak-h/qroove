@@ -2,8 +2,8 @@
 
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
-**Current phase:** 6
-**Next session starts with:** Phase 6 (Admin UI). Phases 0–5 done.
+**Current phase:** 7
+**Next session starts with:** Phase 7 (Player). Phases 0–6 done.
 
 ## Phases
 
@@ -13,7 +13,7 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - [x] 3 — Persistence ports, adapters, domain commands
 - [x] 4 — HTTP API, auth, realtime, metadata
 - [x] 5 — Attendee UI
-- [ ] 6 — Admin UI
+- [x] 6 — Admin UI
 - [ ] 7 — Player
 - [ ] 8 — Hardening, e2e, a11y, perf
 - [ ] 9 — Deploy (Railway + Cloudflare + Firestore)
@@ -87,3 +87,13 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - **Bundle size:** attendee route initial load is ~79 KB gzip JS (react-dom ≈ 45, react-router ≈ 20, app ≈ 15) + 1.8 KB CSS, so the 40 KB target is **not met**. Only the placeholder `/create` route is code-split so far; Phase 6/7 must lazy-load admin and player. Cheapest future saving: replace react-router with a ~1 KB router (≈ −20 KB). Re-measure with `ANALYZE=1 pnpm exec vite build`.
 - Decisions: joining is an explicit one-tap card (so a nickname can be set) instead of an automatic join; "songs until" counts the playing song plus songs ahead in the preview; `/create` is a placeholder until Phase 6; the queue never shows nicknames' owners beyond what the API sends — the UI ignores `ownerNickname` entirely.
 - Not done: QR code for the join link (admin screen, Phase 6); service-worker offline shell is whatever vite-plugin-pwa generates (no runtime caching of API).
+
+### Phase 6 (2026-10-29)
+
+- `apps/web/src/admin/*`, `shared/widgets.tsx` (ConfirmButton, CopyButton, QrCode). QR uses `qrcode-generator` 2.0.4 (tiny, no deps) rendered as one SVG path, instead of `qrcode`. 10 new web tests; server +1 (carry-over/CSRF).
+- Routes: `/new` (plan said `/new`; landing links there), `/a/:id#k=`, `/claim/:id#c=` (shared `AdminEntry`), `/admin/:id`, `/h/:slug`. Handover code lives in the fragment; both entries replace the history entry before navigating so secrets leave the address bar.
+- CSRF: the CSRF cookie is scoped to `/api/events/<id>`, so page JS cannot read it; `GET /admin/state` returns the token and commands send it as `X-Qroove-CSRF`. The token is not in the SSE stream.
+- Decisions: confirmation is an inline two-step button (no modal dialogs); templates set name/end time only ("Dance break N min" ends N min after pressing it, so start soon after); Skip needs confirmation but Pause does not; "Transfer player" is a status panel + link to `/player/:id` — the player itself is Phase 7, and a takeover claim already fences the old device; the created panel shows the recovery secret inside a `<details>`.
+- Bug caught by tests: number inputs that clamped on every keystroke turned "4" into "14"; they now keep raw text and clamp on submit.
+- Bundle: attendee initial JS ≈ 80 KB gz (+0.6 KB vs Phase 5); AdminPage 4.6 KB, CreateEvent 10.4 KB (includes the shared widgets + QR), others <1 KB, all lazy.
+- Not done: editing a DRAFT after creation from the UI (the `PATCH admin/draft` API exists; the form is create-only); admin page does not show participants' counts; pre-start seed removal for imported events is possible via Remove once started, not in DRAFT view since DRAFT has no moderation-specific tools beyond Remove.

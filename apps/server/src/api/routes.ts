@@ -193,7 +193,42 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
     const a = admin(req, id);
     await verifyAdmin(deps, id, a.adminSecret);
     reply.header('cache-control', 'no-store');
-    return adminState(await agg(id), deps.clock.now());
+    return { ...adminState(await agg(id), deps.clock.now()), csrf: sec.csrfFor(a.adminSecret) };
+  });
+
+  // Unplayed songs as an importable snapshot, for "create the next event from these".
+  app.get('/api/events/:id/admin/carry-over', async (req, reply) => {
+    const { id } = parse(idParams, req.params);
+    const a = admin(req, id);
+    await verifyAdmin(deps, id, a.adminSecret);
+    const x = await agg(id);
+    const open = new Set([
+      'PENDING_METADATA',
+      'QUEUED',
+      'INELIGIBLE_TEMPORARILY',
+      'RESERVED_NEXT',
+      'OVERFLOW',
+    ]);
+    const seen = new Set<string>();
+    const recommendations: ExportSnapshot['recommendations'] = [];
+    for (const r of x.requests) {
+      if (!open.has(r.state) || r.possibleDuplicate || seen.has(r.canonicalKey)) continue;
+      seen.add(r.canonicalKey);
+      recommendations.push({
+        title: r.title,
+        artist: r.artist,
+        style: r.style,
+        durationMs: r.durationMs,
+        sourceUrl: r.sourceUrl,
+      });
+    }
+    reply.header('cache-control', 'no-store');
+    return {
+      formatVersion: 1,
+      name: x.event.name,
+      rules: x.event.rules,
+      recommendations,
+    } satisfies ExportSnapshot;
   });
 
   app.get('/api/events/:id/admin/stream', async (req, reply) => {

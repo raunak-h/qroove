@@ -466,6 +466,26 @@ describe('player and handover over HTTP', () => {
   });
 });
 
+describe('admin state and carry-over', () => {
+  it('echoes the CSRF token on state only, and lists unplayed songs for carry-over', async () => {
+    const { app, api, id, join, manual } = await setup();
+    const a = await join();
+    await manual(a, 'One');
+    await manual(await join(), 'Two', 'bachata');
+    const st = await api.admin('GET', id, '/admin/state');
+    expect(st.json.csrf).toBe(api.cookies.get(`qc_${id}`));
+    expect(
+      JSON.stringify((await api.call('GET', `/api/events/${id}/public`)).json ?? {}),
+    ).not.toContain(st.json.csrf);
+    const co = await api.admin('GET', id, '/admin/carry-over');
+    expect(co.status).toBe(200);
+    expect(co.json.recommendations.map((r: any) => r.title)).toEqual(['One', 'Two']);
+    expect((await new Client(app).call('GET', `/api/events/${id}/admin/carry-over`)).status).toBe(
+      401,
+    );
+  });
+});
+
 describe('misc routes', () => {
   it('reserves the Spotify callback path with a 204', async () => {
     const { api } = await setup();

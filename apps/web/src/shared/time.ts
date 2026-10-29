@@ -24,3 +24,16 @@ export function formatClock(ms: number, timeZone?: string): string {
     ...(timeZone ? { timeZone } : {}),
   }).format(ms);
 }
+
+/** Epoch ms → value for `<input type="datetime-local">` in the device's time zone. */
+export function toLocalInput(ms: number): string {
+  const d = new Date(ms - new Date(ms).getTimezoneOffset() * 60_000);
+  return d.toISOString().slice(0, 16);
+}
+
+/** `datetime-local` value → epoch ms (device time zone), or null when blank/invalid. */
+export function fromLocalInput(v: string): number | null {
+  if (!v) return null;
+  const t = new Date(v).getTime();
+  return Number.isFinite(t) ? t : null;
+}
