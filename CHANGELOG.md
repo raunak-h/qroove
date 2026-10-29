@@ -5,6 +5,10 @@ versioning: [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-29
+
+First release, ready for the pilot.
+
 ### Added
 - Monorepo scaffold (pnpm workspaces, strict TypeScript, ESLint, Prettier).
 - `@qroove/config` with brand, style presets and rule defaults.
@@ -55,3 +59,4 @@ versioning: [SemVer](https://semver.org/).
 - Firestore transactions on one event are queued in-process, cutting p95 submit latency under 25 concurrent contributors from over 50 s to about 1 s on the emulator.
 - Faded (opacity) list rows replaced by a dashed marker, which fixes a colour-contrast failure.
 - The server now shuts down cleanly on SIGTERM and releases its Firestore listeners.
+

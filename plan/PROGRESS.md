@@ -2,8 +2,8 @@
 
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
-**Current phase:** 10
-**Next session starts with:** Phase 10 (Release 0.1.0 + ownership-transfer readiness). Phases 0–9 done.
+**Current phase:** — (all phases done)
+**Next session starts with:** Pilot follow-up: the user-side items under "Blocked / needs user", then the pilot validation questions below. Phases 0–10 done; v0.1.0 tagged.
 
 ## Phases
 
@@ -17,7 +17,7 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - [x] 7 — Player
 - [x] 8 — Hardening, e2e, a11y, perf
 - [x] 9 — Deploy (Railway + Cloudflare + Firestore)
-- [ ] 10 — Release 0.1.0 + transfer readiness
+- [x] 10 — Release 0.1.0 + transfer readiness
 
 ## Decisions made (during planning, 2026-10-29)
 
@@ -124,3 +124,31 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - Proxy (orange cloud) intentionally left off; SSE through Cloudflare is untested.
 - A throwaway DRAFT event ("Smoke") was created in production for the cookie check; the purge deletes it after 7 days.
 - Not done: GitHub auto-deploy, phone smoke test (both need the user); `commit` is null in `/api/health` because `railway up` does not set `RAILWAY_GIT_COMMIT_SHA`.
+
+### Phase 10 (2026-10-29)
+
+- Released **0.1.0** (all package versions and `VERSION` bumped, changelog cut, tag `v0.1.0`). Added `CONTRIBUTING.md` (DCO), `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1, reports go to the contact details on sataklela.com rather than a personal email), README badges (relative links so no owner name is hard-coded), screenshot, live/docs links and CSR statement. `runbook/transfer-ownership.md` written. `grep -ri raunak` now matches only `BRAND.repoUrl` and the plan files (history).
+- No "Documented in Phase" placeholders remain in `docs/src`.
+
+## Summary
+
+Qroove 0.1.0 is live at https://qroove.sataklela.com: fair queue scheduler, attendee PWA with live queue and countdown, organiser UI with QR, handover, carry-over, import/export, a local-file player with manual mode, Firestore persistence, retention purge, e2e and axe checks, runbooks.
+
+## Known limitations
+
+- Player: audio tested only via jsdom and manual-mode e2e, never with real files on iOS or Android; WebKit e2e not run; file availability is not reported to the server; no "media unavailable before start" command.
+- Auto-deploy from GitHub is not connected (deploy with `railway up`); `/api/health` shows `commit: null` for that reason.
+- Cloudflare proxy is off; SSE through it is untested. Throughput is serialised per event (~13 mutations/s on the emulator); multi-instance behaviour is untested.
+- Attendee initial JS is ≈ 80 KB gzip (target was 40 KB); the cheapest saving is replacing react-router.
+- A Spotify link without API keys has no artist; the keys are set in production, but real-world matching quality is unverified.
+- Draft events cannot be edited from the UI after creation (the API exists).
+- No analytics or error reporting beyond Railway logs.
+
+## Pilot validation questions
+
+1. Quota (SPEC §3.3): is "five accepted songs per person per event, played ones included" what dancers expect, or do they want "five waiting at once"? The latter is a different, versioned rule.
+2. Is the style run cap (default 2) and the minimum style change right for the room, and do organisers need to override it?
+3. Do guests understand "up next" and the countdown, and does the "uncertain" estimate mislead anyone?
+4. Do organisers prefer local-file playback or manual mode, and which devices and Bluetooth setups actually work?
+5. Is the 30-day retention and anonymous nickname model acceptable to the society and its members?
+6. Does the venue/society have the public-performance licences needed for the music played?
