@@ -52,10 +52,10 @@ export async function createEvent(deps: Deps, body: CreateEventBody): Promise<Cr
 }
 
 export interface UpdateDraftInput extends AdminInput, RuleInput {
-  name?: string;
-  timezone?: string;
-  endAt?: number | null;
-  breaks?: ReadonlyArray<{ label: string; durationSec: number }>;
+  name?: string | undefined;
+  timezone?: string | undefined;
+  endAt?: number | null | undefined;
+  breaks?: ReadonlyArray<{ label: string; durationSec: number }> | undefined;
 }
 
 /** Rules (and everything else) are editable only while the event is a DRAFT. */

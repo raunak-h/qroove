@@ -23,6 +23,12 @@ versioning: [SemVer](https://semver.org/).
 - Automatic next-track reservation, request-state labelling and a denormalised queue preview after every change.
 - ESLint rules: `firebase-admin` only under `db/firestore`; no `Date.now()` in domain code.
 - Docs: data model page and ADR 0006.
+- HTTP API: every route in SPEC §8 plus `by-slug`, `resolve-link`, `admin/session|state|stream|draft|breaks|duplicate|recover|archive`, export/import and the reserved `/api/spotify/callback`; zod-validated bodies and typed JSON errors with a next action.
+- Admin auth: URL-fragment secret exchanged for an HttpOnly `SameSite=Strict` cookie, with origin check and double-submit + HMAC CSRF.
+- Per-IP/per-participant rate limits and a 16 KB body limit.
+- Link intake: allowlisted `parseLink`, Spotify Web API (client credentials, cached token) with oEmbed fallback, iTunes lookup for Apple Music, YouTube oEmbed; SSRF-guarded fetch; ISRC → platform id → fingerprint duplicate keys; possible duplicates held for admin review; style suggestions from title cues only.
+- Server-Sent Events (`/stream`, `/admin/stream`) fed by one repository subscription per event.
+- Docs: API reference, realtime, security, threat model and privacy pages.
 
 ### Changed
 - Licence switched from MIT to AGPL-3.0-only.

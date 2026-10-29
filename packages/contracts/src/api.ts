@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { EventPublicView, BreakSpec } from './event.js';
+import { EventPublicView, BreakSpec, RequestState } from './event.js';
 import { MyRequests, RequestView } from './request.js';
 import { RulesSnapshot, StyleId } from './rules.js';
 import { Lease } from './player.js';
@@ -102,6 +102,53 @@ export const PlayerFinishedBody = z.object({
   outcome: z.enum(['PLAYED', 'FAILED']),
 });
 export const PlayerReleaseBody = z.object({ leaseToken: z.string(), epoch: z.number().int() });
+
+// GET /api/events/:id/admin/state (and /admin/stream)
+export const AdminRequestView = z.object({
+  id: z.string(),
+  state: RequestState,
+  title: z.string(),
+  artist: z.string().nullable(),
+  style: StyleId,
+  ownerNickname: z.string().nullable(),
+  /** Short label so the admin can tell contributors apart; not a usable identifier. */
+  ownerLabel: z.string(),
+  acceptedSeq: z.number().int(),
+  possibleDuplicate: z.boolean(),
+  removedReason: z.string().nullable(),
+});
+export type AdminRequestView = z.infer<typeof AdminRequestView>;
+export const AdminState = z.object({
+  view: EventPublicView,
+  requests: z.array(AdminRequestView),
+  lease: Lease.nullable(),
+  rulesHash: z.string().nullable(),
+  rules: RulesSnapshot,
+});
+export type AdminState = z.infer<typeof AdminState>;
+
+// POST /api/resolve-link
+export const ResolveLinkBody = z.object({ url: z.string().url().max(500) });
+export const ResolveLinkResponse = z.object({
+  title: z.string(),
+  artist: z.string().nullable(),
+  durationMs: z.number().int().nullable(),
+  artworkUrl: z.string().nullable(),
+  provider: z.string(),
+  confidence: z.enum(['high', 'medium', 'low', 'manual']),
+  suggestedStyle: StyleId.nullable(),
+});
+
+// PATCH /api/events/:id/admin/draft
+export const UpdateDraftBody = CreateEventBody.partial().extend({
+  expectedVersion: z.number().int().optional(),
+});
+
+// POST /api/events/:id/admin/duplicate/:rid
+export const DuplicateDecisionBody = z.object({ decision: z.enum(['approve', 'reject']) });
+
+// POST /api/events/:id/admin/recover
+export const RecoverBody = z.object({ recoverySecret: z.string().min(16).max(128) });
 
 // GET /api/events/:id/export, POST /api/events/import
 export const ExportSnapshot = z.object({

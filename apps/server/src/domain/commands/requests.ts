@@ -45,6 +45,10 @@ export async function joinEvent(deps: Deps, input: { eventId: string; nickname?:
 /** Track metadata is resolved by ingestion (Phase 4) before the domain sees it. */
 export interface TrackInput {
   canonicalKey: string;
+  /** Other exact identities (platform id, fingerprint) that must also block duplicates. */
+  aliasKeys?: string[];
+  /** Version-insensitive key; a collision sends the request to admin review. */
+  looseKey?: string | null;
   provider: Provider;
   title: string;
   artist: string | null;
@@ -75,20 +79,48 @@ export function submitRequest(deps: Deps, input: SubmitInput) {
     if (!e.rules.enabledStyles.includes(input.style)) {
       throw new DomainError('VALIDATION', 'That style is not part of this event.');
     }
-    const key = await c.tx.getRecordingKey(input.track.canonicalKey);
+    const t = input.track;
+    const keys = [t.canonicalKey, ...(t.aliasKeys ?? []).filter((k) => k !== t.canonicalKey)];
+    let uncertain = false;
     // Duplicates are rejected before quota is looked at, so a rejected duplicate costs nothing.
-    if (key && key.state !== 'released') throw new DomainError('DUPLICATE');
+    for (const k of keys) {
+      const hit = await c.tx.getRecordingKey(k);
+      if (!hit || hit.state === 'released') continue;
+      const other = await c.tx.getRequest(hit.requestId);
+      // A fingerprint match is only certain when the lengths agree (SPEC §5).
+      const lengthsDiffer =
+        k.startsWith('fp:') &&
+        t.durationMs !== null &&
+        other?.durationMs != null &&
+        Math.abs(t.durationMs - other.durationMs) > 5000;
+      if (lengthsDiffer) uncertain = true;
+      else
+        throw new DomainError(
+          'DUPLICATE',
+          other ? `Already queued as “${other.title}”.` : undefined,
+        );
+    }
+    if (t.looseKey) {
+      const hit = await c.tx.getRecordingKey(t.looseKey);
+      if (hit && hit.state !== 'released') uncertain = true;
+    }
     // Recount from the requests themselves as a guard against a drifted counter.
     const mine = await c.tx.listRequests({ ownerId: p.id });
     const used = mine.filter((r) => countsTowardQuota(r.state)).length;
     if (used >= e.rules.submissionLimit) throw new DomainError('QUOTA_FULL');
 
+    const heldKeys = new Set<string>();
+    if (uncertain) {
+      for (const k of keys) {
+        const hit = await c.tx.getRecordingKey(k);
+        if (hit && hit.state !== 'released') heldKeys.add(k);
+      }
+    }
     const w = await loadWork(c);
-    const t = input.track;
     const req: RequestDoc = {
       id: deps.ids.requestId(),
       ownerId: p.id,
-      state: t.metadataPending ? 'PENDING_METADATA' : 'QUEUED',
+      state: t.metadataPending || uncertain ? 'PENDING_METADATA' : 'QUEUED',
       title: t.title,
       artist: t.artist,
       style: input.style,
@@ -97,7 +129,10 @@ export function submitRequest(deps: Deps, input: SubmitInput) {
       sourceUrl: t.sourceUrl,
       durationMs: t.durationMs,
       artworkUrl: t.artworkUrl,
-      playable: t.playable ?? !t.metadataPending,
+      playable: uncertain ? false : (t.playable ?? !t.metadataPending),
+      keys,
+      looseKey: t.looseKey ?? null,
+      possibleDuplicate: uncertain,
       acceptedSeq: e.acceptedSeq + 1,
       createdAt: c.now,
       updatedAt: c.now,
@@ -105,7 +140,13 @@ export function submitRequest(deps: Deps, input: SubmitInput) {
     };
     w.event = { ...e, acceptedSeq: req.acceptedSeq };
     w.putRequest(req);
-    c.tx.putRecordingKey({ key: t.canonicalKey, requestId: req.id, state: 'active' });
+    // A request held for review never steals a lock from the one it may duplicate.
+    for (const k of keys) {
+      if (!heldKeys.has(k)) c.tx.putRecordingKey({ key: k, requestId: req.id, state: 'active' });
+    }
+    if (req.looseKey && !uncertain) {
+      c.tx.putRecordingKey({ key: req.looseKey, requestId: req.id, state: 'active' });
+    }
     c.tx.putParticipant({ ...p, acceptedCount: used + 1, lastSeenAt: c.now });
     audit(
       c,
@@ -130,12 +171,16 @@ async function takeOut(
   reason: string | null,
 ) {
   const owner = await c.tx.getParticipant(req.ownerId);
+  // Release only the locks this request actually holds.
+  const held: string[] = [];
+  for (const k of [...req.keys, ...(req.looseKey ? [req.looseKey] : [])]) {
+    const doc = await c.tx.getRecordingKey(k);
+    if (doc && doc.requestId === req.id) held.push(k);
+  }
   w.putRequest({ ...req, state: to, removedReason: reason, updatedAt: c.now });
-  c.tx.putRecordingKey({
-    key: req.canonicalKey,
-    requestId: req.id,
-    state: 'released',
-  } satisfies RecordingKeyDoc);
+  for (const key of held) {
+    c.tx.putRecordingKey({ key, requestId: req.id, state: 'released' } satisfies RecordingKeyDoc);
+  }
   if (owner) {
     const remaining = [...w.requests.values()].filter(
       (r) => r.ownerId === owner.id && countsTowardQuota(r.state),
@@ -211,7 +256,8 @@ export function resolveMetadata(
   return runCommand(deps, input.eventId, {}, async (c) => {
     const req = await c.tx.getRequest(input.requestId);
     if (!req) throw new DomainError('NOT_FOUND');
-    if (req.state !== 'PENDING_METADATA') return { ok: true as const, version: c.event.version };
+    if (req.state !== 'PENDING_METADATA' || req.possibleDuplicate)
+      return { ok: true as const, version: c.event.version };
     const w = await loadWork(c);
     if (input.metadata === null) {
       await takeOut(c, w, req, 'UNAVAILABLE', 'metadata unavailable');
@@ -225,6 +271,50 @@ export function resolveMetadata(
       });
     }
     audit(c, 'request.metadata', 'system', { requestId: req.id, ok: input.metadata !== null });
+    return { ok: true as const, version: commit(c, w) };
+  });
+}
+
+/** Admin decision on a request held as a possible duplicate. */
+export function reviewDuplicate(
+  deps: Deps,
+  input: CommandOpts & {
+    eventId: string;
+    adminSecret: string;
+    requestId: string;
+    decision: 'approve' | 'reject';
+  },
+) {
+  return runCommand(deps, input.eventId, input, async (c) => {
+    await requireAdmin(c.tx, input.adminSecret);
+    if (c.event.state === 'ENDED' || c.event.state === 'ARCHIVED')
+      throw new DomainError('EVENT_ENDED');
+    const req = await c.tx.getRequest(input.requestId);
+    if (!req) throw new DomainError('NOT_FOUND');
+    if (!req.possibleDuplicate || req.state !== 'PENDING_METADATA') {
+      throw new DomainError('VALIDATION', 'This request is not waiting for review.');
+    }
+    if (input.decision === 'reject') {
+      const w = await loadWork(c);
+      await takeOut(c, w, req, 'REJECTED', 'duplicate');
+      audit(c, 'request.duplicate.reject', 'admin', { requestId: req.id });
+      return { ok: true as const, version: commit(c, w) };
+    }
+    const free: string[] = [];
+    for (const k of [...req.keys, ...(req.looseKey ? [req.looseKey] : [])]) {
+      const doc = await c.tx.getRecordingKey(k);
+      if (!doc || doc.state === 'released') free.push(k);
+    }
+    const w = await loadWork(c);
+    w.putRequest({
+      ...req,
+      state: 'QUEUED',
+      playable: true,
+      possibleDuplicate: false,
+      updatedAt: c.now,
+    });
+    for (const key of free) c.tx.putRecordingKey({ key, requestId: req.id, state: 'active' });
+    audit(c, 'request.duplicate.approve', 'admin', { requestId: req.id });
     return { ok: true as const, version: commit(c, w) };
   });
 }

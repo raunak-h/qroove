@@ -1,0 +1,142 @@
+import type {
+  AdminRequestView,
+  AdminState,
+  EventPublicView,
+  MyRequests,
+  RequestView,
+  TrackView,
+} from '@qroove/contracts';
+import type { EventAggregate, RequestDoc } from '../db/types.js';
+import { sha256 } from '../domain/ids.js';
+
+const QUEUE_LIMIT = 50;
+
+function trackView(r: RequestDoc, nicknames: Record<string, string | null>): TrackView {
+  return {
+    requestId: r.id,
+    title: r.title,
+    artist: r.artist,
+    style: r.style,
+    durationMs: r.durationMs,
+    artworkUrl: r.artworkUrl,
+    ownerNickname: nicknames[r.ownerId] ?? null,
+  };
+}
+
+/** Sanitised: request ids and display nicknames only — no participant ids or tokens. */
+export function publicView(agg: EventAggregate, now: number): EventPublicView {
+  const { event: e, requests, nicknames } = agg;
+  const byId = new Map(requests.map((r) => [r.id, r]));
+  const np = e.nowPlaying ? byId.get(e.nowPlaying.requestId) : undefined;
+  const queue = e.preview.items.slice(0, QUEUE_LIMIT).flatMap((it) => {
+    const r = byId.get(it.requestId);
+    return r ? [{ ...trackView(r, nicknames), position: it.position, overflow: it.overflow }] : [];
+  });
+  const last = e.history.lastStyle;
+  const cap = last ? (e.rules.runCaps[last as keyof typeof e.rules.runCaps] ?? 1) : null;
+  return {
+    id: e.id,
+    name: e.name,
+    slug: e.publicSlug,
+    state: e.state,
+    timezone: e.timezone,
+    endAt: e.endAt,
+    serverNow: now,
+    version: e.version,
+    rules: e.state === 'DRAFT' ? null : e.rules,
+    nowPlaying:
+      np && e.nowPlaying
+        ? {
+            track: {
+              ...trackView(np, nicknames),
+              durationMs: e.nowPlaying.durationMs ?? np.durationMs,
+            },
+            startedAt: e.nowPlaying.startedAt,
+          }
+        : null,
+    waitingReason: e.waitingReason,
+    runIndicator:
+      last && cap !== null && e.history.runLength > 0
+        ? { style: last as keyof typeof e.rules.runCaps, runLength: e.history.runLength, cap }
+        : null,
+    breaks: e.breaks,
+    preview: e.preview,
+    queue,
+  };
+}
+
+function statusText(r: RequestDoc, agg: EventAggregate): string | null {
+  const paused = agg.event.state === 'PAUSED' || agg.event.state === 'TRANSFERRING';
+  switch (r.state) {
+    case 'PENDING_METADATA':
+      return r.possibleDuplicate ? 'Possible duplicate — needs review' : 'Looking up this song';
+    case 'INELIGIBLE_TEMPORARILY':
+      return 'Position not yet predictable — waiting for another contributor or a style change';
+    case 'OVERFLOW':
+      return 'Beyond planned end — admin must extend';
+    case 'RESERVED_NEXT':
+      return paused ? 'Session paused' : 'Up next';
+    case 'PLAYING':
+      return 'Playing now';
+    case 'QUEUED':
+      return paused ? 'Session paused' : null;
+    case 'UNAVAILABLE':
+      return 'We could not find this song';
+    case 'REJECTED':
+      return 'Removed by the organiser';
+    default:
+      return null;
+  }
+}
+
+export function requestView(r: RequestDoc, agg: EventAggregate): RequestView {
+  const item = agg.event.preview.items.find((i) => i.requestId === r.id);
+  return {
+    id: r.id,
+    state: r.state,
+    title: r.title,
+    artist: r.artist,
+    style: r.style,
+    provider: r.provider,
+    durationMs: r.durationMs,
+    artworkUrl: r.artworkUrl,
+    acceptedSeq: r.acceptedSeq,
+    position: item?.position ?? null,
+    predictedStartMs: item?.predictedStartMs ?? null,
+    uncertain: item?.uncertain ?? false,
+    statusText: statusText(r, agg),
+  };
+}
+
+export function myRequests(agg: EventAggregate, participantId: string): MyRequests {
+  const mine = agg.requests.filter((r) => r.ownerId === participantId);
+  return {
+    accepted: mine.filter((r) => !['WITHDRAWN', 'REJECTED', 'UNAVAILABLE'].includes(r.state))
+      .length,
+    limit: agg.event.rules.submissionLimit,
+    requests: mine.map((r) => requestView(r, agg)),
+  };
+}
+
+export function adminState(agg: EventAggregate, now: number): AdminState {
+  const requests: AdminRequestView[] = agg.requests.map((r) => ({
+    id: r.id,
+    state: r.state,
+    title: r.title,
+    artist: r.artist,
+    style: r.style,
+    ownerNickname: agg.nicknames[r.ownerId] ?? null,
+    ownerLabel: sha256(`${agg.event.id}:${r.ownerId}`).slice(0, 4).toUpperCase(),
+    acceptedSeq: r.acceptedSeq,
+    possibleDuplicate: r.possibleDuplicate,
+    removedReason: r.removedReason,
+  }));
+  const l = agg.event.lease;
+  return {
+    view: { ...publicView(agg, now), rules: agg.event.rules },
+    requests,
+    lease: l ? { epoch: l.epoch, expiresAt: l.expiresAt } : null,
+    rulesHash: agg.event.rulesHash,
+    rules: agg.event.rules,
+  };
+}

@@ -2,8 +2,8 @@
 
 Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 
-**Current phase:** 4
-**Next session starts with:** Phase 4 (HTTP API, auth, realtime, metadata). Phases 0–3 done.
+**Current phase:** 5
+**Next session starts with:** Phase 5 (Attendee UI). Phases 0–4 done.
 
 ## Phases
 
@@ -11,7 +11,7 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - [x] 1 — Monorepo scaffold, branding, docs skeleton, CI
 - [x] 2 — Contracts + scheduler
 - [x] 3 — Persistence ports, adapters, domain commands
-- [ ] 4 — HTTP API, auth, realtime, metadata
+- [x] 4 — HTTP API, auth, realtime, metadata
 - [ ] 5 — Attendee UI
 - [ ] 6 — Admin UI
 - [ ] 7 — Player
@@ -69,3 +69,13 @@ Update at the end of every phase (see `plan/EXECUTION_PLAN.md` §5).
 - Decisions: claiming the player requires an admin secret (a separate player credential can come later); a lease claim or handover treats any track still playing as consumed; handover claim leaves the event PAUSED so the receiver must resume; only one handover offer is live at a time and resuming cancels it; a recovery secret can replace all admin access (`recoverAdmin`); `startBreak` holds new starts until `endBreak`; submissions are accepted while PAUSED but not reserved until resume; a duplicate is refused before quota is checked.
 - Phase 4 must: build `RequestView`/`EventPublicView` from `getEventPublic`, add `parseLink`/`canonicalKey` and call `resolveMetadata` for `PENDING_METADATA`, set `Idempotency-Key` through `idempotencyKey`, and skip SSE pushes for silent (heartbeat) writes.
 - Not covered: a player-side "media unavailable before start" command (reserved track that cannot play); the admin can remove it.
+
+### Phase 4 (2026-10-29)
+
+- `apps/server/src/{api,ingestion,security,realtime}`; `buildApp(env, {repo, clock, fetch})` takes overrides for tests. 64 new tests (API via `inject`, SSE over a real port, ingestion with a mocked network). Emulator suite still 39/39.
+- Plan deviations: no `fastify-type-provider-zod` (zod 4 compatibility risk) — a small `parse(schema, data)` helper does the same; no `@fastify/rate-limit` or `@fastify/cookie` — an in-process sliding-window limiter and a tiny cookie parser (prod runs one instance, so per-process limits are exact); SSE pushes the full public view on each change instead of a ≤4 KB revision message (queue capped at 50); `EventPublicView` kept from Phase 2 and gained `runIndicator`.
+- Auth transport: participant `Authorization: Bearer <participantId>:<token>`; admin cookie `qa_<id>` holds the raw secret (HttpOnly), CSRF = HMAC(`COOKIE_SECRET`, secret) echoed in header and `qc_<id>` cookie. Without `COOKIE_SECRET` a random per-process key is used (sessions' CSRF tokens then reset on restart; prod sets it).
+- Duplicates: `RequestDoc` gained `keys`, `looseKey`, `possibleDuplicate`. Certain duplicate = any of ISRC / platform id / exact fingerprint already locked (fingerprint hits where both durations are known and differ >5 s are treated as uncertain). Uncertain (loose-key hit, i.e. same artist+title with another version tag) = request held as `PENDING_METADATA` + `possibleDuplicate`, never reserved until an admin approves or rejects (`admin/duplicate/:rid`). A held request never takes over another request's key locks; withdraw/reserve/start only touch locks it owns.
+- Spotify oEmbed has no artist, so a Spotify link without API keys has no artist and its fingerprint only matches manual entries with an empty artist. With keys (ISRC, artist) matching is much better — set `SPOTIFY_CLIENT_SECRET` in Railway before the pilot.
+- Added routes beyond the plan list: `admin/draft` (PATCH), `admin/archive`, `admin/recover`, `admin/duplicate/:rid`, export/import.
+- Not done / for later: purge job and retention (Phase 8); `statusText` copy and `RATE_LIMITED` retry-after hints are plain; SSE client reconnect + polling fallback is Phase 5; Firestore read cost per change grows with request count (fine at pilot size).

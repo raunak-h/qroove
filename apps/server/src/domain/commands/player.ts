@@ -95,10 +95,16 @@ export function reportStarted(
     const req = w.requests.get(input.requestId);
     if (!req || req.state !== 'RESERVED_NEXT') throw new DomainError('STALE_VERSION');
 
+    // Consume only the locks this request holds, so a reviewed lookalike cannot overwrite another's.
+    const lockKeys: string[] = [];
+    for (const k of [...req.keys, ...(req.looseKey ? [req.looseKey] : [])]) {
+      const doc = await c.tx.getRecordingKey(k);
+      if (doc?.requestId === req.id) lockKeys.push(k);
+    }
     const durationMs = req.durationMs ?? input.durationMs ?? null;
     const playing = { ...req, state: 'PLAYING' as const, durationMs, updatedAt: c.now };
     w.putRequest(playing);
-    c.tx.putRecordingKey({ key: req.canonicalKey, requestId: req.id, state: 'consumed' });
+    for (const key of lockKeys) c.tx.putRecordingKey({ key, requestId: req.id, state: 'consumed' });
     const seq = c.event.playbackSeq + 1;
     c.tx.putPlayback({
       seq,

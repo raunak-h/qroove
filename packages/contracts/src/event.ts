@@ -82,6 +82,8 @@ export const EventPublicView = z.object({
   rules: RulesSnapshot.nullable(),
   nowPlaying: NowPlaying.nullable(),
   waitingReason: z.string().nullable(),
+  /** Current run of one style against its cap, so attendees can see why a style may be held. */
+  runIndicator: z.object({ style: StyleId, runLength: z.number().int(), cap: z.number().int() }).nullable(),
   breaks: z.array(BreakSpec),
   preview: Preview,
   queue: z.array(TrackView.extend({ position: z.number().int(), overflow: z.boolean() })),

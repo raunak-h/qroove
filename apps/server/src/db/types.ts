@@ -86,6 +86,12 @@ export interface RequestDoc {
   artworkUrl: string | null;
   /** False while metadata is pending or when no playable source exists. */
   playable: boolean;
+  /** Every exact recording key this request claims (canonical first). */
+  keys: string[];
+  /** Version-insensitive key; a collision with another request means human review. */
+  looseKey: string | null;
+  /** Held for admin review because it may be the same recording as an earlier request. */
+  possibleDuplicate: boolean;
   acceptedSeq: number;
   createdAt: number;
   updatedAt: number;
