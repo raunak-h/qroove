@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.secrets/
+*.log
+docs/.vitepress/dist/
+docs/.vitepress/cache/
+coverage/
+test-results/
+playwright-report/
+.firebase/
+firebase-debug.log

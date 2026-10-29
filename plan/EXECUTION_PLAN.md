@@ -44,7 +44,7 @@
 | Scheduler | Pure TS package `packages/scheduler`, zero dependencies, deterministic. |
 | Contracts | `packages/contracts`: zod 4 schemas + inferred types shared by web & server. |
 | Brand/config | `packages/config`: `brand.ts` (name, company, URLs, footer text), `styles.ts` (dance style presets), `defaults.ts` (rule defaults). Web and docs import from here. |
-| Metadata | Adapters behind `MetadataProvider` port: Spotify Web API (client-credentials; enabled only if `SPOTIFY_CLIENT_ID/SECRET` set), Spotify/YouTube oEmbed (keyless), iTunes Lookup API for Apple Music (keyless), manual entry. Allowlisted hosts only (SSRF). |
+| Metadata | Adapters behind `MetadataProvider` port: Spotify Web API (client-credentials; enabled only if `SPOTIFY_CLIENT_ID/SECRET` set; `env.ts` also accepts legacy `SPOTIFY_DEV_CLIENT_ID`), Spotify/YouTube oEmbed (keyless), iTunes Lookup API for Apple Music (keyless), manual entry. Allowlisted hosts only (SSRF). |
 | Playback | Local-file player on the designated device (`<input type=file multiple accept="audio/*">`, optional IndexedDB cache) + Manual mode (Mark started / Mark ended). No streaming/ripping, ever (SPEC §0 hard boundaries). |
 | Docs | **VitePress 1.x** in `docs/`, `base: '/docs/'`, built to `docs/.vitepress/dist`, served by Fastify at `/docs`. Public. Includes architecture, ADRs, API reference, runbook, privacy, threat model, and `CHANGELOG` page. |
 | Changelog | Root `CHANGELOG.md` (Keep a Changelog format, SemVer). Docs page `docs/src/changelog.md` includes it via `<!--@include: ../../CHANGELOG.md-->`. Every phase adds entries under `## [Unreleased]`; Phase 10 cuts `0.1.0`. |
@@ -122,7 +122,7 @@ events/{eventId}                     EventDoc
   adminGrants/{grantId}              { secretHash, issuedAt, revokedAt|null }
   handoverOffers/{offerId}           { codeHash, expiresAt, usedAt|null }
   audit/{autoId}                     { action, actorRole, at, payload (redacted), idempotencyKey|null }
-  idempotency/{key}                  { response, at }   (TTL 24h via Firestore TTL policy on `expireAt`)
+  idempotency/{key}                  { response, at }   (expire 24h; Firestore TTL needs billing → deleted by the Phase 8 purge job)
 ```
 
 `EventDoc` (single doc = the transactional "aggregate root"; every command runs in
@@ -405,6 +405,9 @@ Docs: `architecture/data-model.md` (§3 of this plan, refined to reality), ADR `
 Read SPEC §5 (Link intake, Duplicate identity) and §8.
 
 1. Routes exactly as SPEC §8 (adjust names only if needed; document in API reference). Add:
+   `GET /api/spotify/callback` (the redirect URI registered with Spotify as
+   `https://qroove.sataklela.com/api/spotify/callback`; client-credentials flow doesn't use it, so for now it
+   returns 204 and is reserved for a future user-auth adapter — keep all Spotify routes under `/api/spotify/*`),
    `POST /api/events/:id/admin/session` (exchange secret → cookie), `GET /api/events/:id/admin/state`,
    `POST /api/events/:id/admin/breaks/:bid/start|end`, `POST /api/resolve-link` (parse + metadata,
    rate-limited, no side effects), `GET /api/events/by-slug/:slug` → eventId.
@@ -524,7 +527,7 @@ Docs: `guide/player.md` (Bluetooth tips, iOS autoplay caveats, sound check, righ
 ## Phase 8 — Hardening: retention, export/import, e2e, accessibility, performance
 
 1. Retention: `POST /api/internal/purge` protected by `CRON_SECRET` header; deletes participants/nicknames
-   30 days after `endedAt`, abandoned DRAFTs after 7 days, audit > 90 days, idempotency by TTL. Schedule
+   30 days after `endedAt`, abandoned DRAFTs after 7 days, audit > 90 days, idempotency docs older than 24h (no Firestore TTL on Spark plan). Schedule
    with Railway Cron? (costs a service) → instead run purge opportunistically on server start + every 6h via
    `setInterval` (single instance). Document.
 2. Export `GET /api/events/:id/export` (sanitised JSON: tracks, styles, order, no participants) and import
