@@ -196,6 +196,44 @@ describe('POST /api/events with a playlist', () => {
     expect(r.status).toBe(201);
     expect(r.json.seeded).toBe(14); // 14 x 4 min = 56 min <= 59 min; a 15th would be 60 min
   });
+  it('sends the consent marker YouTube needs, and only to YouTube', async () => {
+    const seen: Array<{ url: string; cookie: string | undefined }> = [];
+    const t = await testApp({
+      fetch: (async (url: string, init: RequestInit) => {
+        seen.push({ url, cookie: (init.headers as Record<string, string>).cookie });
+        return new Response(
+          ytHtml({
+            a: {
+              playlistVideoRenderer: {
+                videoId: 'v1',
+                title: { runs: [{ text: 'A - B' }] },
+                lengthSeconds: '200',
+              },
+            },
+          }),
+        );
+      }) as any,
+    });
+    apps.push(t.app);
+    const r = await t.api.call('POST', '/api/events', {
+      body: {
+        name: 'Y',
+        timezone: 'UTC',
+        plannedDurationMin: 60,
+        playlist: {
+          url: 'https://music.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI',
+          style: 'salsa',
+        },
+      },
+    });
+    expect(r.status).toBe(201);
+    expect(seen).toHaveLength(1);
+    expect(seen[0]!.url).toBe(
+      'https://www.youtube.com/playlist?list=PLFgquLnL59alCl_2TQvOiD5Vgm1hCaGSI',
+    );
+    expect(seen[0]!.cookie).toContain('SOCS=CAI');
+  });
+
   it('needs a planned time, and a supported link', async () => {
     const t = await testApp();
     apps.push(t.app);

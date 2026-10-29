@@ -77,8 +77,8 @@ async function fetchPage(doFetch: FetchLike, t: Target): Promise<string> {
       headers: {
         'user-agent': UA,
         'accept-language': 'en',
-        // Public playlist pages only; this skips YouTube's consent interstitial, nothing more.
-        ...(t.platform === 'youtube' ? { cookie: 'CONSENT=YES+1' } : {}),
+        // Public playlist pages only; SOCS=CAI is the "consent already given" marker that skips YouTube's EU consent redirect.
+        ...(t.platform === 'youtube' ? { cookie: 'SOCS=CAI; CONSENT=YES+1' } : {}),
       },
     });
     if (!res.ok) throw new Error(`status ${res.status}`);
