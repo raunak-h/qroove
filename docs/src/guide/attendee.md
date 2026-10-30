@@ -30,7 +30,7 @@ other attendees do not see it in the queue. Your device gets a private pass for 
 | You see                                | It means                                                                  |
 | -------------------------------------- | ------------------------------------------------------------------------- |
 | Session paused                         | The organiser paused the event; your place is kept                        |
-| Waiting for more eligible songs        | The fairness rules need another contributor or a style change             |
+| Waiting for more eligible songs        | The genre limit was reached; a song of another genre is needed            |
 | Position not yet predictable           | Your song is held until earlier songs play                                |
 | Beyond planned end — admin must extend | The event would finish before your song                                   |
 | Possible duplicate — needs review      | It may be the same recording as one already queued; the organiser decides |

@@ -7,27 +7,20 @@ import type { EventDoc, HistoryDoc, RequestDoc } from '../db/types.js';
 export const EMPTY_HISTORY_DOC: HistoryDoc = {
   lastStyle: null,
   runLength: 0,
-  lastOwnerId: null,
   transitionCount: 0,
-  ownerLastPlayTransition: {},
-  ownerGate: {},
   playedKeys: [],
 };
 
 /** Adapter boundary: the stored array becomes the scheduler's Set. */
 export const toSchedulerHistory = (h: HistoryDoc): HistoryState => ({
   ...h,
-  ownerGate: h.ownerGate,
   playedKeys: new Set(h.playedKeys),
 });
 
 export const fromSchedulerHistory = (h: HistoryState): HistoryDoc => ({
   lastStyle: h.lastStyle,
   runLength: h.runLength,
-  lastOwnerId: h.lastOwnerId,
   transitionCount: h.transitionCount,
-  ownerLastPlayTransition: { ...h.ownerLastPlayTransition },
-  ownerGate: Object.fromEntries(Object.entries(h.ownerGate).map(([k, v]) => [k, [...v]])),
   playedKeys: [...h.playedKeys].sort(),
 });
 

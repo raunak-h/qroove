@@ -5,7 +5,6 @@ export const RULE_DEFAULTS = {
   maxRunCap: 5,
   /** Hard limit: no genre may have a smaller share than 1 part in this many of the total ratio. */
   minGenreShareOf: 10,
-  minStyleTransitionsSinceRequesterPlay: 1,
   transitionOverheadSec: 5,
 } as const;
 

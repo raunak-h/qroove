@@ -13,6 +13,7 @@ versioning: [SemVer](https://semver.org/).
 
 ### Changed
 - Joining requires a name.
+- The queue now looks only at genres: one person's songs can play back to back, up to each genre's limit. The per-person song limit stays, and an event with one genre has no run limit.
 - Landing page: the "Start from a playlist" button and the tagline are gone. The footer is now a short copyright and contact note there, and a single copyright line on every other page. The licence moved to a new License page in the docs.
 - The interface and its messages now mention only Spotify, for the first test.
 - Tidier player and guest pages: local files are an optional collapsed section, the audio bar appears only when a file plays, and empty or repeated guest sections are gone.

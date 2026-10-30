@@ -5,7 +5,6 @@ import {
   DEFAULT_DURATION_MS,
   projectQueue,
   selectNext,
-  isSingleGenre,
   type BreakWindow,
   type Candidate,
 } from '@qroove/scheduler';
@@ -173,11 +172,7 @@ export function recompute(w: Work, now: number): void {
 
 /** Applies a started play to the event's stored history. */
 export function recordPlay(w: Work, r: RequestDoc): void {
-  const pool = [...w.requests.values()]
-    .filter((x) => x.id !== r.id && POOL_STATES.has(x.state))
-    .map(toCandidate);
-  const gate = isSingleGenre(rulesAt(w.event, r.updatedAt));
   w.event.history = fromSchedulerHistory(
-    applyPlay(toSchedulerHistory(w.event.history), toCandidate(r), { pool, gate }),
+    applyPlay(toSchedulerHistory(w.event.history), toCandidate(r)),
   );
 }

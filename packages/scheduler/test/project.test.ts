@@ -34,12 +34,25 @@ describe('projectQueue', () => {
     );
     expect(p.items.map((i) => i.uncertain)).toEqual([false, true]);
   });
-  it('single owner: WAITING_FAIRNESS, not overflow', () => {
-    const p = projectQueue(base({ candidates: [cand('A', 'salsa', 1), cand('A', 'bachata', 2)] }));
-    expect(p.items).toHaveLength(1);
-    expect(p.stoppedReason).toBe('WAITING_FAIRNESS');
-    expect(p.waitingIds).toEqual(['A-b2']);
+  it('one person can fill the queue, while the genre cap still applies', () => {
+    const p = projectQueue(
+      base({
+        candidates: [
+          cand('A', 'salsa', 1),
+          cand('A', 'salsa', 2),
+          cand('A', 'salsa', 3),
+          cand('A', 'bachata', 4),
+        ],
+      }),
+    );
+    expect(p.items.map((i) => i.requestId)).toEqual(['A-s1', 'A-s2', 'A-b4', 'A-s3']);
     expect(p.overflowIds).toEqual([]);
+  });
+  it('waits when only a genre at its cap is left', () => {
+    const p = projectQueue(base({ candidates: [1, 2, 3].map((n) => cand('A', 'salsa', n)) }));
+    expect(p.items).toHaveLength(2);
+    expect(p.stoppedReason).toBe('WAITING_FAIRNESS');
+    expect(p.waitingIds).toEqual(['A-s3']);
   });
   it('scenario 9: song that cannot finish before end is overflow; extension admits it', () => {
     const min = 60_000;

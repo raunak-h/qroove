@@ -1,4 +1,4 @@
-import { applyPlay, isSingleGenre } from './eligibility.js';
+import { applyPlay } from './eligibility.js';
 import { selectNext } from './select.js';
 import {
   DEFAULT_DURATION_MS,
@@ -122,7 +122,7 @@ export function projectQueue(input: ProjectInput): Projection {
     if (c.durationMs === null) uncertain = true;
     t += (c.durationMs ?? DEFAULT_DURATION_MS) + overheadMs;
     remaining = remaining.filter((r) => r.requestId !== c.requestId);
-    history = applyPlay(history, c, { pool: remaining, gate: isSingleGenre(rules) });
+    history = applyPlay(history, c);
   }
 
   const overflowIds: string[] = [];

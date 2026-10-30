@@ -65,8 +65,9 @@ export const RulesSnapshot = z.object({
     .min(1)
     .max(EVENT_LIMITS.maxBreaks + 1),
   submissionLimit: z.number().int().min(1).max(20),
-  minStyleTransitions: z.literal(1),
-  noSameRequesterAdjacent: z.literal(true),
+  /** Retired (ADR 0018); only events created before then still carry these. */
+  minStyleTransitions: z.literal(1).optional(),
+  noSameRequesterAdjacent: z.literal(true).optional(),
   recordingUniquePerEvent: z.literal(true),
   admissionOrder: z.literal('fifo'),
 });
@@ -99,8 +100,6 @@ export function defaultRules(
     rulesVersion: 3,
     segments: Array.from({ length: segmentCount }, () => defaultSegment(enabled, master, ratio)),
     submissionLimit: RULE_DEFAULTS.submissionLimit,
-    minStyleTransitions: 1,
-    noSameRequesterAdjacent: true,
     recordingUniquePerEvent: true,
     admissionOrder: 'fifo',
   };

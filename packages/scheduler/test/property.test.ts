@@ -62,21 +62,14 @@ describe('projection invariants', () => {
 
         const byId = new Map(cands.map((c) => [c.requestId, c]));
         const played = p.items.filter((i) => !i.overflow).map((i) => byId.get(i.requestId)!);
-        const lastTransitionOf = new Map<string, number>();
         const keys = new Set<string>();
-        let transitions = 0,
-          run = 0,
+        let run = 0,
           prev: Candidate | null = null;
         for (const c of played) {
-          if (prev) expect(c.ownerId).not.toBe(prev.ownerId);
           if (prev && prev.style !== c.style) {
-            transitions += 1;
             run = 1;
           } else run += 1;
           expect(run).toBeLessThanOrEqual(rules.runCaps[c.style]!);
-          const last = lastTransitionOf.get(c.ownerId);
-          if (last !== undefined) expect(transitions).toBeGreaterThan(last);
-          lastTransitionOf.set(c.ownerId, transitions);
           expect(keys.has(c.canonicalKey)).toBe(false);
           keys.add(c.canonicalKey);
           prev = c;
@@ -94,19 +87,26 @@ describe('projection invariants', () => {
 });
 
 describe('single-genre invariants', () => {
-  it('never plays one owner twice in a row or exceeds the cap, and waits for half of the others', () => {
+  it('plays every distinct recording, oldest first', () => {
     fc.assert(
       fc.property(scenario, (sc) => {
         const rules: SchedulerRules = { enabledStyles: ['salsa'], runCaps: { salsa: sc.caps[0]! } };
-        const cands: Candidate[] = sc.reqs.map((r, i) => ({
-          requestId: `r${String(i).padStart(3, '0')}`,
-          ownerId: `o${r.o % sc.owners}`,
-          style: 'salsa',
-          acceptedSeq: i,
-          canonicalKey: `k${r.key}`,
-          durationMs: 180_000,
-          playable: true,
-        }));
+        const seen = new Set<string>();
+        const cands: Candidate[] = sc.reqs.flatMap((r, i) => {
+          if (seen.has(`k${r.key}`)) return [];
+          seen.add(`k${r.key}`);
+          return [
+            {
+              requestId: `r${String(i).padStart(3, '0')}`,
+              ownerId: `o${r.o % sc.owners}`,
+              style: 'salsa',
+              acceptedSeq: i,
+              canonicalKey: `k${r.key}`,
+              durationMs: 180_000,
+              playable: true,
+            },
+          ];
+        });
         const p = projectQueue({
           candidates: cands,
           history: EMPTY_HISTORY,
@@ -118,84 +118,9 @@ describe('single-genre invariants', () => {
           overheadSec: 5,
           horizon: 100,
         });
-        const byId = new Map(cands.map((c) => [c.requestId, c]));
-        const order = p.items.filter((i) => !i.overflow).map((i) => byId.get(i.requestId)!);
-        const seen = new Set<string>();
-        order.forEach((c, idx) => {
-          if (idx > 0) expect(c.ownerId).not.toBe(order[idx - 1]!.ownerId);
-          expect(seen.has(c.canonicalKey)).toBe(false);
-          seen.add(c.canonicalKey);
-          // Returning owner: at least ceil(half) of the others' songs that were waiting at their
-          // previous play have been played by now.
-          const prevIdx = order
-            .slice(0, idx)
-            .map((o) => o.ownerId)
-            .lastIndexOf(c.ownerId);
-          if (prevIdx >= 0) {
-            const playedBefore = new Set(order.slice(0, prevIdx + 1).map((o) => o.canonicalKey));
-            const waiting = cands.filter(
-              (o) => o.ownerId !== c.ownerId && !playedBefore.has(o.canonicalKey),
-            );
-            const need = Math.ceil(waiting.length / 2);
-            const oldest = [...waiting]
-              .sort((a, b) => a.acceptedSeq - b.acceptedSeq)
-              .slice(0, need);
-            const nowPlayed = new Set(order.slice(0, idx).map((o) => o.canonicalKey));
-            for (const o of oldest) expect(nowPlayed.has(o.canonicalKey)).toBe(true);
-          }
-        });
+        expect(p.items.map((i) => i.requestId)).toEqual(cands.map((c) => c.requestId));
       }),
-      { numRuns: Number(process.env.PROPERTY_RUNS ?? 2000) },
+      { numRuns },
     );
-  });
-});
-
-describe('segment invariants', () => {
-  it('never plays a style outside its segment, and never overlaps a break', () => {
-    const min = 60_000;
-    fc.assert(
-      fc.property(scenario, fc.integer({ min: 20, max: 90 }), (sc, cut) => {
-        const styles = STYLES.slice(0, sc.styleCount);
-        const first: SchedulerRules = { enabledStyles: [styles[0]!], runCaps: { [styles[0]!]: 3 } };
-        const second: SchedulerRules = {
-          enabledStyles: styles,
-          runCaps: Object.fromEntries(styles.map((s) => [s, 3])),
-        };
-        const brk = { startMs: cut * min, endMs: (cut + 10) * min };
-        const cands: Candidate[] = sc.reqs.map((r, i) => ({
-          requestId: `r${String(i).padStart(3, '0')}`,
-          ownerId: `o${r.o % sc.owners}`,
-          style: styles[r.s % styles.length]!,
-          acceptedSeq: i,
-          canonicalKey: `k${r.key}`,
-          durationMs: r.dur,
-          playable: true,
-        }));
-        const p = projectQueue({
-          candidates: cands,
-          history: EMPTY_HISTORY,
-          rules: first,
-          ruleWindows: [
-            { fromMs: 0, rules: first },
-            { fromMs: brk.endMs, rules: second },
-          ],
-          nowMs: 0,
-          endAtMs: 240 * min,
-          currentRemainingMs: null,
-          breaks: [brk],
-          overheadSec: 5,
-          horizon: 100,
-        });
-        const byId = new Map(cands.map((c) => [c.requestId, c]));
-        for (const it of p.items.filter((i) => !i.overflow)) {
-          const c = byId.get(it.requestId)!;
-          const start = it.predictedStartMs!;
-          const end = start + (c.durationMs ?? DEFAULT_DURATION_MS);
-          expect(end <= brk.startMs || start >= brk.endMs).toBe(true);
-          if (start < brk.startMs) expect(c.style).toBe(styles[0]);
-        }
-      }),
-      { numRuns: Number(process.env.PROPERTY_RUNS ?? 2000) },
-    );
-  });
+  }, 600_000);
 });

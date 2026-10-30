@@ -18,7 +18,7 @@ Build a minimal, installable Progressive Web App (PWA) with a **server-authorita
 
 1. **No DRM circumvention, YouTube ripping, ad blocking or unauthorised audio-stream resolution.** Apple Music/Spotify subscriptions are not a dependency; an organiser-supplied rights-cleared music library is the primary automatic playback path.
 2. **No rules edits once the event is active.** Rules are captured as a versioned snapshot at start; transfers cannot alter them. End-time extensions are an explicitly allowed _schedule-control operation_, not a change to genre or fairness rules.
-3. **No adjacent songs from the same requester; a further song from the same requester requires at least one genre transition after their last play.** Stronger than merely limiting consecutive genres. Infeasible queues must pause rather than covertly violate fairness.
+3. **Superseded by ADR 0018 (2026-10-30): the queue considers genres only, not who added a song.** The requester-spacing text elsewhere in this document no longer applies.
 4. **A genre limit is a cap on consecutive plays, not an exact block pattern.** Default Salsa 2 and Bachata 2, e.g. `S,S,B,B,S,B` is allowed _if the requester-spacing constraint is also satisfied_.
 5. **No identical recording repeats in one event.** Distinct edits, remixes or versions require separate recording identity and review when uncertain.
 6. **First accepted requester owns a recording in the event.** Later duplicates are rejected clearly and do not advance position, confer votes or consume the duplicate submitter's quota.

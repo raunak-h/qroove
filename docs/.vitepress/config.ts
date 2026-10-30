@@ -81,6 +81,11 @@ export default defineConfig({
           { text: '0014 Playlists per genre', link: '/adr/0014-playlists-per-genre' },
           { text: '0015 Permanent room code', link: '/adr/0015-permanent-room-code' },
           { text: '0016 Sortable playlists', link: '/adr/0016-sortable-playlist-import' },
+          {
+            text: '0017 Name, links, official players',
+            link: '/adr/0017-required-name-link-only-official-players',
+          },
+          { text: '0018 Genre-only queue', link: '/adr/0018-genre-only-queue' },
         ],
       },
       {

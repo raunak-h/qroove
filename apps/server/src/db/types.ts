@@ -13,10 +13,7 @@ import type {
 export interface HistoryDoc {
   lastStyle: string | null;
   runLength: number;
-  lastOwnerId: string | null;
   transitionCount: number;
-  ownerLastPlayTransition: Record<string, number>;
-  ownerGate: Record<string, string[]>;
   playedKeys: string[];
 }
 

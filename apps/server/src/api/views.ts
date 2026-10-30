@@ -74,7 +74,7 @@ function statusText(r: RequestDoc, agg: EventAggregate): string | null {
     case 'PENDING_METADATA':
       return r.possibleDuplicate ? 'Possible duplicate — needs review' : 'Looking up this song';
     case 'INELIGIBLE_TEMPORARILY':
-      return 'Position not yet predictable — waiting for another contributor or a style change';
+      return 'Waiting for a different genre to play';
     case 'OVERFLOW':
       return 'Beyond planned end — admin must extend';
     case 'RESERVED_NEXT':

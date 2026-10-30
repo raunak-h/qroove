@@ -169,7 +169,7 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
       );
     });
 
-    it('plays in fair order, updates history on start, and blocks replays', async () => {
+    it('plays oldest first within the genre cap, updates history on start, and blocks replays', async () => {
       const { deps, ev, submit, player } = await setup();
       const a = await guest(deps, ev.eventId);
       const b = await guest(deps, ev.eventId);
@@ -179,36 +179,35 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
       const p = await player();
       expect(await p.start()).toBe(s1.request.id);
       let s = await snap(deps, ev.eventId);
-      expect(s.event.history.lastOwnerId).toBe(a.participantId);
       expect(s.event.history.playedKeys).toEqual(['spotify:track:1']);
       expect(s.event.nowPlaying?.requestId).toBe(s1.request.id);
       expect(s.event.reservation).toBeNull(); // nothing is reserved while a song plays
       await p.finish(s1.request.id);
       s = await snap(deps, ev.eventId);
       expect(s.state(s1.request.id)).toBe('PLAYED');
-      expect(s.event.reservation?.requestId).toBe(b1.request.id); // A cannot go twice in a row
-      expect(s.state(s2.request.id)).toBe('QUEUED');
+      expect(s.event.reservation?.requestId).toBe(s2.request.id); // the same person may go again
       await expectCode(submit(b, 1), 'DUPLICATE'); // played recording stays blocked
       await p.finish(s1.request.id); // idempotent
-      expect(await p.start()).toBe(b1.request.id);
-      await p.finish(b1.request.id);
+      expect(await p.start()).toBe(s2.request.id);
+      await p.finish(s2.request.id);
       s = await snap(deps, ev.eventId);
-      expect(s.event.reservation?.requestId).toBe(s2.request.id);
+      expect(s.event.reservation?.requestId).toBe(b1.request.id);
     });
 
-    it('waits, with a reason, when only the last player has songs left', async () => {
+    it('waits, with a reason, when only a genre at its cap has songs left', async () => {
       const { deps, ev, submit, player } = await setup();
       const a = await guest(deps, ev.eventId);
       await submit(a, 1);
-      const queued = await submit(a, 2);
+      await submit(a, 2);
+      const queued = await submit(a, 3);
       const p = await player();
+      await p.finish(await p.start());
       await p.finish(await p.start());
       const s = await snap(deps, ev.eventId);
       expect(s.event.reservation).toBeNull();
       expect(s.state(queued.request.id)).toBe('INELIGIBLE_TEMPORARILY');
-      expect(s.event.waitingReason).toMatch(/another contributor/);
-      const b = await guest(deps, ev.eventId);
-      const rb = await submit(b, 3, 'bachata');
+      expect(s.event.waitingReason).toMatch(/different style/);
+      const rb = await submit(a, 4, 'bachata');
       expect((await snap(deps, ev.eventId)).event.reservation?.requestId).toBe(rb.request.id);
     });
 
@@ -536,7 +535,7 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
       expect(one.s.event.importSeed).toBe(7);
       expect(one.r.adminSecret).not.toBe(admin.adminSecret);
 
-      // Seeds obey owner spacing like anyone else: one seed plays, then it waits for a real guest.
+      // Seeds follow the genre rules like anyone else, so they keep playing without a guest.
       const started = { eventId: one.r.eventId, adminSecret: one.r.adminSecret };
       await cmd.startEvent(deps, started);
       const p = await cmd.claimLease(deps, started);
@@ -546,11 +545,7 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
       await cmd.reportStarted(deps, { ...lease, requestId: first });
       await cmd.reportFinished(deps, { ...lease, requestId: first, outcome: 'PLAYED' });
       s = await snap(deps, one.r.eventId);
-      expect(s.event.reservation).toBeNull();
-      expect(s.event.waitingReason).toMatch(/another contributor/);
-      const g = await guest(deps, one.r.eventId);
-      await cmd.submitRequest(deps, { ...g, style: 'salsa', track: track('live') });
-      expect((await snap(deps, one.r.eventId)).event.reservation).not.toBeNull();
+      expect(s.event.reservation).not.toBeNull();
     });
 
     it('imports only selected, enabled-style songs and de-duplicates them', async () => {
@@ -714,38 +709,25 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
       expect((await snap(deps, ev.eventId)).event.reservation).toBeNull();
     });
 
-    it('single genre: a returning requester waits for half of the others’ songs', async () => {
-      const { deps, ev, admin } = await setup({
-        enabledStyles: ['salsa'],
-        masterRunCap: 5,
-      });
+    it('single genre: plays oldest first, with no run cap', async () => {
+      const { deps, ev, admin } = await setup({ enabledStyles: ['salsa'], masterRunCap: 1 });
       const a = await guest(deps, ev.eventId);
-      const others = [
-        await guest(deps, ev.eventId),
-        await guest(deps, ev.eventId),
-        await guest(deps, ev.eventId),
-        await guest(deps, ev.eventId),
-      ];
-      const ra1 = await cmd.submitRequest(deps, { ...a, style: 'salsa', track: track('a1') });
-      const ra2 = await cmd.submitRequest(deps, { ...a, style: 'salsa', track: track('a2') });
-      const rs = [];
-      for (const [i, g] of others.entries()) {
-        rs.push(await cmd.submitRequest(deps, { ...g, style: 'salsa', track: track(`o${i}`) }));
+      const ids = [];
+      for (const n of ['a1', 'a2', 'a3']) {
+        ids.push(
+          (await cmd.submitRequest(deps, { ...a, style: 'salsa', track: track(n) })).request.id,
+        );
       }
       const claim = await cmd.claimLease(deps, admin);
       const lease = { eventId: ev.eventId, leaseToken: claim.leaseToken, epoch: claim.lease.epoch };
-      const playNext = async () => {
+      const order = [];
+      for (let i = 0; i < 3; i++) {
         const id = (await snap(deps, ev.eventId)).event.reservation!.requestId;
         await cmd.reportStarted(deps, { ...lease, requestId: id });
         await cmd.reportFinished(deps, { ...lease, requestId: id, outcome: 'PLAYED' });
-        return id;
-      };
-      const order = [];
-      for (let i = 0; i < 5; i++) order.push(await playNext()); // the run cap of 5 ends the run here
-      expect(order[0]).toBe(ra1.request.id);
-      // A's second song is older than every other song, yet A waits: of the four others who were
-      // waiting after A's first song, the oldest two (half) play before A returns.
-      expect(order.slice(1, 4)).toEqual([rs[0]!.request.id, rs[1]!.request.id, ra2.request.id]);
+        order.push(id);
+      }
+      expect(order).toEqual(ids);
     });
 
     it('never writes secrets to the audit trail', async () => {

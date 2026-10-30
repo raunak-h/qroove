@@ -66,9 +66,6 @@ export function RulesList({ rules }: { rules: RulesSnapshot }) {
                 <GenreDot genre={g} size={12} />×{seg.runCaps[g]}
               </span>
             ))}
-            <span className="muted small">
-              {genres.length > 1 ? ' · style change' : ' · half of the others first'}
-            </span>
           </li>
         );
       })}
