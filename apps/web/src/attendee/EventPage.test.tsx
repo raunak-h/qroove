@@ -57,11 +57,9 @@ type Handler = (url: string, init: RequestInit) => { status?: number; body: unkn
 let handler: Handler;
 const calls: Array<{ url: string; init: RequestInit }> = [];
 
-const KEY = 'K'.repeat(24);
 beforeEach(() => {
   localStorage.clear();
   sessionStorage.clear();
-  sessionStorage.setItem('qroove:jk:ABC123', KEY);
   calls.length = 0;
   vi.stubGlobal('EventSource', undefined);
   vi.stubGlobal('crypto', { randomUUID: () => 'uuid-1' });
@@ -115,19 +113,7 @@ describe('EventPage', () => {
     expect(token.closest('a,button')).toBeNull(); // nothing to tap
   });
 
-  it('cannot join without the QR secret, but can still watch the queue', async () => {
-    sessionStorage.clear();
-    handler = (url) =>
-      url.includes('by-slug') ? { body: { eventId: 'ev1', slug: 'ABC123' } } : { body: baseView };
-    renderPage();
-    expect(await screen.findByText('Someone Else')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Join this event' })).toBeNull();
-    expect(screen.getByText(/joining needs the organiser’s QR code/i)).toBeInTheDocument();
-  });
-
-  it('takes the join secret from the QR link and removes it from the address bar', async () => {
-    sessionStorage.clear();
-    window.location.hash = '#j=' + KEY;
+  it('lets anyone who opened the page join: no secret needed', async () => {
     const joined: unknown[] = [];
     handler = (url, init) => {
       if (url.includes('by-slug')) return { body: { eventId: 'ev1', slug: 'ABC123' } };
@@ -141,8 +127,7 @@ describe('EventPage', () => {
     const user = userEvent.setup();
     renderPage();
     await user.click(await screen.findByRole('button', { name: 'Join this event' }));
-    await waitFor(() => expect(joined).toEqual([{ joinKey: KEY }]));
-    expect(window.location.hash).toBe('');
+    await waitFor(() => expect(joined).toEqual([{}]));
   });
 
   it('shows a break in the queue where it falls', async () => {

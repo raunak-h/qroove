@@ -13,19 +13,13 @@ import {
   type Deps,
   type Work,
 } from '../context.js';
-import { sameHash, sha256 } from '../ids.js';
+import { sha256 } from '../ids.js';
 
-/** Joining needs the secret from the organiser's QR code; a shared room code is not enough. */
-export async function joinEvent(
-  deps: Deps,
-  input: { eventId: string; nickname?: string; joinKey?: string | undefined },
-) {
+/** Anyone with the room code (or the QR code, which opens the same link) can join. */
+export async function joinEvent(deps: Deps, input: { eventId: string; nickname?: string }) {
   return deps.repo.runInTransaction(input.eventId, async (tx) => {
     const event = await tx.getEvent();
     if (!event) throw new DomainError('NOT_FOUND');
-    if (!input.joinKey || !sameHash(input.joinKey, event.joinKey)) {
-      throw new DomainError('JOIN_KEY_REQUIRED');
-    }
     if (event.state === 'ENDED' || event.state === 'ARCHIVED') throw new DomainError('EVENT_ENDED');
     const now = deps.clock.now();
     const token = deps.ids.secret();

@@ -582,14 +582,12 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
       expect(r.seeded).toBe(1);
     });
 
-    it('refuses a join without the QR secret', async () => {
-      const deps = makeDeps(await make());
-      const ev = await liveEvent(deps);
-      await expectCode(cmd.joinEvent(deps, { eventId: ev.eventId }), 'JOIN_KEY_REQUIRED');
-      await expectCode(
-        cmd.joinEvent(deps, { eventId: ev.eventId, joinKey: 'wrong' }),
-        'JOIN_KEY_REQUIRED',
-      );
+    it('lets anyone with the room code join, and refuses an ended event', async () => {
+      const { deps, ev, admin } = await setup();
+      const j = await cmd.joinEvent(deps, { eventId: ev.eventId, nickname: 'Ana' });
+      expect(j.participantId).toBeTruthy();
+      await cmd.endEvent(deps, admin);
+      await expectCode(cmd.joinEvent(deps, { eventId: ev.eventId }), 'EVENT_ENDED');
     });
 
     it('enforces the break limits: half of the time, spacing, steps of ten minutes', async () => {

@@ -14,10 +14,9 @@ async function setup(opts: Parameters<typeof testApp>[0] = {}) {
   apps.push(t.app);
   const { created } = await createAndStart(t.api);
   const id: string = created.eventId;
-  const joinKey = new URL(created.joinUrl).hash.replace('#j=', '');
   const join = async (nickname?: string) => {
     const r = await t.api.call('POST', `/api/events/${id}/join`, {
-      body: { joinKey, ...(nickname ? { nickname } : {}) },
+      body: nickname ? { nickname } : {},
     });
     expect(r.status).toBe(200);
     return { participantId: r.json.participantId as string, token: r.json.token as string };
@@ -34,38 +33,27 @@ async function setup(opts: Parameters<typeof testApp>[0] = {}) {
       body: { style, manual: { title, artist: 'Band', ...extra } },
       headers,
     });
-  return { ...t, created, id, join, joinKey, manual };
+  return { ...t, created, id, join, manual };
 }
 
-describe('joining needs the QR secret', () => {
-  it('refuses a join with only the room code, or a wrong key, and never leaks the key in public data', async () => {
-    const { api, id, created, joinKey } = await setup();
-    const none = await api.call('POST', `/api/events/${id}/join`, { body: {} });
-    expect(none.status).toBe(403);
-    expect(none.json.error.code).toBe('JOIN_KEY_REQUIRED');
-    const wrong = await api.call('POST', `/api/events/${id}/join`, {
-      body: { joinKey: 'x'.repeat(43) },
-    });
-    expect(wrong.status).toBe(403);
-    const ok = await api.call('POST', `/api/events/${id}/join`, { body: { joinKey } });
+describe('joining with the room code', () => {
+  it('lets anyone with the permanent room code join, and the QR link is the same public link', async () => {
+    const { api, id, created } = await setup();
+    const ok = await api.call('POST', `/api/events/${id}/join`, { body: {} });
     expect(ok.status).toBe(200);
-    const pub = await api.call('GET', `/api/events/${created.slug}/public`);
-    expect(JSON.stringify(pub.json)).not.toContain(joinKey);
-    const lookup = await api.call('GET', `/api/events/by-slug/${created.slug}`);
-    expect(JSON.stringify(lookup.json)).not.toContain(joinKey);
-  });
-
-  it('gives the organiser the QR payload in admin state only', async () => {
-    const { api, id, joinKey, created } = await setup();
+    // The QR code is just a backup for the typed code: it opens the same public page.
+    expect(created.joinUrl).toMatch(new RegExp(`/e/${created.slug}$`));
     const st = await api.admin('GET', id, '/admin/state');
-    expect(st.json.joinUrl).toContain(`/e/${created.slug}#j=${joinKey}`);
+    expect(st.json.joinUrl).toBe(created.joinUrl);
+    const lookup = await api.call('GET', `/api/events/by-slug/${created.slug.toLowerCase()}`);
+    expect(lookup.status).toBe(200);
   });
 });
 
 describe('events and admin session', () => {
   it('creates an event whose admin URL keeps the secret in the fragment', async () => {
     const { created } = await setup();
-    expect(created.joinUrl).toMatch(/\/e\/[0-9A-Z]{6}#j=[\w-]{20,}$/);
+    expect(created.joinUrl).toMatch(/\/e\/[0-9A-Z]{6}$/);
     expect(created.adminUrl).toMatch(/\/a\/\w+#k=/);
     expect(created.adminUrl.split('#')[0]).not.toContain(new URL(created.adminUrl).hash.slice(3));
     expect(created.recoverySecret).toBeTruthy();

@@ -40,24 +40,28 @@ describe('Landing', () => {
     expect(boxes()[1]).toHaveFocus();
   });
 
-  it('fills every box from a pasted code, ignoring stray characters', async () => {
-    vi.stubGlobal(
-      'fetch',
-      async () => new Response(JSON.stringify({ eventId: 'e', slug: 'ABC123', name: 'Friday' })),
-    );
+  it('shows the code as two triplets and opens the event when the sixth character is in', async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((r) => (release = r));
+    vi.stubGlobal('fetch', async () => {
+      await gate; // hold the lookup so the boxes can be inspected first
+      return new Response(
+        JSON.stringify({ eventId: 'e', slug: 'ABC123', name: 'Mango Octopus Rye' }),
+      );
+    });
     home();
+    expect(screen.getByText('-')).toBeInTheDocument(); // the hyphen between the triplets
     const user = userEvent.setup();
     await user.click(boxes()[0]!);
-    await user.paste(' ab-c123 ');
+    await user.paste(' ab-c123 '); // stray characters and a typed hyphen are ignored
     expect(
       boxes()
         .map((b) => b.value)
         .join(''),
     ).toBe('ABC123');
-    // A found event tells the visitor to scan; the code alone never joins.
-    expect(await screen.findByText(/scan the organiser’s QR code/i)).toBeInTheDocument();
-    expect(screen.getByText('Friday')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /join/i })).toBeNull();
+    release();
+    // A found event opens straight away: the code alone is enough to join.
+    await waitFor(() => expect(screen.queryByText('Enter code')).toBeNull());
   });
 
   it('says plainly when no event has that code', async () => {

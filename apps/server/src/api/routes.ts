@@ -147,13 +147,11 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
     adminSecret: string;
     recoverySecret: string;
     rules: unknown;
-    joinKey: string;
   }) => ({
     eventId: r.eventId,
     slug: r.slug,
     name: r.name,
-    // The key rides in the fragment (never logged); only the QR code should carry this URL.
-    joinUrl: `${base}/e/${r.slug}#j=${r.joinKey}`,
+    joinUrl: `${base}/e/${r.slug}`,
     // The secret lives in the fragment, which browsers never send to a server.
     adminUrl: `${base}/a/${r.eventId}#k=${r.adminSecret}`,
     recoverySecret: r.recoverySecret,
@@ -378,9 +376,9 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
   app.post('/api/events/:id/join', async (req, reply) => {
     const { id } = parse(idParams, req.params);
     limit(`join:${req.ip}`, 20, MINUTE);
-    const { nickname, joinKey } = parse(JoinBody, req.body ?? {});
+    const { nickname } = parse(JoinBody, req.body ?? {});
     reply.header('cache-control', 'no-store');
-    return cmd.joinEvent(deps, { eventId: id, joinKey, ...(nickname ? { nickname } : {}) });
+    return cmd.joinEvent(deps, { eventId: id, ...(nickname ? { nickname } : {}) });
   });
 
   app.post('/api/events/:id/requests', async (req) => {

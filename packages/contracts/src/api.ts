@@ -74,11 +74,7 @@ export type OkResponse = z.infer<typeof OkResponse>;
 export const PublicResponse = EventPublicView;
 
 // POST /api/events/:id/join
-export const JoinBody = z.object({
-  nickname: Nickname.optional(),
-  /** The secret from the organiser's QR code. */
-  joinKey: z.string().min(16).max(128).optional(),
-});
+export const JoinBody = z.object({ nickname: Nickname.optional() });
 export const JoinResponse = z.object({ participantId: Id, token: z.string() });
 export type JoinResponse = z.infer<typeof JoinResponse>;
 
@@ -163,7 +159,7 @@ export const AdminState = z.object({
   rulesHash: z.string().nullable(),
   rules: RulesSnapshot,
   plannedDurationMin: z.number().int().nullable(),
-  /** Carried only by the QR code; never shown as text. */
+  /** The public join link, shown as a QR code (a backup to the typed room code). */
   joinUrl: z.string(),
   /** Only on `GET /admin/state`: the page cannot read the cookie (its path is the API's), so it is echoed here. */
   csrf: z.string().optional(),

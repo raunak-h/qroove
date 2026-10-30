@@ -143,6 +143,6 @@ export function adminState(agg: EventAggregate, now: number, baseUrl: string): A
     rulesHash: agg.event.rulesHash,
     rules: agg.event.rules,
     plannedDurationMin: agg.event.plannedDurationMin,
-    joinUrl: `${baseUrl}/e/${agg.event.publicSlug}#j=${agg.event.joinKey}`,
+    joinUrl: `${baseUrl}/e/${agg.event.publicSlug}`,
   };
 }

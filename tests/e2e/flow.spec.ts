@@ -70,7 +70,8 @@ test('create → run → play manually → hand over → end → carry over', as
   await expectAccessible(page, '/admin (draft)');
   await page.getByRole('tab', { name: 'Invite' }).click();
   await expect(page.getByRole('img', { name: /QR code to join/ })).toBeVisible();
-  await expect(page.getByRole('button', { name: /copy/i })).toHaveCount(0);
+  // The permanent room code is shown as two triplets, with the QR as a backup.
+  await expect(page.getByText(/^[0-9A-Z]{3}-[0-9A-Z]{3}$/)).toBeVisible();
   await expectNoScroll(page, 'console (invite)');
   await page.getByRole('tab', { name: 'More' }).click();
   await expectNoScroll(page, 'console (more)');
@@ -87,19 +88,21 @@ test('create → run → play manually → hand over → end → carry over', as
   await page.getByRole('button', { name: 'Start event' }).click();
   await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
 
-  // The join link exists only inside the QR code; the organiser's session can read it ---------
+  // The QR code opens the same public link the typed room code leads to ----------------------
   const state = await (await page.request.get(`/api/events/${eventId}/admin/state`)).json();
   const joinUrl = new URL(state.joinUrl);
   const slug = joinUrl.pathname.split('/').pop()!;
-  expect(joinUrl.hash).toMatch(/^#j=/);
+  expect(joinUrl.hash).toBe('');
 
-  // Someone who only has the room code can look but not join --------------------------------
-  const codeOnly = await newPage(browser, ctxOpts);
-  await codeOnly.page.goto(`/e/${slug}`);
-  await expect(codeOnly.page.getByText(/joining needs the organiser’s QR code/i)).toBeVisible();
-  await expect(codeOnly.page.getByRole('button', { name: 'Join this event' })).toHaveCount(0);
+  // Typing the room code on the landing page is enough to get in and join ---------------------
+  const typed = await newPage(browser, ctxOpts);
+  await typed.page.goto('/');
+  await typed.page.getByRole('textbox').first().click();
+  await typed.page.keyboard.type(slug.toLowerCase());
+  await expect(typed.page).toHaveURL(new RegExp(`/e/${slug}$`));
+  await expect(typed.page.getByRole('button', { name: 'Join this event' })).toBeVisible();
 
-  // Three attendees join through the QR link ---------------------------------------------------
+  // Three attendees join through the link in the QR code ---------------------------------------------------
   const people = [] as Awaited<ReturnType<typeof newPage>>[];
   for (const [i, [title, artist, style]] of [
     ['Song One', 'Band A', 'Salsa'],
@@ -108,9 +111,8 @@ test('create → run → play manually → hand over → end → carry over', as
   ].entries()) {
     const p = await newPage(browser, ctxOpts);
     people.push(p);
-    await p.page.goto(`${joinUrl.pathname}${joinUrl.hash}`);
+    await p.page.goto(joinUrl.pathname);
     await expect(p.page.getByRole('button', { name: 'Join this event' })).toBeVisible();
-    expect(new URL(p.page.url()).hash).toBe(''); // the secret leaves the address bar
     await p.page.getByRole('button', { name: 'Join this event' }).click();
     if (i === 0) await expectAccessible(p.page, '/e/:slug (joined)');
     await addSong(p.page, title!, artist!, style!);
@@ -178,5 +180,5 @@ test('create → run → play manually → hand over → end → carry over', as
   await expect(page.getByRole('heading', { name: eventName })).toBeVisible();
   await expectAccessible(page, '/h/:slug');
 
-  for (const p of [codeOnly, ...people, player, second]) await p.context.close();
+  for (const p of [typed, ...people, player, second]) await p.context.close();
 });

@@ -94,9 +94,9 @@ export const api = {
       `/api/events/${encodeURIComponent(slug)}/public`,
       signal ? { signal } : {},
     ),
-  join: (eventId: string, joinKey: string, nickname?: string) =>
+  join: (eventId: string, nickname?: string) =>
     request<JoinResponse>('POST', `/api/events/${eventId}/join`, {
-      body: { joinKey, ...(nickname ? { nickname } : {}) },
+      body: nickname ? { nickname } : {},
     }),
   myRequests: (eventId: string, creds: Creds) =>
     request<MyRequests>('GET', `/api/events/${eventId}/my-requests`, { creds }),

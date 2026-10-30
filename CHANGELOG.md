@@ -6,6 +6,7 @@ versioning: [SemVer](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- Joining: the permanent 6-character room code (shown as two triplets, `ABC-123`) now joins on its own, so remote classes can use it, and the landing page opens the event as soon as the sixth character is typed. The QR code stays on the Invite page as a non-verbal backup (it is the same public link). The secret join key is gone.
 - The event name moves to the header on organiser and attendee pages: very small, lower-case, hyphen-separated (`mango-octopus-rye`), Courier New, in the menu's colour and not selectable, so it reads as a label. The big heading is kept for screen readers only.
 - Creating an event (or carrying one over) goes straight to the organiser page. The interstitial that showed the organiser link and recovery secret is gone, and so is the recovery form: control belongs to the browser that created the event, and moves by handover.
 - Buttons have a lighter background so they stand out from the page; the timeline's genre stripes are drawn again on every browser (segments are no longer `<button>` elements, whose layout Safari ignores); the break's time range above the bar is gone, only its minutes and the remove button remain.

@@ -42,23 +42,3 @@ export function setTheme(t: Theme) {
     /* ignore */
   }
 }
-
-const joinKeyName = (slug: string) => `qroove:jk:${slug}`;
-
-/**
- * The join secret arrives in the QR code's URL fragment. Keep it for this tab only and take it out
- * of the address bar, so it is not shared by copying the page link.
- */
-export function takeJoinKey(slug: string): string | null {
-  const m = /(?:^|[#&])j=([\w-]{16,128})/.exec(location.hash);
-  try {
-    if (m) {
-      sessionStorage.setItem(joinKeyName(slug), m[1]!);
-      history.replaceState(null, '', location.pathname + location.search);
-      return m[1]!;
-    }
-    return sessionStorage.getItem(joinKeyName(slug));
-  } catch {
-    return m?.[1] ?? null;
-  }
-}

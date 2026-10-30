@@ -30,8 +30,7 @@ export async function liveEvent(
 }
 
 export async function guest(deps: Deps, eventId: string, nickname?: string) {
-  const joinKey = (await deps.repo.getEventPublic(eventId))!.event.joinKey;
-  const j = await joinEvent(deps, { eventId, joinKey, ...(nickname ? { nickname } : {}) });
+  const j = await joinEvent(deps, { eventId, ...(nickname ? { nickname } : {}) });
   return { eventId, participantId: j.participantId, token: j.token };
 }
 

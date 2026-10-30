@@ -1101,3 +1101,19 @@ body.console .layout main {
 .topbar-spacer {
   flex: 1;
 }
+.code-sep {
+  align-self: center;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.room-code {
+  margin: 0;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 2.6rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--text);
+  user-select: text;
+  -webkit-user-select: text;
+}

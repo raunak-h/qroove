@@ -117,7 +117,7 @@ export default function AdminPage() {
           )}
         </section>
         <section className="page" role="tabpanel" aria-label="Invite" id="page-invite">
-          <SharePanel joinUrl={state.joinUrl} name={v.name} />
+          <SharePanel joinUrl={state.joinUrl} name={v.name} slug={v.slug} />
         </section>
         <section className="page more" role="tabpanel" aria-label="More" id="page-more">
           <div className="stack">

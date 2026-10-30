@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router';
 import { GenreSwatch } from '../shared/Genre';
 import { ApiError } from '../shared/api';
 import { formatClock, fromLocalInput, pluralise, toLocalInput } from '../shared/time';
+import { formatCode } from '../shared/code';
 import { RulesList } from '../shared/menu';
 import { ConfirmButton, CopyButton, QrCode } from '../shared/widgets';
 import {
@@ -258,14 +259,22 @@ export function SchedulePanel({ s, cmd, refresh }: PanelProps) {
   );
 }
 
-/** The QR code is the only way in: no text code, no link, nothing to copy. */
-export function SharePanel({ joinUrl, name }: { joinUrl: string; name: string }) {
+/** The permanent room code (two triplets, easy to say aloud) with the QR code as a backup. */
+export function SharePanel({
+  joinUrl,
+  name,
+  slug,
+}: {
+  joinUrl: string;
+  name: string;
+  slug: string;
+}) {
   return (
     <section className="share" aria-label="Invite people">
-      <QrCode text={joinUrl} label={`QR code to join ${name}`} />
-      <p className="muted small">
-        Guests scan this with their phone camera to join. There is no code to share.
+      <p className="room-code" aria-label={`Room code ${slug.split('').join(' ')}`}>
+        {formatCode(slug)}
       </p>
+      <QrCode text={joinUrl} label={`QR code to join ${name}`} />
     </section>
   );
 }

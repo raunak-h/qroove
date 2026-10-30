@@ -62,7 +62,7 @@ const state = (over: Record<string, unknown> = {}, viewOver: Record<string, unkn
   rulesHash: 'abcdef0123456789',
   rules,
   plannedDurationMin: 120,
-  joinUrl: 'http://x/e/ABC123#j=JOINKEYJOINKEYJOINKEY',
+  joinUrl: 'http://x/e/ABC123',
   lease: null,
   requests: [
     {
@@ -152,7 +152,7 @@ describe('CreateEvent', () => {
       eventId: 'ev1',
       slug: 'ABC123',
       name: 'Mango Octopus Rye',
-      joinUrl: 'http://x/e/ABC123#j=JOINKEYJOINKEYJOINKEY',
+      joinUrl: 'http://x/e/ABC123',
       adminUrl: 'http://x/a/ev1#k=SECRETSECRET',
       recoverySecret: 'RECOVERYRECOVERY',
       rules,
@@ -213,7 +213,7 @@ describe('CreateEvent', () => {
     await user.click(screen.getByRole('button', { name: 'Create event' }));
     // Straight to the organiser page: no interstitial with a link or a recovery secret.
     expect(await screen.findByRole('heading', { name: 'Friday Social' })).toBeInTheDocument();
-    expect(document.body.textContent).not.toMatch(/Save this link|RECOVERY|SECRETSECRET|JOINKEY/);
+    expect(document.body.textContent).not.toMatch(/Save this link|RECOVERY|SECRETSECRET/);
     const session = calls.find((c) => c.url.endsWith('/admin/session'))!;
     expect(session.url).toBe('/api/events/ev1/admin/session');
     expect(session.body).toEqual({ secret: 'SECRETSECRET' });
@@ -363,7 +363,7 @@ describe('AdminPage', () => {
       extra?.(c) ?? (c.method === 'GET' ? { body: state() } : { body: { ok: true, version: 6 } });
   };
 
-  it('is one screen with tabs; the QR is the only invitation and nothing can be copied', async () => {
+  it('has three pages: the invite page shows the room code and a backup QR', async () => {
     ok();
     const user = userEvent.setup();
     page();
@@ -372,12 +372,10 @@ describe('AdminPage', () => {
     expect(screen.getByText(/1\/2/)).toBeInTheDocument();
     expect(screen.getByText(/1 song would run past the end/)).toBeInTheDocument();
     expect(screen.getByText(/Next: Next Song/)).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain('ABC123'); // no room code on the organiser screen
     await user.click(screen.getByRole('tab', { name: 'Invite' }));
     expect(screen.getByRole('img', { name: /QR code to join Friday Social/ })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /copy/i })).toBeNull();
-    expect(document.body.textContent).not.toContain('JOINKEY');
-    expect(document.body.textContent).not.toContain('/e/ABC123');
+    // The permanent room code is shown as two triplets, with the QR as a backup.
+    expect(screen.getByText('ABC-123')).toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: 'More' }));
     await user.click(screen.getByRole('button', { name: 'Rules' }));
     expect(screen.getByText(/abcdef012345/)).toBeInTheDocument();

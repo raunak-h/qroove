@@ -143,7 +143,6 @@ export function newDraft(
     endedAt: null,
     endAt: null,
     plannedDurationMin: input.plannedDurationMin,
-    joinKey: deps.ids.secret(),
     breaks: input.breaks,
     rules: input.rules,
     rulesHash: null,

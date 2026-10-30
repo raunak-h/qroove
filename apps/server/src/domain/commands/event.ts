@@ -40,7 +40,6 @@ export interface CreatedEvent {
   recoverySecret: string;
   name: string;
   rules: RulesSnapshot;
-  joinKey: string;
 }
 
 export interface CreateOptions {
@@ -83,7 +82,6 @@ export async function createEvent(
     slug: bundle.event.publicSlug,
     name: bundle.event.name,
     rules: bundle.event.rules,
-    joinKey: bundle.event.joinKey,
     seeded: seeds.length,
     ...secrets,
   };
