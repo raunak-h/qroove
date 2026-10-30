@@ -13,11 +13,12 @@ _Mango Octopus Rye_ ([ADR 0013](/adr/0013-generated-event-names)).
   and _Other (Musicality Exercise)_ underneath. Salsa, bachata and their non-Latin styles start selected; cha-cha is
   an extra. Colours: red salsa, black bachata, orange cha-cha, grey Other; non-Latin styles are striped. A style and its
   non-Latin version count as one genre.
-- **The bar:** the whole evening, always as wide as the screen. **Tap it to add a break** there (10 minutes, snapped
-  to the 10-minute grid). Drag a break's handles to move or lengthen it (10 to 30 minutes); tap the break and press ✕
-  to remove it. You cannot go past the limits: at most 3 breaks, together at most half of the time, and at least 20
-  minutes of music before, between and after. Songs only start if they can finish before a break.
-- **Parts of the evening:** each break splits the bar. Tap a part under the bar to give it its own styles and
+- **The bar:** the whole evening, always as wide as the screen, with the minutes written above every part and every
+  break. **Press and hold a part** to add a 10-minute break in the middle of it (on the 10-minute grid). **Drag a
+  break** to move it; drag its **end handle** to make it longer or shorter (10 to 30 minutes, one direction only).
+  Tap a break and press ✕ to remove it. You cannot go past the limits: at most 3 breaks, together at most half of
+  the time, and at least 20 minutes of music before, between and after, so breaks never touch.
+- **Parts of the evening:** each break splits the bar. **Tap a part** of the bar to give it its own styles and
   numbers; new parts start as copies of the one they came from. A song waits for a part that allows its style.
 - **Drums:** most songs in a row (1 to 5, applied to every genre), and songs per person (1 to 20). Under the ratio
   summary you can give each genre its own number; the default is an equal split, and no genre may get less than 1

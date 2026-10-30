@@ -35,11 +35,21 @@ test('create → run → play manually → hand over → end → carry over', as
     'aria-valuetext',
     '2:00',
   );
-  // Tap the middle of the bar to add a break there.
-  const timeline = page.getByRole('group', { name: /Evening timeline/ });
-  const box = (await timeline.boundingBox())!;
-  await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-  await expect(page.getByRole('tab')).toHaveCount(2);
+  // A plain tap on the bar only selects a part; pressing and holding adds a break in its middle.
+  const part1 = page.getByRole('button', { name: /^Part 1 of 1/ });
+  await part1.click();
+  await expect(page.getByRole('button', { name: /^Part/ })).toHaveCount(1);
+  const box = (await part1.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 3, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.waitForTimeout(700);
+  await page.mouse.up();
+  await expect(page.getByRole('button', { name: /^Part/ })).toHaveCount(2);
+  await expect(page.getByRole('slider', { name: 'Break 1', exact: true })).toHaveAttribute(
+    'aria-valuenow',
+    '60',
+  );
+  await expectAccessible(page, '/new (with a break)');
   await page.getByRole('button', { name: 'Create event' }).click();
   await expect(page.getByText(/Save this link/)).toBeVisible();
   const eventName = (await page.getByRole('heading', { level: 1 }).innerText()).trim();

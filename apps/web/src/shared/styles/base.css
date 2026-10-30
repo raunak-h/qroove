@@ -841,7 +841,6 @@ body.console .layout main {
   border: 1px solid #fff;
   background: var(--bg);
   touch-action: pan-y;
-  cursor: copy;
 }
 .tl-bar.rejected {
   animation: tl-shake 0.3s;
@@ -858,6 +857,13 @@ body.console .layout main {
   outline: 3px solid var(--accent);
 }
 .tl-seg {
+  padding: 0;
+  border: 0;
+  font: inherit;
+  cursor: pointer;
+  -webkit-touch-callout: none;
+  user-select: none;
+  touch-action: pan-y;
   position: absolute;
   top: 0;
   bottom: 0;
@@ -889,7 +895,8 @@ body.console .layout main {
   border: 1px solid #fff;
   border-radius: 4px;
   z-index: 2;
-  cursor: pointer;
+  cursor: grab;
+  touch-action: none;
 }
 .tl-break.sel {
   box-shadow: 0 0 0 2px var(--accent);
@@ -905,9 +912,6 @@ body.console .layout main {
   place-items: center;
   cursor: ew-resize;
   touch-action: none;
-}
-.tl-handle.start {
-  transform: translateX(-100%);
 }
 .tl-handle:focus-visible {
   outline: 3px solid var(--accent);
@@ -929,19 +933,6 @@ body.console .layout main {
 }
 .tl-stamps > :last-child {
   text-align: right;
-}
-.tl-parts {
-  display: flex;
-  gap: 0.35rem;
-  margin-top: 0.4rem;
-}
-.tl-part {
-  flex: 1;
-  min-width: 0;
-  gap: 0.2rem;
-  flex-wrap: wrap;
-  padding: 0.25rem;
-  margin-top: 0 !important;
 }
 .tl-sel {
   display: flex;
@@ -995,6 +986,40 @@ body.console .layout main {
   display: inline-grid;
   place-items: center;
 }
-.tl-parts {
-  margin-bottom: 0.9rem;
+.tl-labels {
+  position: relative;
+  height: 2.6rem;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+}
+.tl-labels-breaks,
+.tl-labels-parts {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1.3rem;
+}
+.tl-labels-breaks {
+  top: 0;
+}
+.tl-labels-parts {
+  top: 1.3rem;
+}
+.tl-label {
+  position: absolute;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  color: var(--text);
+}
+.tl-label.brk {
+  color: #cdb4f6; /* a light tint of royal purple, readable on the dark surface */
+  font-weight: 700;
+}
+:root[data-theme='light'] .tl-label.brk {
+  color: #5a3a8a;
+}
+.tl-label.wide::after {
+  content: ' min';
+  color: var(--muted);
+  font-weight: 400;
 }

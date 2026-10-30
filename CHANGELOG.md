@@ -6,6 +6,7 @@ versioning: [SemVer](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- Timeline gestures: tap a part of the bar to select it; press and hold a part to add a break in its middle (snapped to the 10-minute grid). Breaks are dragged as a whole, and only the end handle changes their length (the start handle is gone). Minutes are written above every break and every part. Breaks still cannot touch (at least 20 minutes of music between them).
 - Time stamps sit above the timeline (in a fixed-height row, so selecting a break never moves the bar); the "h:mm" caption under the time wheel is gone.
 - Breaks are royal purple (was sky blue).
 - Style selectors show the style's name inside a box whose thick border is its colour (striped for non-Latin); unselected boxes fade border and text together. The same boxes are used when an attendee picks a style for a song.

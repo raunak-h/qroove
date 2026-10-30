@@ -198,11 +198,10 @@ describe('CreateEvent', () => {
     await user.click(styleBox('Cha-cha'));
     wheel('Accepted songs per person').focus();
     await user.keyboard('{ArrowDown}{ArrowDown}'); // 5 -> 7
-    const bar = screen.getByRole('group', { name: /Evening timeline/ });
-    fireEvent.pointerDown(bar, { clientX: 180 }); // the middle: 75 min
-    fireEvent.pointerUp(bar, { clientX: 180 });
-    expect(screen.getAllByRole('tab')).toHaveLength(2);
-    await user.click(screen.getByRole('tab', { name: 'Part 2 of 2' }));
+    // Press and hold the part: the break goes to its middle (2:30 -> 75 min, centred on 10).
+    fireEvent.keyDown(screen.getAllByRole('button', { name: /^Part/ })[0]!, { key: 'b' });
+    expect(screen.getAllByRole('button', { name: /^Part/ })).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: /^Part 2 of 2/ })); // a plain tap selects it
     await user.click(styleBox('Bachata')); // part two drops bachata
     await user.click(screen.getByRole('button', { name: 'Create event' }));
     expect(await screen.findByRole('heading', { name: 'Mango Octopus Rye' })).toBeInTheDocument();
@@ -212,7 +211,7 @@ describe('CreateEvent', () => {
     expect(body).toMatchObject({
       plannedDurationMin: 150,
       submissionLimit: 7,
-      breaks: [{ startMin: 80, durationSec: 600 }],
+      breaks: [{ startMin: 70, durationSec: 600 }],
     });
     const segs = body.segments as Array<{ enabledStyles: string[] }>;
     expect(segs).toHaveLength(2);
