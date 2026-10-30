@@ -9,6 +9,15 @@ import {
 } from '@qroove/config';
 
 export const styleName = (id: string) => STYLE_PRESETS.find((s) => s.id === id)?.label ?? id;
+const ROWS: Array<[StyleId, StyleId]> = [
+  ['salsa', 'salsa_nl'],
+  ['bachata', 'bachata_nl'],
+  ['chacha', 'chacha_nl'],
+];
+/** A selector box: the style's name inside, its colour scheme as a thick border (striped for non-Latin). */
+export const styleBoxClass = (id: StyleId) => `style-box${isNonLatin(id) ? ' striped' : ''}`;
+export const styleBoxVars = (id: StyleId) => ({ ['--c' as string]: GENRE_COLOURS[genreOf(id)] });
+
 const known = (id: string): id is StyleId => STYLE_PRESETS.some((s) => s.id === id);
 
 /**
@@ -68,12 +77,6 @@ export function StyleSwatches({
   );
 }
 
-const ROWS: Array<[StyleId, StyleId]> = [
-  ['salsa', 'salsa_nl'],
-  ['bachata', 'bachata_nl'],
-  ['chacha', 'chacha_nl'],
-];
-
 /**
  * Pick styles by tapping swatches. Latin styles are one column on the left, their non-Latin
  * counterparts directly across on the right; "Other" sits underneath.
@@ -99,12 +102,11 @@ export function StyleGrid({
       type="button"
       role="checkbox"
       aria-checked={value.has(id)}
-      aria-label={styleName(id)}
-      title={styleName(id)}
-      className={`style-cell${value.has(id) ? ' on' : ''}`}
+      className={`${styleBoxClass(id)}${value.has(id) ? ' on' : ''}`}
+      style={styleBoxVars(id)}
       onClick={() => toggle(id)}
     >
-      <GenreSwatch style={id} size={30} label={false} />
+      {styleName(id)}
     </button>
   );
   return (

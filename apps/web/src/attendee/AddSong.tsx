@@ -2,7 +2,7 @@ import { allowedStyles, type EventPublicView, type StyleId } from '@qroove/contr
 import { STYLE_PRESETS } from '@qroove/config';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, type Creds, type ResolvedLink } from '../shared/api';
-import { GenreSwatch } from '../shared/Genre';
+import { styleBoxClass, styleBoxVars } from '../shared/Genre';
 import { parseDuration } from '../shared/time';
 
 const isUrl = (s: string) => /^https?:\/\//i.test(s.trim());
@@ -206,7 +206,11 @@ export function AddSong({
         <fieldset className="chips">
           <legend className="sr-only">Dance style</legend>
           {styles.map((s) => (
-            <label key={s.id} className={`chip${style === s.id ? ' on' : ''}`}>
+            <label
+              key={s.id}
+              className={`${styleBoxClass(s.id)}${style === s.id ? ' on' : ''}`}
+              style={styleBoxVars(s.id)}
+            >
               <input
                 type="radio"
                 name="style"
@@ -214,7 +218,7 @@ export function AddSong({
                 checked={style === s.id}
                 onChange={() => setStyle(s.id)}
               />
-              <GenreSwatch style={s.id} size={28} />
+              {s.label}
             </label>
           ))}
         </fieldset>

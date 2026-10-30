@@ -199,9 +199,6 @@ export default function CreateEvent() {
             setSegs(fit.segs);
           }}
         />
-        <span className="muted small" aria-hidden="true">
-          h:mm
-        </span>
       </div>
 
       <TimelineBar

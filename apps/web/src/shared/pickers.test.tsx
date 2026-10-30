@@ -110,7 +110,7 @@ describe('StyleGrid', () => {
     const on = screen
       .getAllByRole('checkbox')
       .filter((c) => c.getAttribute('aria-checked') === 'true')
-      .map((c) => c.getAttribute('aria-label'));
+      .map((c) => c.textContent);
     expect(on).toEqual([
       'Salsa',
       'Non-Latin salsa-compatible',
@@ -124,7 +124,7 @@ describe('StyleGrid', () => {
   });
   it('lays out Latin styles on the left and each non-Latin counterpart directly across', () => {
     render(<Grid />);
-    const order = screen.getAllByRole('checkbox').map((c) => c.getAttribute('aria-label'));
+    const order = screen.getAllByRole('checkbox').map((c) => c.textContent);
     // Two columns: row-major order alternates left / right, then Other alone.
     expect(order).toEqual([
       'Salsa',
@@ -135,6 +135,23 @@ describe('StyleGrid', () => {
       'Non-Latin cha-cha-compatible',
       'Other (Musicality Exercise)',
     ]);
+  });
+  it('shows each name inside a box whose thick border is the style colour; non-Latin is striped', () => {
+    render(<Grid />);
+    const salsa = screen.getByRole('checkbox', { name: 'Salsa' });
+    expect(salsa).toHaveTextContent('Salsa');
+    expect(salsa.className).toContain('style-box');
+    expect(salsa.className).not.toContain('striped');
+    expect(salsa.style.getPropertyValue('--c')).toBe('#d32f2f');
+    const nl = screen.getByRole('checkbox', { name: 'Non-Latin bachata-compatible' });
+    expect(nl.className).toContain('striped');
+    expect(nl.style.getPropertyValue('--c')).toBe('#000000');
+    expect(screen.getByRole('checkbox', { name: 'Cha-cha' }).style.getPropertyValue('--c')).toBe(
+      '#fb8c00',
+    );
+    // Enabled and disabled differ by the `on` state (full strength vs faded border and text).
+    expect(salsa.className).toContain(' on');
+    expect(screen.getByRole('checkbox', { name: 'Cha-cha' }).className).not.toContain(' on');
   });
   it('toggles a style on tap', async () => {
     render(<Grid />);

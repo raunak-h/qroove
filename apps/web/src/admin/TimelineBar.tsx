@@ -135,6 +135,33 @@ export function TimelineBar({
 
   return (
     <div className="tl">
+      {/* Every time stamp sits above the bar, out from under the thumb. The row has a fixed height,
+          so selecting a break never moves the bar. */}
+      <div className="tl-stamps">
+        <span aria-hidden="true">0:00</span>
+        <span className="tl-sel" role="status">
+          {selBreak !== null && breaks[selBreak] ? (
+            <>
+              <span className="mono">
+                {hm(breaks[selBreak]!.startMin)} –{' '}
+                {hm(breaks[selBreak]!.startMin + breaks[selBreak]!.durationMin)}
+              </span>
+              <button
+                type="button"
+                className="btn"
+                aria-label={`Remove break ${selBreak + 1}`}
+                onClick={() => {
+                  onRemove(selBreak);
+                  setSelBreak(null);
+                }}
+              >
+                ✕
+              </button>
+            </>
+          ) : null}
+        </span>
+        <span aria-hidden="true">{hm(plannedMin)}</span>
+      </div>
       <div
         ref={bar}
         className={`tl-bar${rejected ? ' rejected' : ''}`}
@@ -178,10 +205,6 @@ export function TimelineBar({
         ))}
         {breaks.map((_, i) => [handle(i, 'start'), handle(i, 'end')])}
       </div>
-      <div className="tl-ends" aria-hidden="true">
-        <span>0:00</span>
-        <span>{hm(plannedMin)}</span>
-      </div>
       <div className="tl-parts" role="tablist" aria-label="Parts of the evening">
         {spans.map((_, i) => (
           <button
@@ -199,25 +222,6 @@ export function TimelineBar({
           </button>
         ))}
       </div>
-      {selBreak !== null && breaks[selBreak] ? (
-        <div className="row tl-sel" role="status">
-          <span className="mono">
-            {hm(breaks[selBreak]!.startMin)} –{' '}
-            {hm(breaks[selBreak]!.startMin + breaks[selBreak]!.durationMin)}
-          </span>
-          <button
-            type="button"
-            className="btn"
-            aria-label={`Remove break ${selBreak + 1}`}
-            onClick={() => {
-              onRemove(selBreak);
-              setSelBreak(null);
-            }}
-          >
-            ✕
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }
