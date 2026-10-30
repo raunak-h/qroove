@@ -44,7 +44,7 @@ export function parsePlaylistUrl(raw: string): Target {
   if (['www.youtube.com', 'youtube.com', 'music.youtube.com', 'm.youtube.com'].includes(host)) {
     const list = u.searchParams.get('list');
     if (u.pathname !== '/playlist' && u.pathname !== '/watch') throw bad();
-    if (!list || !ID.test(list)) throw bad('Paste a YouTube or YouTube Music playlist link.');
+    if (!list || !ID.test(list)) throw bad('Paste a Spotify playlist link (open.spotify.com/playlist/…).');
     // A song opened in YouTube Music carries its generated radio mix (RD…): the link means that song.
     if (u.searchParams.get('v') && list.startsWith('RD')) throw bad();
     // YouTube Music playlists are ordinary YouTube playlists underneath.
@@ -54,13 +54,13 @@ export function parsePlaylistUrl(raw: string): Target {
     const m = /^\/([a-z]{2})\/playlist\/([^/]{1,120})\/(pl\.[A-Za-z0-9]{8,64})\/?$/.exec(
       u.pathname,
     );
-    if (!m) throw bad('Paste an Apple Music playlist link (music.apple.com/…/playlist/…).');
+    if (!m) throw bad('Paste a Spotify playlist link (open.spotify.com/playlist/…).');
     return {
       platform: 'apple',
       url: `https://music.apple.com/${m[1]}/playlist/${encodeURIComponent(decodeURIComponent(m[2]!))}/${m[3]}`,
     };
   }
-  throw bad('Playlists from Spotify, YouTube Music, YouTube and Apple Music are supported.');
+  throw bad('Paste a Spotify playlist link (open.spotify.com/playlist/…).');
 }
 
 const MAX_PAGE_BYTES = 4 * 1024 * 1024;

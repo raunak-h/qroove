@@ -561,7 +561,7 @@ export default function PlayerPage() {
                   ? `File found: ${match.track.file.name}`
                   : `Probable file (title only): ${match.track.file.name}`
                 : source
-                  ? `Plays in the ${source.kind === 'spotify' ? 'Spotify' : 'YouTube'} player.`
+                  ? 'Plays in its official player.'
                   : 'No matching file on this device.'}
             </p>
             {!match && source?.kind === 'spotify' ? (
@@ -675,8 +675,8 @@ export default function PlayerPage() {
       <ErrorLine error={error} />
       <p className="muted small">
         Only play recordings you are licensed to play at this venue. Qroove never streams or copies
-        music: Spotify and YouTube songs play in those services&apos; own players. Browsers need one
-        tap to start audio, and Bluetooth routing is controlled by the device.
+        music: songs play in the music service&apos;s own player. Browsers need one tap to start
+        audio, and Bluetooth routing is controlled by the device.
       </p>
       <p>
         <Link to={`/admin/${eventId}`}>Back to organiser page</Link>

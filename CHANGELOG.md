@@ -13,6 +13,7 @@ versioning: [SemVer](https://semver.org/).
 
 ### Changed
 - Joining requires a name.
+- The interface and its messages now mention only Spotify, for the first test.
 - One "Add music" card replaces the separate song form and the music-plus-sign section. It takes a link and a top-level genre, and warns which other genres to remove. Artist, length and typed titles are no longer asked for.
 - The live status is one small green dot under the event name in the header, with no "Live" text.
 

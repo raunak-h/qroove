@@ -128,7 +128,7 @@ describe('PlayerPage with a Spotify or YouTube link', () => {
     const user = userEvent.setup();
     open();
     await ready(user);
-    await screen.findByText(/Plays in the Spotify player/);
+    await screen.findByText(/Plays in its official player/);
     await user.click(screen.getByRole('button', { name: 'Start' }));
     await waitFor(() => expect(embedEvents).not.toBeNull());
     expect(calls.some((c) => c.url.endsWith('/player/started'))).toBe(false); // not until audio plays

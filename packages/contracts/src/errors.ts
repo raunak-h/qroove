@@ -75,12 +75,12 @@ export const ERROR_COPY: Record<ErrorCode, ErrorCopy> = {
   },
   UNSUPPORTED_LINK: {
     message: 'That link is not from a supported service.',
-    action: 'Paste a Spotify, YouTube or Apple Music link, or enter the song manually.',
+    action: 'Paste a Spotify link to a playlist or a song.',
     http: 422,
   },
   METADATA_UNAVAILABLE: {
     message: 'We could not look up that song.',
-    action: 'Enter the title and artist manually.',
+    action: 'Check the link is public, or try another one.',
     http: 502,
   },
   RATE_LIMITED: {

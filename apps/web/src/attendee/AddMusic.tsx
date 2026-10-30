@@ -116,7 +116,7 @@ export function AddMusic({
     <section className="card stack" aria-labelledby="am-h">
       <h2 id="am-h">Add music</h2>
       <p className="muted small">
-        Paste a link to a playlist or a song from Spotify or YouTube Music. Long-press the box to
+        Paste a link to a playlist or a song from Spotify. Long-press the box to
         paste, or use the button.
       </p>
       <div className="row">

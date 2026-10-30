@@ -53,7 +53,7 @@ export function parseLink(raw: string): ParsedLink {
     const song = u.searchParams.get('i');
     const m = /^\/[a-z]{2}\/song\/(?:[^/]+\/)?(\d{5,})\/?$/.exec(u.pathname);
     const id = song && /^\d{5,}$/.test(song) ? song : m?.[1];
-    if (!id) throw unsupported('Paste a link to a single Apple Music song.');
+    if (!id) throw unsupported('Paste a Spotify link to a playlist or a song.');
     return { platform: 'apple', id, canonicalUrl: `https://music.apple.com/song/${id}` };
   }
   if (host === 'youtu.be') {
@@ -64,7 +64,7 @@ export function parseLink(raw: string): ParsedLink {
   if (YOUTUBE_HOSTS.has(host)) {
     const v = u.pathname === '/watch' ? u.searchParams.get('v') : null;
     if (!v || !/^[A-Za-z0-9_-]{11}$/.test(v))
-      throw unsupported('Paste a link to a single YouTube video.');
+      throw unsupported('Paste a Spotify link to a playlist or a song.');
     return youtube(v);
   }
   throw unsupported();

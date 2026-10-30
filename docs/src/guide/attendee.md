@@ -39,7 +39,7 @@ other attendees do not see it in the queue. Your device gets a private pass for 
 
 There is one place to add music, for a playlist or a single song.
 
-1. Paste a link from Spotify or YouTube Music (YouTube and Apple Music links work too). Long-press the box to paste, or tap **Paste**, which reads your clipboard only when you tap it. Title, artist and length come from the link.
+1. Paste a link from Spotify. Long-press the box to paste, or tap **Paste**, which reads your clipboard only when you tap it. Title, artist and length come from the link.
 2. Pick the link's **genre**. Qroove then reminds you to remove songs of other genres, for example _You selected SALSA. Remove all BACHATA, CHA-CHA, OTHER songs._
 3. Sort the list: drag to reorder, swipe left to remove, swipe right to send to the top. Songs beyond your allowance are greyed out.
 4. Tap **Add**.

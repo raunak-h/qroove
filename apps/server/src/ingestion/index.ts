@@ -100,7 +100,7 @@ export function createIngestion(opts: IngestionOptions): Ingestion {
       } catch {
         throw new DomainError(
           'UNSUPPORTED_LINK',
-          'Paste a link to a playlist or a song from Spotify, YouTube Music, YouTube or Apple Music.',
+          'Paste a Spotify link to a playlist or a song.',
         );
       }
       const song = await fetchSong(opts.fetch, link);
