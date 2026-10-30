@@ -1,5 +1,5 @@
 import type { RulesSnapshot } from '@qroove/contracts';
-import { genresOf } from '@qroove/config';
+import { BRAND, genresOf } from '@qroove/config';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { GenreDot, StyleSwatches } from './Genre';
@@ -52,7 +52,22 @@ export function RulesList({ rules }: { rules: RulesSnapshot }) {
   );
 }
 
-/** Top-right menu: session rules (only on event pages), theme, privacy. */
+const Burger = () => (
+  <svg
+    viewBox="0 0 24 24"
+    width="24"
+    height="24"
+    aria-hidden="true"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+  >
+    <path d="M4 6h16M4 12h16M4 18h16" />
+  </svg>
+);
+
+/** Top-right controls: the sun/moon toggle and the three-line menu (Docs, Privacy, Source; rules on event pages). */
 export function AppMenu() {
   const { rules } = useContext(RulesCtx);
   const [open, setOpen] = useState(false);
@@ -65,15 +80,17 @@ export function AppMenu() {
   }, [open]);
   return (
     <div className="menu">
+      <ThemeToggle />
       <button
         type="button"
-        className="btn ghost"
+        className="btn ghost icon-btn"
+        aria-label="Menu"
         aria-haspopup="true"
         aria-expanded={open}
         aria-controls="app-menu"
         onClick={() => setOpen(!open)}
       >
-        Menu
+        <Burger />
       </button>
       {open ? (
         <div id="app-menu" className="menu-panel card" role="group" aria-label="Menu">
@@ -90,10 +107,15 @@ export function AppMenu() {
               {showRules ? <RulesList rules={rules} /> : null}
             </div>
           ) : null}
-          <ThemeToggle />
+          <a href={BRAND.docsPath} className="btn ghost">
+            Docs
+          </a>
           <Link to="/privacy" className="btn ghost" onClick={() => setOpen(false)}>
             Privacy
           </Link>
+          <a href={BRAND.repoUrl} className="btn ghost" rel="noopener">
+            Source
+          </a>
         </div>
       ) : null}
     </div>

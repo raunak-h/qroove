@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -75,13 +75,26 @@ describe('Landing', () => {
     await waitFor(() => expect(screen.getByText('No event has that code.')).toBeInTheDocument());
   });
 
-  it('has the logo as a home link on the left, and the rules/theme menu on the right', async () => {
+  it('has the logo as a home link on the left; a sun/moon toggle and a three-line menu on the right', async () => {
+    document.documentElement.dataset.theme = 'dark';
     home();
     const user = userEvent.setup();
     expect(screen.getByRole('link', { name: 'Qroove home' })).toHaveAttribute('href', '/');
-    expect(screen.queryByRole('button', { name: /Session rules/ })).toBeNull(); // no event, no rules
-    await user.click(screen.getByRole('button', { name: 'Menu' }));
-    expect(screen.getByRole('group', { name: 'Menu' })).toHaveTextContent('Privacy');
+    const menu = screen.getByRole('button', { name: 'Menu' });
+    expect(menu).toHaveTextContent(''); // an icon, not the word
+    // The theme toggle sits beside the menu, outside it.
+    await user.click(menu);
+    const panel = screen.getByRole('group', { name: 'Menu' });
+    expect(within(panel).queryByRole('button', { name: /mode/i })).toBeNull();
+    expect(
+      within(panel)
+        .getAllByRole('link')
+        .map((a) => a.textContent),
+    ).toEqual(['Docs', 'Privacy', 'Source']);
+    expect(within(panel).queryByRole('button', { name: /Session rules/ })).toBeNull(); // no event
+    await user.click(screen.getByRole('button', { name: 'Switch to light mode' }));
+    expect(document.documentElement.dataset.theme).toBe('light');
+    expect(screen.getByRole('button', { name: 'Switch to dark mode' })).toBeInTheDocument();
   });
 });
 

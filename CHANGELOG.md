@@ -5,6 +5,10 @@ versioning: [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Wheel pickers settle faster: the value follows the wheel live, and the rest position is confirmed on `scrollend` (fallback 40 ms, was 90 ms).
+- Header: the menu is a three-line icon holding Docs, Privacy and Source (plus session rules on event pages); light/dark is a sun/moon toggle beside it.
+
 ## [0.3.0] - 2026-10-29
 
 ### Added

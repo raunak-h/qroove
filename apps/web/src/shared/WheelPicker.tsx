@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 
 const ITEM = 44; // px; also the touch-target size
 const ROWS = 5;
+const SETTLE_MS = 40; // was 90: the wheel now follows the scroll live, this only confirms the rest position
 
 /**
  * A vertical drum: scroll-snap rows that fade away above and below the highlighted one. The only
@@ -26,30 +27,64 @@ export function WheelPicker<T extends string | number>({
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const settle = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const frame = useRef<number | undefined>(undefined);
+  /** True while a finger or momentum is moving the wheel: external-value syncing must not fight it. */
+  const spinning = useRef(false);
+  /** The last value we reported, so a stale closure never reports the same row twice. */
+  const reported = useRef<T>(value);
   const index = Math.max(0, values.indexOf(value));
+  // Follow the parent when it changes the value itself (defaults, keyboard, clamping).
+  useEffect(() => {
+    reported.current = value;
+  }, [value]);
 
   // Follow external changes (defaults, keyboard) without fighting a spin in progress.
   useEffect(() => {
     const el = scroller.current;
-    if (el && Math.abs(el.scrollTop - index * ITEM) > 1) {
+    if (el && !spinning.current && Math.abs(el.scrollTop - index * ITEM) > 1) {
       el.scrollTo?.({ top: index * ITEM, behavior: 'smooth' });
       el.scrollTop = index * ITEM;
     }
   }, [index]);
 
-  useEffect(() => () => clearTimeout(settle.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(settle.current);
+      if (frame.current !== undefined) cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
+
+  // `scrollend` fires the moment the snap finishes, so the wheel settles without waiting on a timer.
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el || !('onscrollend' in window)) return;
+    const done = () => {
+      clearTimeout(settle.current);
+      spinning.current = false;
+      commitFromScroll();
+    };
+    el.addEventListener('scrollend', done);
+    return () => el.removeEventListener('scrollend', done);
+  });
 
   function commitFromScroll() {
     const el = scroller.current;
     if (!el) return;
     const i = Math.min(values.length - 1, Math.max(0, Math.round(el.scrollTop / ITEM)));
     const v = values[i]!;
-    if (v !== value) onChange(v);
+    if (v !== reported.current) {
+      reported.current = v;
+      onChange(v);
+    }
   }
 
   const move = (to: number) => {
     const i = Math.min(values.length - 1, Math.max(0, to));
-    if (values[i] !== value) onChange(values[i]!);
+    if (values[i] !== value) {
+      reported.current = values[i]!;
+      onChange(values[i]!);
+    }
   };
 
   return (
@@ -82,8 +117,20 @@ export function WheelPicker<T extends string | number>({
           }
         }}
         onScroll={() => {
+          spinning.current = true;
+          // Follow the wheel live, so the number under the highlight changes as it passes.
+          if (frame.current === undefined) {
+            frame.current = requestAnimationFrame(() => {
+              frame.current = undefined;
+              commitFromScroll();
+            });
+          }
+          // Fallback for browsers without `scrollend`: short, since the snap itself is the slow part.
           clearTimeout(settle.current);
-          settle.current = setTimeout(commitFromScroll, 90);
+          settle.current = setTimeout(() => {
+            spinning.current = false;
+            commitFromScroll();
+          }, SETTLE_MS);
         }}
       >
         <div style={{ height: ITEM * 2 }} aria-hidden="true" />

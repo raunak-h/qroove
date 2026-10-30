@@ -942,3 +942,17 @@ body.console .layout main {
 .playlist-cell.missing input {
   border-color: #ffb35c;
 }
+.menu {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.menu-panel {
+  right: 0;
+}
+.icon-btn {
+  width: 44px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+}

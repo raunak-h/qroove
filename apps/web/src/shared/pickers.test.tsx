@@ -53,16 +53,32 @@ describe('WheelPicker', () => {
   describe('spinning', () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
-    it('settles on the row that scrolled to the centre', () => {
+    it('follows the wheel live, and confirms the rest position within 40 ms of the last scroll', () => {
       const seen: number[] = [];
       const { container } = render(<Wheel onChange={(n) => seen.push(n)} />);
       const scroller = container.querySelector('.wheel-scroll') as HTMLElement;
-      scroller.scrollTop = 44 * 3; // three rows down: 2:00 -> 2:45 is index 7 + ... start index is 7, so 3 rows = index 3
+      scroller.scrollTop = 44 * 3; // index 3 of 15-minute steps starting at 0:15 = 1:00
       fireEvent.scroll(scroller);
       act(() => {
-        vi.advanceTimersByTime(120);
+        vi.advanceTimersByTime(20); // one animation frame: the number already follows the wheel
       });
-      expect(seen).toEqual([60]); // index 3 of 15-minute steps starting at 0:15 = 1:00
+      expect(seen).toEqual([60]);
+      scroller.scrollTop = 44 * 4;
+      fireEvent.scroll(scroller);
+      act(() => {
+        vi.advanceTimersByTime(60); // well inside the old 90 ms delay
+      });
+      expect(seen).toEqual([60, 75]);
+    });
+    it('does not fight an ongoing spin by scrolling back to the old value', () => {
+      const { container } = render(<Wheel />);
+      const scroller = container.querySelector('.wheel-scroll') as HTMLElement;
+      scroller.scrollTop = 44 * 6;
+      fireEvent.scroll(scroller);
+      act(() => {
+        vi.advanceTimersByTime(20);
+      });
+      expect(scroller.scrollTop).toBe(44 * 6); // left where the user put it
     });
   });
 });
