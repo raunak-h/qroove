@@ -13,6 +13,7 @@ versioning: [SemVer](https://semver.org/).
 
 ### Changed
 - Joining requires a name.
+- Landing page: the "Start from a playlist" button and the tagline are gone. The footer is now a short copyright and contact note there, and a single copyright line on every other page. The licence moved to a new License page in the docs.
 - The interface and its messages now mention only Spotify, for the first test.
 - Tidier player and guest pages: local files are an optional collapsed section, the audio bar appears only when a file plays, and empty or repeated guest sections are gone.
 - One "Add music" card replaces the separate song form and the music-plus-sign section. It takes a link and a top-level genre, and warns which other genres to remove. Artist, length and typed titles are no longer asked for.

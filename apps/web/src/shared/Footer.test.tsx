@@ -1,15 +1,34 @@
-import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
+import { afterEach, describe, expect, it } from 'vitest';
 import { Footer } from './Footer';
 
+const at = (path: string) =>
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <Footer />
+    </MemoryRouter>,
+  );
+
 describe('Footer', () => {
-  it('links to the company and states the initiative', () => {
-    render(<Footer />);
-    const link = screen.getByRole('link', { name: 'Sataklela OÜ' });
-    expect(link).toHaveAttribute('href', 'https://sataklela.com');
-    expect(link).toHaveAttribute('rel', 'noopener');
-    expect(screen.getByText(/CSR initiative/)).toBeInTheDocument();
-    expect(screen.getByText(/AGPL-3\.0/)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Docs' })).toHaveAttribute('href', '/docs');
+  afterEach(cleanup);
+
+  it('introduces the company on the landing page', () => {
+    at('/');
+    expect(screen.getByText('Copyright © Sataklela OÜ 2026')).toBeInTheDocument();
+    expect(
+      screen.getByText('Qroove is a CSR initiative by the core development team of Sataklela OÜ.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Contact us' })).toHaveAttribute(
+      'href',
+      'https://sataklela.com',
+    );
+    expect(screen.getByText(/We're a friendly bunch :\)/)).toBeInTheDocument();
+  });
+
+  it('is one line everywhere else', () => {
+    const { container } = at('/e/ABC123');
+    expect(container.textContent).toBe('Copyright © Sataklela 2026');
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 });

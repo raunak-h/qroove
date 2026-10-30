@@ -1,4 +1,3 @@
-import { BRAND } from '@qroove/config';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { api, ApiError } from '../shared/api';
@@ -52,13 +51,7 @@ export function Landing() {
         <Link to="/new" className="btn primary">
           Create an event
         </Link>
-        <Link to="/new#playlist" className="btn ghost">
-          Start from a playlist
-        </Link>
       </div>
-      <p className="muted small">
-        {BRAND.tagline} <Link to="/privacy">Privacy</Link>
-      </p>
     </div>
   );
 }

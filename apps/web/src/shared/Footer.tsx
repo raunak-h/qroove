@@ -1,27 +1,25 @@
-import { BRAND, footerText } from '@qroove/config';
+import { BRAND, copyrightLine, shortCopyrightLine } from '@qroove/config';
+import { useLocation } from 'react-router';
 
-/** One thin line of small text (it wraps to two on a narrow phone). */
+/** The landing page says who we are; every other page keeps the footer as thin as possible. */
 export function Footer() {
-  const text = footerText();
-  const [before, after] = text.split(BRAND.company.name) as [string, string];
+  const { pathname } = useLocation();
+  if (pathname !== '/') {
+    return (
+      <footer className="footer">
+        <p>{shortCopyrightLine()}</p>
+      </footer>
+    );
+  }
   return (
     <footer className="footer">
+      <p>{copyrightLine()}</p>
+      <p>{BRAND.initiative}</p>
       <p>
-        {before}
         <a href={BRAND.company.url} rel="noopener">
-          {BRAND.company.name}
-        </a>
-        {after}
-        <span className="sep" aria-hidden="true">
-          ·
-        </span>
-        <a href={BRAND.docsPath}>Docs</a>
-        <span className="sep" aria-hidden="true">
-          ·
-        </span>
-        <a href={BRAND.repoUrl} rel="noopener">
-          Source
-        </a>
+          Contact us
+        </a>{' '}
+        to know more. {BRAND.contactLine}
       </p>
     </footer>
   );
