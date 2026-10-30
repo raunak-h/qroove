@@ -116,8 +116,8 @@ export function AddMusic({
     <section className="card stack" aria-labelledby="am-h">
       <h2 id="am-h">Add music</h2>
       <p className="muted small">
-        Paste a link to a playlist or a song from Spotify. Long-press the box to
-        paste, or use the button.
+        Paste a link to a playlist or a song from Spotify. Long-press the box to paste, or use the
+        button.
       </p>
       <div className="row">
         <PlaylistInput
@@ -126,7 +126,7 @@ export function AddMusic({
           onChange={setUrl}
           onTracks={onTracks}
           label="Playlist or song link"
-          placeholder="https://open.spotify.com/playlist/…"
+          placeholder="Spotify link"
         />
         <button type="button" className="btn" onClick={() => void paste()}>
           Paste

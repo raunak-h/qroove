@@ -116,7 +116,9 @@ function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
       </header>
 
       <NowPlaying view={view} />
-      {creds ? <MyNextSong view={view} mine={mine} serverNow={now + clockOffset} /> : null}
+      {creds && mine?.requests.length ? (
+        <MyNextSong view={view} mine={mine} serverNow={now + clockOffset} />
+      ) : null}
       {ended ? null : creds ? (
         <AddMusic
           view={view}
@@ -138,9 +140,6 @@ function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
         />
       ) : null}
       <UpNext view={view} mineIds={mineIds} />
-      <p className="muted small">
-        <Link to="/privacy">Privacy</Link>
-      </p>
     </div>
   );
 }

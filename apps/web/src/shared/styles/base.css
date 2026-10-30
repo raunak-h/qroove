@@ -1279,3 +1279,18 @@ body.console .layout main {
   flex: 1;
   min-width: 0;
 }
+.playlist-status:empty {
+  display: none;
+}
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+.check-row input {
+  flex: none;
+  width: 1.5rem;
+  height: 1.5rem;
+  min-height: 0;
+  margin: 0;
+}

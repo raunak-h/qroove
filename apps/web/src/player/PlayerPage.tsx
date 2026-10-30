@@ -390,7 +390,7 @@ export default function PlayerPage() {
   return (
     <main className="stack">
       <header className="row between">
-        <h1>Player · {s.view.name}</h1>
+        <h1>Player</h1>
       </header>
 
       {notice ? (
@@ -451,8 +451,8 @@ export default function PlayerPage() {
         {soundChecked ? <p role="status">Sound check done.</p> : null}
       </section>
 
-      <section className="card stack" aria-labelledby="lib-h">
-        <h2 id="lib-h">3 · Music on this device</h2>
+      <details className="card stack">
+        <summary>Use audio files on this device (optional, {library.length} loaded)</summary>
         <p className="muted">
           Choose audio files you are allowed to play. They stay on this device and are never
           uploaded.
@@ -483,10 +483,7 @@ export default function PlayerPage() {
             }}
           />
         </label>
-        <p>
-          {library.length} {library.length === 1 ? 'file' : 'files'} loaded.
-        </p>
-        <label className="row">
+        <label className="check-row">
           <input
             type="checkbox"
             checked={remember}
@@ -502,7 +499,7 @@ export default function PlayerPage() {
             </span>
           </span>
         </label>
-      </section>
+      </details>
 
       <section className="card stack" aria-labelledby="np-h" aria-live="polite">
         <h2 id="np-h">Now</h2>
@@ -527,7 +524,7 @@ export default function PlayerPage() {
         <audio
           ref={audio}
           controls
-          hidden={embed !== null}
+          hidden={embed !== null || audioId === null}
           onPlaying={() => void onPlaying((audio.current?.duration ?? 0) * 1000 || null)}
           onEnded={() => void onEnded()}
           onError={() => void onMediaError()}
