@@ -6,9 +6,7 @@ import { useMenuRules } from '../shared/menu';
 import { clearCreds, loadCreds } from '../shared/storage';
 import { useLockedPage } from '../shared/useLockedPage';
 import { useEventStream, useTick } from '../shared/useEventStream';
-import { AddPlaylist } from './AddPlaylist';
-import { AddSong } from './AddSong';
-import { ConnectionBadge } from './ConnectionBadge';
+import { AddMusic } from './AddMusic';
 import { JoinCard } from './JoinCard';
 import { MyNextSong } from './MyNextSong';
 import { MyRequests } from './MyRequests';
@@ -60,7 +58,7 @@ export function EventPage() {
 
 function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
   const { view, connection, error, clockOffset } = useEventStream(eventId, slug);
-  useMenuRules(view?.rules, view?.name);
+  useMenuRules(view?.rules, view?.name, connection);
   const [creds, setCreds] = useState<Creds | null>(() => loadCreds(eventId));
   const [mine, setMine] = useState<Mine | null>(null);
   const now = useTick(1000);
@@ -103,44 +101,33 @@ function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
   }
 
   const ended = view.state === 'ENDED' || view.state === 'ARCHIVED';
+  const status = ended
+    ? 'This event has ended.'
+    : view.state === 'DRAFT'
+      ? 'Not started yet.'
+      : view.state === 'PAUSED' || view.state === 'TRANSFERRING'
+        ? 'Session paused.'
+        : null;
   return (
     <div className="stack">
       <header>
         <h1 className="sr-only">{view.name}</h1>
-        <p className="muted">
-          {ended
-            ? 'This event has ended.'
-            : view.state === 'DRAFT'
-              ? 'Not started yet.'
-              : view.state === 'PAUSED' || view.state === 'TRANSFERRING'
-                ? 'Session paused.'
-                : 'Live.'}{' '}
-        </p>
-        <ConnectionBadge connection={connection} />
+        {status ? <p className="muted">{status}</p> : null}
       </header>
 
       <NowPlaying view={view} />
       {creds ? <MyNextSong view={view} mine={mine} serverNow={now + clockOffset} /> : null}
-      {creds ? (
-        <AddSong
-          view={view}
-          eventId={eventId}
-          creds={creds}
-          full={mine !== null && mine.accepted >= mine.limit}
-          onAdded={reload}
-        />
-      ) : ended ? null : (
-        <JoinCard eventId={eventId} onJoined={setCreds} />
-      )}
-      {creds ? (
-        <AddPlaylist
+      {ended ? null : creds ? (
+        <AddMusic
           view={view}
           eventId={eventId}
           creds={creds}
           remaining={mine ? Math.max(0, mine.limit - mine.accepted) : 0}
           onAdded={reload}
         />
-      ) : null}
+      ) : (
+        <JoinCard eventId={eventId} onJoined={setCreds} />
+      )}
       {creds && mine ? (
         <MyRequests
           mine={mine}

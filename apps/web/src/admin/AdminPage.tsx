@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
-import { ConnectionBadge } from '../attendee/ConnectionBadge';
 import { ApiError } from '../shared/api';
 import { useMenuRules } from '../shared/menu';
 import { useLockedPage } from '../shared/useLockedPage';
@@ -57,7 +56,7 @@ export default function AdminPage() {
   const [sub, setSub] = useState<Sub | null>(null);
   const pager = useRef<HTMLDivElement>(null);
   useLockedPage();
-  useMenuRules(state?.rules, state?.view.name);
+  useMenuRules(state?.rules, state?.view.name, connection);
   useEffect(() => {
     document.body.classList.add('console');
     return () => document.body.classList.remove('console');
@@ -88,10 +87,7 @@ export default function AdminPage() {
     <div className="console">
       <header className="console-head">
         <h1 className="sr-only">{v.name}</h1>
-        <div className="row muted small">
-          <span>{v.state.toLowerCase()}</span>
-          <ConnectionBadge connection={connection} />
-        </div>
+        {v.state === 'ACTIVE' ? null : <p className="muted small">{v.state.toLowerCase()}</p>}
         <ErrorLine error={error} />
       </header>
       <div

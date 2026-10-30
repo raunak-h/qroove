@@ -16,6 +16,7 @@ export function PlaylistInput({
   label,
   style,
   missing = false,
+  placeholder,
 }: {
   value: string;
   onChange: (v: string) => void;
@@ -25,6 +26,7 @@ export function PlaylistInput({
   label: string;
   style?: StyleId;
   missing?: boolean;
+  placeholder?: string;
 }) {
   const pl = usePlaylist(value);
   useEffect(() => {
@@ -35,9 +37,11 @@ export function PlaylistInput({
     <div className={`playlist-cell${missing ? ' missing' : ''}`}>
       {style ? <GenreSwatch style={style} size={22} /> : null}
       <input
-        type="url"
+        type="text"
+        autoComplete="off"
         inputMode="url"
         aria-label={label}
+        placeholder={placeholder}
         aria-invalid={missing || pl.status === 'error' || undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}

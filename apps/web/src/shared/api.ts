@@ -1,10 +1,4 @@
-import type {
-  EventPublicView,
-  JoinResponse,
-  MyRequests,
-  RequestView,
-  StyleId,
-} from '@qroove/contracts';
+import type { EventPublicView, JoinResponse, MyRequests, StyleId } from '@qroove/contracts';
 
 export interface ResolvedLink {
   title: string;
@@ -112,26 +106,6 @@ export const api = {
     }),
   myRequests: (eventId: string, creds: Creds) =>
     request<MyRequests>('GET', `/api/events/${eventId}/my-requests`, { creds }),
-  resolveLink: (url: string, signal?: AbortSignal) =>
-    request<ResolvedLink>('POST', '/api/resolve-link', {
-      body: { url },
-      ...(signal ? { signal } : {}),
-    }),
-  submit: (
-    eventId: string,
-    creds: Creds,
-    body: {
-      style: StyleId;
-      url?: string;
-      manual?: { title: string; artist?: string; durationMs?: number };
-    },
-    idempotencyKey: string,
-  ) =>
-    request<{ request: RequestView }>('POST', `/api/events/${eventId}/requests`, {
-      body,
-      creds,
-      idempotencyKey,
-    }),
   resolvePlaylist: (url: string, signal?: AbortSignal) =>
     request<{ tracks: PlaylistSong[] }>('POST', '/api/resolve-playlist', {
       body: { url },

@@ -56,6 +56,8 @@ export async function buildApp(
   });
 
   await app.register(helmet, {
+    // YouTube's embed refuses to play without a referrer. Only the origin is sent cross-origin.
+    referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
@@ -69,7 +71,9 @@ export async function buildApp(
         mediaSrc: ["'self'", 'blob:'],
         connectSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
+        // Official players only (see ADR 0017); no audio ever passes through this server.
+        scriptSrc: ["'self'", 'https://www.youtube.com'],
+        frameSrc: ['https://www.youtube.com', 'https://open.spotify.com'],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
         baseUri: ["'self'"],

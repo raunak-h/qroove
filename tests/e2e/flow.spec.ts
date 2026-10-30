@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { addSong, expectAccessible, newPage } from './helpers';
+import { addSong, joinAs, expectAccessible, newPage } from './helpers';
 
 /** The page never needs vertical scrolling (the queue list is the one allowed exception). */
 async function expectNoScroll(page: Page, label: string) {
@@ -113,7 +113,7 @@ test('create → run → play manually → hand over → end → carry over', as
     people.push(p);
     await p.page.goto(joinUrl.pathname);
     await expect(p.page.getByRole('button', { name: 'Join this event' })).toBeVisible();
-    await p.page.getByRole('button', { name: 'Join this event' }).click();
+    await joinAs(p.page, `Guest ${i + 1}`);
     if (i === 0) await expectAccessible(p.page, '/e/:slug (joined)');
     await addSong(p.page, title!, artist!, style!);
   }

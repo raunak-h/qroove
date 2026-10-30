@@ -97,7 +97,8 @@ export type OkResponse = z.infer<typeof OkResponse>;
 export const PublicResponse = EventPublicView;
 
 // POST /api/events/:id/join
-export const JoinBody = z.object({ nickname: Nickname.optional() });
+/** A name is required so the organiser can tell who added which song. */
+export const JoinBody = z.object({ nickname: Nickname });
 export const JoinResponse = z.object({ participantId: Id, token: z.string() });
 export type JoinResponse = z.infer<typeof JoinResponse>;
 

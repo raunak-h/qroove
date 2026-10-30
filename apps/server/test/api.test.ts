@@ -16,7 +16,7 @@ async function setup(opts: Parameters<typeof testApp>[0] = {}) {
   const id: string = created.eventId;
   const join = async (nickname?: string) => {
     const r = await t.api.call('POST', `/api/events/${id}/join`, {
-      body: nickname ? { nickname } : {},
+      body: { nickname: nickname ?? 'Guest' },
     });
     expect(r.status).toBe(200);
     return { participantId: r.json.participantId as string, token: r.json.token as string };
@@ -39,8 +39,12 @@ async function setup(opts: Parameters<typeof testApp>[0] = {}) {
 describe('joining with the room code', () => {
   it('lets anyone with the permanent room code join, and the QR link is the same public link', async () => {
     const { api, id, created } = await setup();
-    const ok = await api.call('POST', `/api/events/${id}/join`, { body: {} });
+    const ok = await api.call('POST', `/api/events/${id}/join`, { body: { nickname: 'Ana' } });
     expect(ok.status).toBe(200);
+    for (const body of [{}, { nickname: '   ' }]) {
+      const nameless = await api.call('POST', `/api/events/${id}/join`, { body });
+      expect(nameless.status).toBe(400);
+    }
     // The QR code is just a backup for the typed code: it opens the same public page.
     expect(created.joinUrl).toMatch(new RegExp(`/e/${created.slug}$`));
     const st = await api.admin('GET', id, '/admin/state');
@@ -223,9 +227,10 @@ describe('attendees', () => {
     expect(dup.json.error.message).toContain('Song 1');
     expect((await api.call('GET', '/api/events/by-slug/ZZZZZZ')).status).toBe(404);
     expect((await manual(await join(), 'x', 'tango')).status).toBe(400);
-    expect((await api.call('POST', `/api/events/nope/join`, { body: {} })).json.error.code).toBe(
-      'NOT_FOUND',
-    );
+    expect(
+      (await api.call('POST', `/api/events/nope/join`, { body: { nickname: 'Ana' } })).json.error
+        .code,
+    ).toBe('NOT_FOUND');
   });
 
   it('withdraws a request and frees the slot', async () => {

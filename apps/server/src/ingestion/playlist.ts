@@ -2,7 +2,7 @@ import { DomainError } from '@qroove/contracts';
 import { DEFAULT_DURATION_MS } from '@qroove/scheduler';
 import { fingerprint } from '../domain/keys.js';
 import { ALLOWED_HOSTS, type FetchLike } from './fetch.js';
-import type { Platform } from './parseLink.js';
+import type { ParsedLink, Platform } from './parseLink.js';
 
 export interface PlaylistTrack {
   title: string;
@@ -45,6 +45,8 @@ export function parsePlaylistUrl(raw: string): Target {
     const list = u.searchParams.get('list');
     if (u.pathname !== '/playlist' && u.pathname !== '/watch') throw bad();
     if (!list || !ID.test(list)) throw bad('Paste a YouTube or YouTube Music playlist link.');
+    // A song opened in YouTube Music carries its generated radio mix (RD…): the link means that song.
+    if (u.searchParams.get('v') && list.startsWith('RD')) throw bad();
     // YouTube Music playlists are ordinary YouTube playlists underneath.
     return { platform: 'youtube', url: `https://www.youtube.com/playlist?list=${list}` };
   }
@@ -279,6 +281,66 @@ export function parseYouTube(html: string): PlaylistTrack[] {
     }
   });
   return out;
+}
+
+/** A Spotify song's public embed page has its title, artists and length. */
+export function parseSpotifySong(html: string, sourceUrl: string): PlaylistTrack | null {
+  let song: PlaylistTrack | null = null;
+  walk(scriptJson(html, /<script id="__NEXT_DATA__"[^>]*>/), (o) => {
+    const e = o.entity;
+    if (song || !isObj(e) || e.type !== 'track') return;
+    const title = str(e.title) ?? str(e.name);
+    if (!title) return;
+    const artists = Array.isArray(e.artists)
+      ? e.artists.map((a) => (isObj(a) ? str(a.name) : null)).filter(Boolean)
+      : [];
+    song = {
+      title,
+      artist: artists.length ? artists.join(', ') : null,
+      durationMs: typeof e.duration === 'number' && e.duration > 0 ? Math.round(e.duration) : null,
+      sourceUrl,
+    };
+  });
+  return song;
+}
+
+/** A YouTube watch page has the video's title, channel and length. */
+export function parseYouTubeSong(html: string, sourceUrl: string): PlaylistTrack | null {
+  const data = jsonAfter(html, 'ytInitialPlayerResponse = ');
+  const d = isObj(data) && isObj(data.videoDetails) ? data.videoDetails : null;
+  const raw = d ? str(d.title) : null;
+  if (!d || !raw) return null;
+  const { title, artist } = cleanVideoTitle(raw, str(d.author));
+  const secs = Number(d.lengthSeconds);
+  return {
+    title,
+    artist,
+    durationMs: Number.isFinite(secs) && secs > 0 ? secs * 1000 : null,
+    sourceUrl,
+  };
+}
+
+/** Best effort: null when the page cannot be read or parsed, so the caller can try other sources. */
+export async function fetchSong(
+  doFetch: FetchLike,
+  link: ParsedLink,
+): Promise<PlaylistTrack | null> {
+  try {
+    if (link.platform === 'spotify') {
+      const url = `https://open.spotify.com/embed/track/${link.id}`;
+      return parseSpotifySong(
+        await fetchPage(doFetch, { platform: 'spotify', url }),
+        link.canonicalUrl,
+      );
+    }
+    if (link.platform === 'youtube') {
+      const html = await fetchPage(doFetch, { platform: 'youtube', url: link.canonicalUrl });
+      return parseYouTubeSong(html, link.canonicalUrl);
+    }
+  } catch {
+    /* fall through */
+  }
+  return null;
 }
 
 export async function fetchPlaylist(doFetch: FetchLike, rawUrl: string): Promise<Playlist> {

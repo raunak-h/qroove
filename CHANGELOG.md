@@ -6,10 +6,20 @@ versioning: [SemVer](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- Spotify and YouTube songs now play on the player page, in each service's official player, and the queue advances when they end. Spotify needs a browser signed in to Premium; a 30-second preview is refused rather than counted as played.
+- Song links work wherever playlist links do, with title, artist and length taken from the source. A YouTube Music song link counts as that song, not its radio mix.
 - Guests can add a whole playlist: paste a link, sort the songs (drag to reorder, swipe left to remove with a red bin, swipe right to send to the top with a green arrow), and add the top songs that fit their remaining allowance; the rest are greyed out. `POST /api/resolve-playlist` and `POST /api/events/:id/requests/batch`.
 - The organiser's create page uses the same sortable list for playlist songs (greyed out beyond the planned time minus one minute); the create request now takes the sorted `songs` instead of playlist links.
 
 ### Changed
+- Joining requires a name.
+- One "Add music" card replaces the separate song form and the music-plus-sign section. It takes a link and a top-level genre, and warns which other genres to remove. Artist, length and typed titles are no longer asked for.
+- The live status is one small green dot under the event name in the header, with no "Live" text.
+
+### Fixed
+- Long-press paste works in fields on organiser, player and event pages.
+
+### Changed (also)
 - Joining: the permanent 6-character room code (shown as two triplets, `ABC-123`) now joins on its own, so remote classes can use it, and the landing page opens the event as soon as the sixth character is typed. The QR code stays on the Invite page as a non-verbal backup (it is the same public link). The secret join key is gone.
 - The event name moves to the header on organiser and attendee pages: very small, lower-case, hyphen-separated (`mango-octopus-rye`), Courier New, in the menu's colour and not selectable, so it reads as a label. The big heading is kept for screen readers only.
 - Creating an event (or carrying one over) goes straight to the organiser page. The interstitial that showed the organiser link and recovery secret is gone, and so is the recovery form: control belongs to the browser that created the event, and moves by handover.

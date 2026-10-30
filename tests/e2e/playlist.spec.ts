@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { expectAccessible } from './helpers';
+import { expectAccessible, joinAs } from './helpers';
 
 const tracks = ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo'].map((t) => ({
   title: t,
@@ -46,12 +46,11 @@ test('a guest sorts a playlist by swiping, then adds only the songs they have ro
   await expect(a.getByRole('button', { name: 'Pause' })).toBeVisible();
 
   await page.goto(`/e/${created.slug}`);
-  await page.getByRole('button', { name: 'Join this event' }).click();
-  await page.getByLabel('Add a playlist').click();
+  await joinAs(page, 'Ana');
   await page
-    .getByLabel(/Playlist link/)
+    .getByLabel('Playlist or song link')
     .fill('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M');
-  const list = page.getByRole('list', { name: 'Playlist songs' });
+  const list = page.getByRole('list', { name: 'Songs to add' });
   const rows = list.getByRole('listitem');
   await expect(rows).toHaveCount(5);
   // Three songs allowed: the fourth and fifth are greyed out.
@@ -69,6 +68,8 @@ test('a guest sorts a playlist by swiping, then adds only the songs they have ro
   // Now Echo, Bravo, Charlie are active and Delta is greyed out.
   await expect(rows.nth(3)).toHaveClass(/over/);
 
+  await page.getByRole('radio', { name: 'Salsa', exact: true }).check();
+  await expect(page.getByText(/You selected SALSA\. Remove all BACHATA/)).toBeVisible();
   await page.getByRole('button', { name: 'Add 3' }).click();
   await expect(page.getByText(/3 added/)).toBeVisible();
   const mine = page.getByRole('heading', { name: 'My songs' }).locator('..');

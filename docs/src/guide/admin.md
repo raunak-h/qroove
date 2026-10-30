@@ -79,3 +79,7 @@ rules, and you can remove any before starting.
 ## Past events
 
 `/h/<code>` shows a read-only playlist of everything requested at an event: titles, artists and styles, no names.
+
+## Playing Spotify and YouTube songs
+
+On the player page, a song with a Spotify or YouTube link plays in that service's own player when no local file matches. Use a browser signed in to Spotify Premium, or Spotify offers only a 30-second preview; Qroove then refuses to start the song and offers the link and **Mark started**. Some YouTube videos do not allow embedding, and YouTube may show adverts. You still need the licences to play music at your venue.

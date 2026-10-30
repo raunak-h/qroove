@@ -4,6 +4,15 @@ import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PlayerPage from './PlayerPage';
 
+type Events = import('./embed').EmbedEvents;
+let embedEvents: Events | null = null;
+vi.mock('./embed', async (real) => ({
+  ...(await real<typeof import('./embed')>()),
+  mountEmbed: (_el: HTMLElement, _s: unknown, ev: Events) => {
+    embedEvents = ev;
+    return () => undefined;
+  },
+}));
 vi.mock('./tone', () => ({ playTone: async () => undefined }));
 vi.mock('./store', () => ({
   loadTracks: async () => [],
@@ -52,6 +61,7 @@ const mkState = (over: { reserved?: boolean; playing?: boolean; epoch?: number |
 
 beforeEach(() => {
   calls = [];
+  embedEvents = null;
   failPath = null;
   sessionStorage.clear();
   adminState = mkState({ reserved: true });
@@ -104,6 +114,44 @@ async function ready(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'Play test chime' }));
   await screen.findByText('Sound check done.');
 }
+
+describe('PlayerPage with a Spotify or YouTube link', () => {
+  const withLink = () => {
+    const st = mkState({ reserved: true });
+    (st.requests[0] as { sourceUrl: string }).sourceUrl =
+      `https://open.spotify.com/track/${'a'.repeat(22)}`;
+    adminState = st;
+  };
+
+  it('plays in the provider player and reports the real start and end', async () => {
+    withLink();
+    const user = userEvent.setup();
+    open();
+    await ready(user);
+    await screen.findByText(/Plays in the Spotify player/);
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await waitFor(() => expect(embedEvents).not.toBeNull());
+    expect(calls.some((c) => c.url.endsWith('/player/started'))).toBe(false); // not until audio plays
+    act(() => embedEvents!.onPlaying(200_000));
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith('/player/started'))).toBe(true));
+    act(() => embedEvents!.onEnded());
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith('/player/finished'))).toBe(true));
+  });
+
+  it('falls back to the link and manual mode when only a preview is offered', async () => {
+    withLink();
+    const user = userEvent.setup();
+    open();
+    await ready(user);
+    await user.click(await screen.findByRole('button', { name: 'Start' }));
+    await waitFor(() => expect(embedEvents).not.toBeNull());
+    act(() => embedEvents!.onFailed('preview'));
+    await screen.findByText(/only a 30-second preview/);
+    expect(calls.some((c) => c.url.endsWith('/player/started'))).toBe(false);
+    expect(screen.getByRole('button', { name: 'Mark started' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Try the player again' })).toBeInTheDocument();
+  });
+});
 
 describe('PlayerPage', () => {
   it('blocks Start until the lease is held and the sound check is done', async () => {

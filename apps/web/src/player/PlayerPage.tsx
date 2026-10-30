@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router';
-import { ConnectionBadge } from '../attendee/ConnectionBadge';
 import { playerApi, type LeaseCreds } from '../admin/adminApi';
 import { useAdminStream } from '../admin/useAdminStream';
 import { ErrorLine } from '../admin/useAction';
 import { ApiError } from '../shared/api';
+import { useMenuRules } from '../shared/menu';
 import { useLockedPage } from '../shared/useLockedPage';
 import { formatCountdown } from '../shared/time';
+import { EmbedPlayer } from './EmbedPlayer';
+import { sourceOf, type EmbedFailure, type Source } from './embed';
 import {
   findMatch,
   isAudio,
@@ -46,6 +48,7 @@ export default function PlayerPage() {
   useLockedPage();
   const stream = useAdminStream(eventId);
   const { state: s, csrf } = stream;
+  useMenuRules(s?.rules, s?.view.name, stream.connection);
 
   const [leaseState, setLeaseState] = useState<LeaseState>('none');
   const lease = useRef<LeaseCreds | null>(null);
@@ -61,6 +64,7 @@ export default function PlayerPage() {
   const [unlocked, setUnlocked] = useState(false);
   /** Mirrors of refs that the screen needs to show. */
   const [audioId, setAudioId] = useState<string | null>(null);
+  const [embed, setEmbed] = useState<{ id: string; source: Source } | null>(null);
   const [myEpoch, setMyEpoch] = useState<number | null>(null);
 
   const audio = useRef<HTMLAudioElement>(null);
@@ -80,6 +84,13 @@ export default function PlayerPage() {
     if (failed.has(reserved.id)) return null;
     return findMatch(library, reserved);
   }, [reserved, library, picked, failed]);
+  // A local file wins (no adverts, no sign-in); otherwise the song's own Spotify or YouTube player.
+  const reservedUrl = reserved?.sourceUrl ?? null;
+  const reservedId = reserved?.id ?? null;
+  const source = useMemo(
+    () => (reservedId && !failed.has(reservedId) ? sourceOf(reservedUrl) : null),
+    [reservedId, reservedUrl, failed],
+  );
 
   // ---- lease -------------------------------------------------------------------------------
   const stopAudio = useCallback(() => {
@@ -89,9 +100,10 @@ export default function PlayerPage() {
       a.removeAttribute('src');
       a.load();
     }
-    if (current.current) URL.revokeObjectURL(current.current.url);
+    if (current.current?.url) URL.revokeObjectURL(current.current.url);
     current.current = null;
     setAudioId(null);
+    setEmbed(null);
     void wake.current?.release().catch(() => undefined);
     wake.current = null;
   }, []);
@@ -237,21 +249,42 @@ export default function PlayerPage() {
     [stopAudio],
   );
 
+  const startEmbed = useCallback((id: string, src: Source) => {
+    if (current.current) return;
+    current.current = { id, reported: false, url: '' };
+    setAudioId(id);
+    setEmbed({ id, source: src });
+    setUnlocked(true);
+  }, []);
+
   // Auto-advance once audio is unlocked and the sound check is done.
   useEffect(() => {
-    if (!reserved || !match || !unlocked || !soundChecked) return;
+    if (!reserved || (!match && !source) || !unlocked || !soundChecked) return;
     if (leaseState !== 'held' || s?.view.state !== 'ACTIVE' || nowPlaying || current.current)
       return;
-    void startFile(reserved.id, match.track, reserved.title, reserved.artist);
-  }, [reserved, match, unlocked, soundChecked, leaseState, s?.view.state, nowPlaying, startFile]);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- starting the next song is the effect
+    if (match) void startFile(reserved.id, match.track, reserved.title, reserved.artist);
+    else if (source) startEmbed(reserved.id, source);
+  }, [
+    reserved,
+    match,
+    source,
+    unlocked,
+    soundChecked,
+    leaseState,
+    s?.view.state,
+    nowPlaying,
+    startFile,
+    startEmbed,
+  ]);
 
-  async function onPlaying() {
+  async function onPlaying(durationMs: number | null) {
     const c = current.current;
     const l = lease.current;
     if (!c || c.reported || !l) return;
     c.reported = true;
     try {
-      await playerApi.started(eventId, l, c.id, (audio.current?.duration ?? 0) * 1000 || null);
+      await playerApi.started(eventId, l, c.id, durationMs);
       try {
         wake.current = (await navigator.wakeLock?.request('screen')) ?? null;
       } catch {
@@ -276,14 +309,20 @@ export default function PlayerPage() {
     stream.refresh();
   }
 
-  async function onMediaError() {
+  async function onMediaError(why?: EmbedFailure) {
     const c = current.current;
     const l = lease.current;
     if (!c || !l) return;
     stopAudio();
     if (c.reported) await playerApi.finished(eventId, l, c.id, 'FAILED').catch(guard);
     else setFailed((f) => new Set(f).add(c.id));
-    setNotice('That file could not be played. Use manual mode or pick another file.');
+    setNotice(
+      why === 'preview'
+        ? 'Spotify offered only a 30-second preview, so the song was not started. Sign in to Spotify Premium in this browser and try again, or play it another way.'
+        : why === 'blocked'
+          ? 'That song cannot be played here (its owner may not allow embedding). Open the link or pick a file.'
+          : 'That file could not be played. Use manual mode or pick another file.',
+    );
     stream.refresh();
   }
 
@@ -352,7 +391,6 @@ export default function PlayerPage() {
     <main className="stack">
       <header className="row between">
         <h1>Player · {s.view.name}</h1>
-        <ConnectionBadge connection={stream.connection} />
       </header>
 
       {notice ? (
@@ -477,10 +515,20 @@ export default function PlayerPage() {
           <p className="muted">Nothing is playing.</p>
         )}
         {/* Native controls keep the player usable without our UI (lock screen, headphones). */}
+        {embed ? (
+          <EmbedPlayer
+            key={embed.id}
+            source={embed.source}
+            onPlaying={(ms) => void onPlaying(ms)}
+            onEnded={() => void onEnded()}
+            onFailed={(why) => void onMediaError(why)}
+          />
+        ) : null}
         <audio
           ref={audio}
           controls
-          onPlaying={() => void onPlaying()}
+          hidden={embed !== null}
+          onPlaying={() => void onPlaying((audio.current?.duration ?? 0) * 1000 || null)}
           onEnded={() => void onEnded()}
           onError={() => void onMediaError()}
         />
@@ -512,8 +560,16 @@ export default function PlayerPage() {
                 ? match.kind === 'exact'
                   ? `File found: ${match.track.file.name}`
                   : `Probable file (title only): ${match.track.file.name}`
-                : 'No matching file on this device.'}
+                : source
+                  ? `Plays in the ${source.kind === 'spotify' ? 'Spotify' : 'YouTube'} player.`
+                  : 'No matching file on this device.'}
             </p>
+            {!match && source?.kind === 'spotify' ? (
+              <p className="muted small">
+                Stay signed in to Spotify Premium in this browser, or Spotify offers only a preview
+                and the song will not start.
+              </p>
+            ) : null}
             {match ? (
               <button
                 className="btn primary"
@@ -521,6 +577,14 @@ export default function PlayerPage() {
                 onClick={() =>
                   void startFile(reserved.id, match.track, reserved.title, reserved.artist)
                 }
+              >
+                Start
+              </button>
+            ) : source ? (
+              <button
+                className="btn primary"
+                disabled={!canStart}
+                onClick={() => startEmbed(reserved.id, source)}
               >
                 Start
               </button>
@@ -549,6 +613,20 @@ export default function PlayerPage() {
                 <p className="muted small">
                   Or play it another way and use manual mode. This cannot promise ad-free playback.
                 </p>
+                {failed.has(reserved.id) && sourceOf(reserved.sourceUrl) ? (
+                  <button
+                    className="btn"
+                    onClick={() =>
+                      setFailed((old) => {
+                        const n = new Set(old);
+                        n.delete(reserved.id);
+                        return n;
+                      })
+                    }
+                  >
+                    Try the player again
+                  </button>
+                ) : null}
                 {reserved.sourceUrl ? (
                   <a
                     className="btn"
@@ -597,8 +675,8 @@ export default function PlayerPage() {
       <ErrorLine error={error} />
       <p className="muted small">
         Only play recordings you are licensed to play at this venue. Qroove never streams or copies
-        music. Browsers need one tap to start audio, and Bluetooth routing is controlled by the
-        device.
+        music: Spotify and YouTube songs play in those services&apos; own players. Browsers need one
+        tap to start audio, and Bluetooth routing is controlled by the device.
       </p>
       <p>
         <Link to={`/admin/${eventId}`}>Back to organiser page</Link>

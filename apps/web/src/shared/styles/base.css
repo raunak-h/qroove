@@ -336,10 +336,15 @@ ol.list .title {
 .conn {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  margin: 0.25rem 0 0;
-  font-size: 0.9rem;
+  justify-content: center;
+  gap: 0.25rem;
+  font-size: 0.6rem;
+  line-height: 1;
   color: var(--muted);
+}
+.conn .dot {
+  width: 0.4rem;
+  height: 0.4rem;
 }
 .dot {
   width: 0.7rem;
@@ -540,6 +545,7 @@ body.locked input,
 body.locked textarea {
   -webkit-user-select: text;
   user-select: text;
+  -webkit-touch-callout: default;
 }
 .layout main {
   display: flex;
@@ -618,9 +624,6 @@ body.console .layout main {
 }
 .console-head h1 {
   font-size: 1.25rem;
-  margin: 0;
-}
-.console-head .conn {
   margin: 0;
 }
 .console-head .row {
@@ -1258,4 +1261,21 @@ body.console .layout main {
 .playlist-error {
   flex-basis: 100%;
   margin: 0;
+}
+
+/* Official Spotify / YouTube players. YouTube requires at least 200 x 200 px, visible and uncovered. */
+.embed-host {
+  width: 100%;
+  min-height: 200px;
+  aspect-ratio: 16 / 9;
+}
+.embed-host > *,
+.embed-host iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.row > .playlist-cell {
+  flex: 1;
+  min-width: 0;
 }

@@ -107,8 +107,9 @@ describe('EventPage', () => {
     const { container } = renderPage();
     await screen.findByText('Someone Else');
     const token = container.querySelector('.topbar .event-token')!;
-    expect(token.textContent).toBe('mango-octopus-rye');
-    expect(token.getAttribute('aria-hidden')).toBe('true'); // decorative; the heading carries the name
+    const label = token.querySelector('[aria-hidden]')!;
+    expect(label.textContent).toBe('mango-octopus-rye');
+    expect(label.getAttribute('aria-hidden')).toBe('true'); // decorative; the heading carries the name
     expect(screen.getByRole('heading', { name: 'Mango Octopus Rye' })).toBeInTheDocument();
     expect(token.closest('a,button')).toBeNull(); // nothing to tap
   });
@@ -126,8 +127,11 @@ describe('EventPage', () => {
     };
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole('button', { name: 'Join this event' }));
-    await waitFor(() => expect(joined).toEqual([{}]));
+    const join = await screen.findByRole('button', { name: 'Join this event' });
+    expect(join).toBeDisabled(); // a name is required
+    await user.type(screen.getByLabelText('Your name'), ' Ana ');
+    await user.click(join);
+    await waitFor(() => expect(joined).toEqual([{ nickname: 'Ana' }]));
   });
 
   it('adds a whole playlist: only as many as are left can be added, the rest are greyed out', async () => {
@@ -169,12 +173,11 @@ describe('EventPage', () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText('Someone Else');
-    await user.click(screen.getByLabelText('Add a playlist')); // opens the playlist section
     await user.type(
-      screen.getByLabelText(/Playlist link/),
+      screen.getByLabelText('Playlist or song link'),
       'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
     );
-    const list = await screen.findByRole('list', { name: 'Playlist songs' });
+    const list = await screen.findByRole('list', { name: 'Songs to add' });
     const rows = within(list).getAllByRole('listitem');
     expect(rows).toHaveLength(4);
     // 5 allowed - 3 already accepted = 2 left: the third and fourth are over the limit.
@@ -184,7 +187,11 @@ describe('EventPage', () => {
     const after = within(list).getAllByRole('listitem');
     expect(after[0]).toHaveAccessibleName(/^Song D/);
     expect(after.map((r) => r.className.includes('over'))).toEqual([false, false, true, true]);
-    await user.click(screen.getAllByRole('radio', { name: 'Bachata' }).at(-1)!);
+    expect(screen.getByRole('button', { name: 'Choose a genre first' })).toBeDisabled();
+    await user.click(screen.getByRole('radio', { name: 'Bachata' }));
+    expect(
+      screen.getByText('You selected BACHATA. Remove all SALSA, CHA-CHA, OTHER songs.'),
+    ).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Add 2' }));
     await screen.findByText(/2 added/);
     expect(batch!.style).toBe('bachata');
@@ -255,31 +262,36 @@ describe('EventPage', () => {
     expect(screen.getByText(/Check the link or code/)).toBeInTheDocument();
   });
 
-  it('joins, adds a typed song with an idempotency key, and withdraws it', async () => {
+  it('joins, adds a song by link with an idempotency key, and withdraws it', async () => {
     const mine = { accepted: 0, limit: 5, requests: [] as unknown[] };
     handler = (url, init) => {
       if (url.includes('by-slug')) return { body: { eventId: 'ev1', slug: 'ABC123' } };
       if (url.endsWith('/join')) return { body: { participantId: 'p1', token: 'tok'.repeat(10) } };
       if (url.endsWith('/my-requests')) return { body: mine };
-      if (url.endsWith('/requests') && init.method === 'POST') {
-        const r = {
+      if (url.endsWith('/resolve-playlist'))
+        return {
+          body: {
+            tracks: [{ title: 'Mi Bachata', artist: 'Band', durationMs: 200000, sourceUrl: null }],
+          },
+        };
+      if (url.endsWith('/requests/batch')) {
+        mine.requests.push({
           id: 'r1',
           state: 'RESERVED_NEXT',
           title: 'Mi Bachata',
           artist: 'Band',
           style: 'bachata',
           provider: 'manual',
-          durationMs: null,
+          durationMs: 200000,
           artworkUrl: null,
           acceptedSeq: 1,
           position: 1,
           predictedStartMs: Date.now() + 5000,
           uncertain: false,
           statusText: 'Up next',
-        };
-        mine.requests.push(r);
+        });
         mine.accepted = 1;
-        return { body: { request: r } };
+        return { body: { results: [{ index: 0, status: 'ADDED' }], accepted: 1 } };
       }
       if (init.method === 'DELETE') {
         mine.requests.length = 0;
@@ -290,19 +302,24 @@ describe('EventPage', () => {
     };
     const user = userEvent.setup();
     renderPage();
-    await user.click(await screen.findByRole('button', { name: 'Join this event' }));
-    const input = await screen.findByLabelText(/Paste a Spotify/);
-    await user.type(input, 'Mi Bachata');
-    expect(screen.getByRole('button', { name: 'Add to queue' })).toBeDisabled(); // no style yet
-    await user.type(screen.getByLabelText(/Artist/), 'Band');
+    await user.type(await screen.findByLabelText('Your name'), 'Ana');
+    await user.click(screen.getByRole('button', { name: 'Join this event' }));
+    // No artist or length fields, and only one place to add music.
+    await user.type(
+      await screen.findByLabelText('Playlist or song link'),
+      `Listen https://open.spotify.com/track/${'a'.repeat(22)}`,
+    );
+    await screen.findByRole('list', { name: 'Songs to add' });
+    expect(screen.queryByLabelText(/Artist/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Length/)).not.toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: 'Bachata' }));
-    await user.click(screen.getByRole('button', { name: 'Add to queue' }));
-    expect(await screen.findByText(/Added “Mi Bachata”/)).toBeInTheDocument();
-    const post = calls.find((c) => c.url.endsWith('/requests') && c.init.method === 'POST')!;
+    await user.click(screen.getByRole('button', { name: 'Add 1' }));
+    expect(await screen.findByText(/1 added/)).toBeInTheDocument();
+    const post = calls.find((c) => c.url.endsWith('/requests/batch'))!;
     expect((post.init.headers as Record<string, string>)['idempotency-key']).toBe('uuid-1');
     expect(JSON.parse(post.init.body as string)).toEqual({
       style: 'bachata',
-      manual: { title: 'Mi Bachata', artist: 'Band' },
+      songs: [{ title: 'Mi Bachata', artist: 'Band', durationMs: 200000, sourceUrl: null }],
     });
     expect(await screen.findByText(/You’re up next: Mi Bachata/)).toBeInTheDocument();
     const list = screen.getByRole('heading', { name: 'My songs' }).closest('section')!;
@@ -316,7 +333,7 @@ describe('EventPage', () => {
     );
   });
 
-  it('shows the server’s message and next action when a submit is refused', async () => {
+  it('shows the server’s message and next action when a link is refused', async () => {
     localStorage.setItem(
       'qroove:p:ev1',
       JSON.stringify({ participantId: 'p1', token: 'tok'.repeat(10) }),
@@ -326,12 +343,12 @@ describe('EventPage', () => {
       if (url.endsWith('/my-requests')) return { body: { accepted: 1, limit: 5, requests: [] } };
       if (init.method === 'POST')
         return {
-          status: 409,
+          status: 400,
           body: {
             error: {
-              code: 'DUPLICATE',
-              message: 'Already queued as “X”.',
-              action: 'Pick a different song or version.',
+              code: 'UNSUPPORTED_LINK',
+              message: 'We could not read that link.',
+              action: 'Try another.',
             },
           },
         };
@@ -339,11 +356,9 @@ describe('EventPage', () => {
     };
     const user = userEvent.setup();
     renderPage();
-    await user.type(await screen.findByLabelText(/Paste a Spotify/), 'X');
-    await user.click(screen.getByRole('radio', { name: 'Salsa' }));
-    await user.click(screen.getByRole('button', { name: 'Add to queue' }));
+    await user.type(await screen.findByLabelText('Playlist or song link'), 'https://example.com/x');
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Already queued as “X”. Pick a different song or version.',
+      'We could not read that link. Try another.',
     );
   });
 

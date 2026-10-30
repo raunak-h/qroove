@@ -182,3 +182,12 @@ Qroove 0.1.0 is live at https://qroove.sataklela.com: fair queue scheduler, atte
 - Verified in Chromium with real pointer events (e2e `playlist.spec.ts`), not on a touch device: swipe thresholds (35% of the row), the 8 px sideways slop before a touch becomes a swipe, and iOS rubber-banding are untested. Drag uses a fixed 60 px row height.
 - Not done: per-song style for guests (one style per batch); a batch that crosses a quota moment mid-way reports the rest as QUOTA_FULL; drag auto-scroll when the list is taller than the screen.
 - Tests: scheduler 32, contracts 11, server 141, web 81, e2e 5.
+
+### Phase 14 — pilot flow fixes (2026-10-30)
+
+- ADR 0017: required name, link-only "Add music" card (`attendee/AddMusic.tsx` replaces `AddSong` and `AddPlaylist`), top-level genre with removal advice, official Spotify/YouTube players on the player page (`player/embed.ts`), green dot in the header.
+- The paste bug was `useLockedPage` blocking the context menu everywhere, including in fields.
+- Spotify's iframe API script uses `eval`, blocked by the CSP, so `embed.ts` speaks its unpublished postMessage protocol directly. Expect this to need attention if Spotify changes it.
+- Verified live from the sandbox: song and playlist lookup for Spotify and YouTube Music. Spotify embed loads, starts and is correctly refused as a preview (headless, not signed in).
+- **Not verified:** full-length Spotify playback signed in to Premium, whether third-party cookie blocking stops that session reaching the embed, and any YouTube playback (every video gave error 150 from this sandbox's browser, even Big Buck Bunny, on any origin). Test on the real player device before relying on them.
+- Not done: docs screenshots `attendee-join.png` and `attendee-add.png` are stale; guests cannot pick a non-Latin variant any more; provider terms for use at events are unchecked.

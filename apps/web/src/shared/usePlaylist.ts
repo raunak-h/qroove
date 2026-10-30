@@ -9,14 +9,15 @@ export type PlaylistState =
 const EMPTY: PlaylistSong[] = [];
 const IDLE: PlaylistState = { status: 'idle', tracks: EMPTY, error: null };
 const LOADING: PlaylistState = { status: 'loading', tracks: EMPTY, error: null };
-const looksLikeLink = (u: string) => /^https?:\/\/\S+$/i.test(u.trim());
+/** Share sheets often paste words around the link, so the first link in the text is used. */
+const linkIn = (text: string) => /https?:\/\/\S+/i.exec(text)?.[0] ?? '';
 
-/** Loads a public playlist link once it has stopped changing (so pasting loads it straight away). */
+/** Loads a public playlist or song link once it has stopped changing (so pasting loads it straight away). */
 export function usePlaylist(url: string): PlaylistState {
-  const link = url.trim();
+  const link = linkIn(url);
   const [done, setDone] = useState<{ link: string; state: PlaylistState } | null>(null);
   useEffect(() => {
-    if (!looksLikeLink(link)) return;
+    if (!link) return;
     const ctl = new AbortController();
     const t = setTimeout(() => {
       api
@@ -35,7 +36,7 @@ export function usePlaylist(url: string): PlaylistState {
       ctl.abort();
     };
   }, [link]);
-  if (!looksLikeLink(link)) return IDLE;
+  if (!link) return IDLE;
   if (done?.link === link) return done.state;
   return LOADING;
 }

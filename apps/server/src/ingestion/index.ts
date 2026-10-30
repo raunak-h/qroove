@@ -3,11 +3,11 @@ import { DomainError } from '@qroove/contracts';
 import { fingerprint, looseKey } from '../domain/keys.js';
 import type { TrackInput } from '../domain/commands/requests.js';
 import type { FetchLike } from './fetch.js';
-import { parseLink, type Platform } from './parseLink.js';
+import { parseLink, type ParsedLink, type Platform } from './parseLink.js';
 import { ItunesProvider } from './providers/itunes.js';
 import { OEmbedProvider } from './providers/oembed.js';
 import { SpotifyApiProvider } from './providers/spotify.js';
-import { fetchPlaylist, type Playlist } from './playlist.js';
+import { fetchPlaylist, fetchSong, parsePlaylistUrl, type Playlist } from './playlist.js';
 import { suggestStyle } from './style.js';
 import type { MetadataProvider, TrackMetadata } from './types.js';
 
@@ -18,7 +18,10 @@ export interface ResolvedTrack {
 }
 
 export interface Ingestion {
-  /** Public playlist page → tracks. Best effort: these pages are not a stable API. */
+  /**
+   * A public playlist or song link → its tracks (one for a song), with metadata from the source.
+   * Best effort: these pages are not a stable API.
+   */
   resolvePlaylist(url: string): Promise<Playlist>;
   resolveUrl(url: string): Promise<ResolvedTrack>;
   resolveManual(m: {
@@ -65,25 +68,57 @@ export function createIngestion(opts: IngestionOptions): Ingestion {
     apple: [itunes],
     youtube: [oembed],
   };
-  return {
-    resolvePlaylist: (url) => fetchPlaylist(opts.fetch, url),
-    async resolveUrl(url) {
-      const link = parseLink(url);
-      let last: unknown;
-      for (const p of chains[link.platform]) {
-        try {
-          const meta = await p.lookup(link);
-          return {
-            track: toTrack(meta, link.canonicalUrl),
-            confidence: meta.confidence,
-            suggestedStyle: suggestStyle(meta.title),
-          };
-        } catch (e) {
-          last = e;
-        }
+  async function resolveUrl(url: string): Promise<ResolvedTrack> {
+    const link = parseLink(url);
+    let last: unknown;
+    for (const p of chains[link.platform]) {
+      try {
+        const meta = await p.lookup(link);
+        return {
+          track: toTrack(meta, link.canonicalUrl),
+          confidence: meta.confidence,
+          suggestedStyle: suggestStyle(meta.title),
+        };
+      } catch (e) {
+        last = e;
       }
-      throw last instanceof DomainError ? last : new DomainError('METADATA_UNAVAILABLE');
+    }
+    throw last instanceof DomainError ? last : new DomainError('METADATA_UNAVAILABLE');
+  }
+  return {
+    async resolvePlaylist(url) {
+      let isPlaylist = true;
+      try {
+        parsePlaylistUrl(url);
+      } catch {
+        isPlaylist = false;
+      }
+      if (isPlaylist) return fetchPlaylist(opts.fetch, url);
+      let link: ParsedLink;
+      try {
+        link = parseLink(url);
+      } catch {
+        throw new DomainError(
+          'UNSUPPORTED_LINK',
+          'Paste a link to a playlist or a song from Spotify, YouTube Music, YouTube or Apple Music.',
+        );
+      }
+      const song = await fetchSong(opts.fetch, link);
+      if (song) return { platform: link.platform, tracks: [song] };
+      const { track } = await resolveUrl(url);
+      return {
+        platform: link.platform,
+        tracks: [
+          {
+            title: track.title,
+            artist: track.artist,
+            durationMs: track.durationMs,
+            sourceUrl: track.sourceUrl,
+          },
+        ],
+      };
     },
+    resolveUrl,
     resolveManual(m) {
       const artist = m.artist?.trim() || null;
       const fp = fingerprint(m.title, artist);

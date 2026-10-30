@@ -2,20 +2,24 @@ import type { RulesSnapshot } from '@qroove/contracts';
 import { BRAND, genresOf } from '@qroove/config';
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
+import { ConnectionBadge } from '../attendee/ConnectionBadge';
 import { GenreDot, StyleSwatches } from './Genre';
+import type { Connection } from './useEventStream';
 import { ThemeToggle } from './ThemeToggle';
 
 interface HeaderEvent {
   rules: RulesSnapshot | null;
   name: string | null;
+  connection: Connection | null;
 }
+const NO_EVENT: HeaderEvent = { rules: null, name: null, connection: null };
 const RulesCtx = createContext<{
   event: HeaderEvent;
   setEvent: (e: HeaderEvent) => void;
-}>({ event: { rules: null, name: null }, setEvent: () => {} });
+}>({ event: NO_EVENT, setEvent: () => {} });
 
 export function MenuProvider({ children }: { children: ReactNode }) {
-  const [event, setEvent] = useState<HeaderEvent>({ rules: null, name: null });
+  const [event, setEvent] = useState<HeaderEvent>(NO_EVENT);
   return <RulesCtx.Provider value={{ event, setEvent }}>{children}</RulesCtx.Provider>;
 }
 
@@ -26,12 +30,13 @@ export const nameToken = (name: string) => name.trim().toLowerCase().split(/\s+/
 export function useMenuRules(
   rules: RulesSnapshot | null | undefined,
   name?: string | null | undefined,
+  connection?: Connection | undefined,
 ) {
   const { setEvent } = useContext(RulesCtx);
   useEffect(() => {
-    setEvent({ rules: rules ?? null, name: name ?? null });
-    return () => setEvent({ rules: null, name: null });
-  }, [rules, name, setEvent]);
+    setEvent({ rules: rules ?? null, name: name ?? null, connection: connection ?? null });
+    return () => setEvent(NO_EVENT);
+  }, [rules, name, connection, setEvent]);
 }
 
 /** The event's name in the header: small, lower-case, hyphenated, and plainly not a control. */
@@ -39,9 +44,10 @@ export function HeaderEventName() {
   const { event } = useContext(RulesCtx);
   if (!event.name) return <span className="topbar-spacer" />;
   return (
-    <span className="event-token" aria-hidden="true">
-      {nameToken(event.name)}
-    </span>
+    <div className="event-token">
+      <span aria-hidden="true">{nameToken(event.name)}</span>
+      {event.connection ? <ConnectionBadge connection={event.connection} /> : null}
+    </div>
   );
 }
 

@@ -10,8 +10,8 @@ export function Privacy() {
           This device gets a random pass for each event you join. It is stored in your browser only.
         </li>
         <li>
-          We store the songs you add, and a nickname if you choose one. Nicknames are shown next to
-          your songs.
+          We store the songs you add and the name you join with, which shows the organiser who added
+          each song.
         </li>
         <li>Participant records are deleted 30 days after an event ends.</li>
         <li>No audio is stored or streamed by Qroove. There are no ads or trackers.</li>

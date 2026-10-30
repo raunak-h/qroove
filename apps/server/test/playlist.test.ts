@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- HTTP response bodies are untyped JSON in tests */
+import { createIngestion } from '../src/ingestion/index.js';
+import type { FetchLike } from '../src/ingestion/fetch.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import {
@@ -321,7 +323,9 @@ describe('POST /api/events/:id/requests/batch', () => {
       submissionLimit: 3,
       enabledStyles: ['salsa', 'bachata'],
     });
-    const j = await t.api.call('POST', `/api/events/${created.eventId}/join`, { body: {} });
+    const j = await t.api.call('POST', `/api/events/${created.eventId}/join`, {
+      body: { nickname: 'Ana' },
+    });
     return {
       t,
       id: created.eventId as string,
@@ -369,5 +373,78 @@ describe('POST /api/events/:id/requests/batch', () => {
       body: { style: 'chacha', songs: spot(2) },
     });
     expect(r.status).toBe(400);
+  });
+});
+
+describe('song links', () => {
+  const spotifyPage = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+    props: {
+      pageProps: {
+        state: {
+          data: {
+            entity: {
+              type: 'track',
+              title: 'Vivir Mi Vida',
+              artists: [{ name: 'Marc Anthony' }],
+              duration: 252_000,
+            },
+          },
+        },
+      },
+    },
+  })}</script>`;
+  const youtubePage = `<script>var ytInitialPlayerResponse = ${JSON.stringify({
+    videoDetails: {
+      title: 'Romeo Santos - Propuesta Indecente (Official Video)',
+      author: 'Romeo Santos',
+      lengthSeconds: '235',
+    },
+  })};</script>`;
+  const serve = (html: string, seen: string[]) =>
+    createIngestion({
+      now: () => 0,
+      fetch: (async (url: string) => {
+        seen.push(url);
+        return new Response(html);
+      }) as FetchLike,
+    });
+
+  it('takes title, artist and length of a Spotify song from its page', async () => {
+    const seen: string[] = [];
+    const id = 'a'.repeat(22);
+    const pl = await serve(spotifyPage, seen).resolvePlaylist(
+      `https://open.spotify.com/track/${id}?si=abc`,
+    );
+    expect(seen).toEqual([`https://open.spotify.com/embed/track/${id}`]);
+    expect(pl.tracks).toEqual([
+      {
+        title: 'Vivir Mi Vida',
+        artist: 'Marc Anthony',
+        durationMs: 252_000,
+        sourceUrl: `https://open.spotify.com/track/${id}`,
+      },
+    ]);
+  });
+
+  it('treats a YouTube Music song link with its radio mix as that one song', async () => {
+    const seen: string[] = [];
+    const pl = await serve(youtubePage, seen).resolvePlaylist(
+      'https://music.youtube.com/watch?v=dQw4w9WgXcQ&list=RDAMVMdQw4w9WgXcQ',
+    );
+    expect(seen).toEqual(['https://www.youtube.com/watch?v=dQw4w9WgXcQ']);
+    expect(pl.tracks).toEqual([
+      {
+        title: 'Propuesta Indecente',
+        artist: 'Romeo Santos',
+        durationMs: 235_000,
+        sourceUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+      },
+    ]);
+  });
+
+  it('refuses a link that is neither a playlist nor a song', async () => {
+    await expect(
+      serve('', []).resolvePlaylist('https://example.com/playlist'),
+    ).rejects.toMatchObject({ code: 'UNSUPPORTED_LINK' });
   });
 });

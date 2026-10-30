@@ -21,10 +21,22 @@ export async function newPage(
   return { context, page: await context.newPage() };
 }
 
+/** Adds one song by link. The lookup is stubbed so the tests never depend on Spotify being up. */
 export async function addSong(page: Page, title: string, artist: string, style: string) {
-  await page.getByLabel(/Paste a Spotify/).fill(title);
-  await page.getByLabel(/Artist/).fill(artist);
+  await page.route('**/api/resolve-playlist', (route) =>
+    route.fulfill({
+      json: { tracks: [{ title, artist, durationMs: 200_000, sourceUrl: null }] },
+    }),
+  );
+  await page.getByLabel('Playlist or song link').fill('https://open.spotify.com/track/x');
   await page.getByRole('radio', { name: style, exact: true }).check();
-  await page.getByRole('button', { name: 'Add to queue' }).click();
-  await expect(page.getByText(new RegExp(`Added “${title}”`))).toBeVisible();
+  await expect(page.getByRole('list', { name: 'Songs to add' })).toContainText(title);
+  await page.getByRole('button', { name: 'Add 1' }).click();
+  await expect(page.getByText('1 added')).toBeVisible();
+  await page.unroute('**/api/resolve-playlist');
+}
+
+export async function joinAs(page: Page, name: string) {
+  await page.getByLabel('Your name').fill(name);
+  await page.getByRole('button', { name: 'Join this event' }).click();
 }

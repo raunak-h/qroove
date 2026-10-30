@@ -33,7 +33,10 @@ describe('CSP', () => {
     const app = await buildApp(parseEnv({ NODE_ENV: 'test' }));
     const api = await app.inject('/api/health');
     const docs = await app.inject('/docs/');
-    expect(api.headers['content-security-policy']).toContain("script-src 'self';");
+    expect(api.headers['content-security-policy']).toContain(
+      "script-src 'self' https://www.youtube.com;",
+    );
+    expect(api.headers['content-security-policy']).not.toContain("'unsafe-inline' https");
     expect(docs.headers['content-security-policy']).toContain("script-src 'self' 'unsafe-inline'");
     await app.close();
   });

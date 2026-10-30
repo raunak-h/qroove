@@ -8,8 +8,8 @@ Both lead to the same page, so remote classes can join with the code alone.
 
 ## Joining
 
-To add songs, tap **Join this event**. Your device gets a private pass for this event only, kept in your browser. You can add a
-nickname first (optional); it is shown next to your songs. Other attendees' names are not shown in the queue.
+To add songs, type **your name** and tap **Join this event**. The name is required, so the organiser can see who added which song;
+other attendees do not see it in the queue. Your device gets a private pass for this event only, kept in your browser.
 
 ![The event page before joining](/screens/attendee-join.png){width=280}
 
@@ -35,16 +35,14 @@ nickname first (optional); it is shown next to your songs. Other attendees' name
 | Beyond planned end — admin must extend | The event would finish before your song                                   |
 | Possible duplicate — needs review      | It may be the same recording as one already queued; the organiser decides |
 
-## Adding a song
+## Adding music
 
-![Adding a song](/screens/attendee-add.png){width=280}
+There is one place to add music, for a playlist or a single song.
 
-1. Paste a Spotify, YouTube or Apple Music link (the **Paste** button reads your clipboard only when you tap
-   it), or just type the title. A pasted link shows a preview of the song it found.
-2. If the link cannot be read, type the title instead. Artist and length are optional.
-3. Pick a **dance style**. This is your choice; Qroove only suggests one when the title says it (for example
-   "bachata"), and never from the sound or catalogue genre.
-4. Tap **Add to queue**.
+1. Paste a link from Spotify or YouTube Music (YouTube and Apple Music links work too). Long-press the box to paste, or tap **Paste**, which reads your clipboard only when you tap it. Title, artist and length come from the link.
+2. Pick the link's **genre**. Qroove then reminds you to remove songs of other genres, for example _You selected SALSA. Remove all BACHATA, CHA-CHA, OTHER songs._
+3. Sort the list: drag to reorder, swipe left to remove, swipe right to send to the top. Songs beyond your allowance are greyed out.
+4. Tap **Add**.
 
 If something goes wrong the message says what to do next, for example _Already queued as "…". Pick a different
 song or version._ A song can only be in an event once, even from a different platform.

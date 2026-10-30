@@ -379,7 +379,7 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
     limit(`join:${req.ip}`, 20, MINUTE);
     const { nickname } = parse(JoinBody, req.body ?? {});
     reply.header('cache-control', 'no-store');
-    return cmd.joinEvent(deps, { eventId: id, ...(nickname ? { nickname } : {}) });
+    return cmd.joinEvent(deps, { eventId: id, nickname });
   });
 
   app.post('/api/events/:id/requests', async (req) => {
