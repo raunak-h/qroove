@@ -173,3 +173,12 @@ Qroove 0.1.0 is live at https://qroove.sataklela.com: fair queue scheduler, atte
 - Names: 112 words (28 each of fruit, vegetables, carbs, sea creatures), about 1.4 M ordered triples. Names are claimed at creation, so unused suggestions are never burned. The ledger keeps every used triple in one document (about 100 k events before the 1 MB limit); fine for a pilot, revisit before wide use. Attendee nicknames are still free text.
 - Not done: segment-specific rules in the attendee style picker (it offers every style allowed anywhere; the server accepts it and the song waits for its part); WebKit e2e; editing a draft after creation.
 - Tests: scheduler 32 (+2 property incl. segments), contracts 11, server 140 (+emulator), web 63, e2e 4 incl. axe.
+
+### Phase 13 — room code, sortable playlists (2026-10-30)
+
+- Superseded the QR-only join (ADR 0008 → ADR 0015): the permanent 6-character room code (shown `ABC-123`) joins on its own; QR is the backup; join key removed from the model and API.
+- Playlist import is now interactive for everyone (ADR 0016): `shared/SongList.tsx` (drag by grip, swipe left to remove with a red bin, swipe right to send to top with a green arrow, hidden keyboard buttons, greyed rows past the allowance), `shared/PlaylistInput.tsx` + `usePlaylist` (debounced load of a pasted link), `attendee/AddPlaylist.tsx` (batch add, one style), and the create page (songs from per-style links, interleaved, greyed beyond planned time minus one minute; create sends `songs`).
+- Server: `POST /api/resolve-playlist`, `POST /api/events/:id/requests/batch`, `CreateEventBody.songs` (replaces `playlists`), `safeSourceUrl`, `songCoverageProblem`.
+- Verified in Chromium with real pointer events (e2e `playlist.spec.ts`), not on a touch device: swipe thresholds (35% of the row), the 8 px sideways slop before a touch becomes a swipe, and iOS rubber-banding are untested. Drag uses a fixed 60 px row height.
+- Not done: per-song style for guests (one style per batch); a batch that crosses a quota moment mid-way reports the rest as QUOTA_FULL; drag auto-scroll when the list is taller than the screen.
+- Tests: scheduler 32, contracts 11, server 141, web 81, e2e 5.

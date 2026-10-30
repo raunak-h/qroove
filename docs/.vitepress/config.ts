@@ -73,6 +73,8 @@ export default defineConfig({
           { text: '0012 Timeline and drums', link: '/adr/0012-visual-timeline-and-drums' },
           { text: '0013 Generated names', link: '/adr/0013-generated-event-names' },
           { text: '0014 Playlists per genre', link: '/adr/0014-playlists-per-genre' },
+          { text: '0015 Permanent room code', link: '/adr/0015-permanent-room-code' },
+          { text: '0016 Sortable playlists', link: '/adr/0016-sortable-playlist-import' },
         ],
       },
       {

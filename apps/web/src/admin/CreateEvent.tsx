@@ -9,16 +9,19 @@ import {
   type StyleId,
 } from '@qroove/config';
 import {
-  playlistCoverageProblem,
+  songCoverageProblem,
   ratioProblem,
   validateBreaks,
   type BreakSlot,
 } from '@qroove/contracts/breaks';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { ApiError } from '../shared/api';
-import { GenreDot, GenreSwatch, StyleGrid } from '../shared/Genre';
+import { GenreDot, StyleGrid } from '../shared/Genre';
+import { PlaylistInput } from '../shared/PlaylistInput';
+import { SongList, type ListSong } from '../shared/SongList';
 import { WheelPicker } from '../shared/WheelPicker';
+import type { PlaylistSong } from '../shared/api';
 import { adminApi, organiserPath } from './adminApi';
 import { hm, TimelineBar } from './TimelineBar';
 import { ErrorLine } from './useAction';
@@ -58,6 +61,18 @@ const PLAYLIST_ROWS: StyleId[][] = [
   ['chacha', 'chacha_nl'],
   ['other'],
 ];
+const DEFAULT_SONG_MS = 4 * 60_000; // a song of unknown length counts as four minutes, like the scheduler
+
+/** Takes one from each list in turn, so a second playlist is not stuck behind the whole first one. */
+function interleave<T>(a: readonly T[], b: readonly T[]): T[] {
+  const out: T[] = [];
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    if (i < a.length) out.push(a[i]!);
+    if (i < b.length) out.push(b[i]!);
+  }
+  return out;
+}
+
 const ONE_TO_FIVE = [1, 2, 3, 4, 5];
 const ONE_TO_TWENTY = Array.from({ length: 20 }, (_, i) => i + 1);
 
@@ -79,7 +94,20 @@ export default function CreateEvent() {
   const [segs, setSegs] = useState<Seg[]>([newSeg()]);
   const [sel, setSel] = useState(0);
   const [limit, setLimit] = useState<number>(RULE_DEFAULTS.submissionLimit);
+  // Playlists: one link per style; their songs go into one list the organiser can sort.
   const [lists, setLists] = useState<Partial<Record<StyleId, string>>>({});
+  const [songs, setSongs] = useState<Array<ListSong & { style: StyleId }>>([]);
+  const onTracks = useCallback((key: string, tracks: PlaylistSong[]) => {
+    const style = key as StyleId;
+    setSongs((prev) => {
+      const rest = prev.filter((x) => x.style !== style);
+      if (tracks.length === 0) return rest.length === prev.length ? prev : rest;
+      return interleave(
+        rest,
+        tracks.map((t, i) => ({ ...t, style, id: `${style}:${i}:${t.title}` })),
+      );
+    });
+  }, []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const go = useNavigate();
@@ -98,11 +126,24 @@ export default function CreateEvent() {
   const everyStyle = STYLE_PRESETS.filter((p) => segs.some((s) => s.styles.has(p.id))).map(
     (p) => p.id,
   );
-  // One playlist per style; a Latin style's playlist covers its non-Latin counterpart and back.
-  const chosen = everyStyle.filter((id) => (lists[id] ?? '').trim() !== '');
-  const playlistsUsed = chosen.length > 0;
-  const covered = new Set(chosen.map(genreOfStyle));
-  const coverageProblem = playlistCoverageProblem(everyStyle, chosen);
+  // Songs of styles that are no longer in the event are hidden (and dropped when the form is sent).
+  const visible = songs.filter((x) => everyStyle.includes(x.style));
+  // Only what fits in the planned time minus one minute can be queued; the rest is greyed out.
+  const budgetMs = (planned - 1) * 60_000;
+  let used = 0;
+  let activeCount = 0;
+  for (const x of visible) {
+    used += x.durationMs ?? DEFAULT_SONG_MS;
+    if (used > budgetMs) break;
+    activeCount += 1;
+  }
+  const active = visible.slice(0, activeCount);
+  const coverageProblem = songCoverageProblem(
+    everyStyle,
+    active.map((x) => x.style),
+  );
+  const covered = new Set(active.map((x) => genreOfStyle(x.style)));
+  const playlistsUsed = visible.length > 0;
   const ready = !empty && ratioIssues.every((x) => !x) && !coverageProblem && !busy;
 
   async function submit(e: React.FormEvent) {
@@ -138,8 +179,16 @@ export default function CreateEvent() {
               })),
             }
           : {}),
-        ...(chosen.length
-          ? { playlists: chosen.map((id) => ({ url: lists[id]!.trim(), style: id })) }
+        ...(active.length
+          ? {
+              songs: active.map(({ title, artist, durationMs, sourceUrl, style }) => ({
+                title,
+                artist,
+                durationMs,
+                sourceUrl,
+                style,
+              })),
+            }
           : {}),
       });
       go(organiserPath(made), { replace: true });
@@ -267,25 +316,42 @@ export default function CreateEvent() {
           <span aria-hidden="true">♫ +</span>
         </summary>
         <div className="playlist-grid">
-          {PLAYLIST_ROWS.flat().map((id) => {
-            if (!everyStyle.includes(id)) return <span key={id} aria-hidden="true" />;
-            const missing = playlistsUsed && !covered.has(genreOfStyle(id));
-            return (
-              <div key={id} className={`playlist-cell${missing ? ' missing' : ''}`}>
-                <GenreSwatch style={id} size={22} />
-                <input
-                  type="url"
-                  inputMode="url"
-                  aria-label={`Playlist link for ${STYLE_PRESETS.find((p) => p.id === id)!.label}`}
-                  aria-invalid={missing || undefined}
-                  value={lists[id] ?? ''}
-                  onChange={(e) => setLists({ ...lists, [id]: e.target.value })}
-                />
-              </div>
-            );
-          })}
+          {PLAYLIST_ROWS.flat().map((id) =>
+            everyStyle.includes(id) ? (
+              <PlaylistInput
+                key={id}
+                style={id}
+                label={`Playlist link for ${STYLE_PRESETS.find((p) => p.id === id)!.label}`}
+                value={lists[id] ?? ''}
+                onChange={(v) => setLists({ ...lists, [id]: v })}
+                id={id}
+                onTracks={onTracks}
+                missing={playlistsUsed && !covered.has(genreOfStyle(id))}
+              />
+            ) : (
+              <span key={id} aria-hidden="true" />
+            ),
+          )}
         </div>
-        {coverageProblem ? (
+        {visible.length > 0 ? (
+          <>
+            <SongList
+              songs={visible}
+              onChange={(next) =>
+                setSongs([
+                  ...(next as Array<ListSong & { style: StyleId }>),
+                  ...songs.filter((x) => !everyStyle.includes(x.style)),
+                ])
+              }
+              activeCount={activeCount}
+              label="Playlist songs"
+            />
+            <p className="muted small playlist-budget" aria-live="polite">
+              {Math.round(Math.min(used, budgetMs + 1) / 60000)} / {planned - 1} min
+            </p>
+          </>
+        ) : null}
+        {coverageProblem && visible.length > 0 ? (
           <p className="error" role="alert">
             {coverageProblem}
           </p>

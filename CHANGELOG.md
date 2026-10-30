@@ -5,6 +5,10 @@ versioning: [SemVer](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Guests can add a whole playlist: paste a link, sort the songs (drag to reorder, swipe left to remove with a red bin, swipe right to send to the top with a green arrow), and add the top songs that fit their remaining allowance; the rest are greyed out. `POST /api/resolve-playlist` and `POST /api/events/:id/requests/batch`.
+- The organiser's create page uses the same sortable list for playlist songs (greyed out beyond the planned time minus one minute); the create request now takes the sorted `songs` instead of playlist links.
+
 ### Changed
 - Joining: the permanent 6-character room code (shown as two triplets, `ABC-123`) now joins on its own, so remote classes can use it, and the landing page opens the event as soon as the sixth character is typed. The QR code stays on the Invite page as a non-verbal backup (it is the same public link). The secret join key is gone.
 - The event name moves to the header on organiser and attendee pages: very small, lower-case, hyphen-separated (`mango-octopus-rye`), Courier New, in the menu's colour and not selectable, so it reads as a label. The big heading is kept for screen readers only.

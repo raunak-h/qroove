@@ -23,11 +23,13 @@ _Mango Octopus Rye_ ([ADR 0013](/adr/0013-generated-event-names)).
 - **Drums:** most songs in a row (1 to 5, applied to every genre), and songs per person (1 to 20). Under the ratio
   summary you can give each genre its own number; the default is an equal split, and no genre may get less than 1
   part in 10 of the total.
-- **Playlists (optional, ♫ +):** one link per style from Spotify, YouTube Music, YouTube or Apple Music. If you add
-  any, every genre in the event needs at least one: a salsa playlist covers non-Latin salsa and the other way round,
-  but salsa, bachata and cha-cha each need their own once selected. Songs are taken from the playlists in turn and
-  queued up to one minute less than the planned time. These are public web pages, so the import is best effort and
-  long playlists are cut short; if a link cannot be read you can still add songs by hand.
+- **Playlists (optional, ♫ +):** paste one link per style from Spotify, YouTube Music, YouTube or Apple Music. The
+  songs load into **one list**, mixed so no playlist sits behind another, and you sort it exactly like a guest does:
+  drag by the grip, swipe left to remove, swipe right to send a song to the top. Only what fits in the planned time
+  minus one minute can be queued (the minutes used are shown); the rest is greyed out below a dashed line and is not
+  added. If you add any songs, every genre in the event needs at least one of them: a salsa song or a non-Latin
+  salsa song both count for salsa. These are public web pages, so the import is best effort and long playlists are
+  cut short.
 
 ## After you create it
 
@@ -52,8 +54,8 @@ purpose, use **Hand over** (below) before you leave.
   when a break is due. Under them is the queue on its own blue-grey background: every request with its contributor's
   tag. **Remove** (two taps) frees that person's slot. A song marked _Possible duplicate_ is held until you choose
   **Distinct** or **Reject**.
-- **Invite (swipe left):** only the QR code. Guests scan it with their camera; the room code alone cannot join, and
-  there is no link or copy button. Right-click and text selection are off on this page.
+- **Invite (swipe left):** the permanent room code as two triplets (`ABC-123`) for reading out or typing, and a QR
+  code as a non-verbal backup. Both open the same page.
 - **More (swipe again):** the player, **Hand over**, **Time** (extend the end), **Rules** (read-only) and **End the
   event**.
 

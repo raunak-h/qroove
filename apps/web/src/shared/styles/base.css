@@ -1117,3 +1117,145 @@ body.console .layout main {
   user-select: text;
   -webkit-user-select: text;
 }
+
+/* ---- sortable playlist ---------------------------------------------------------------------- */
+.songs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+.song {
+  position: relative;
+  overflow: hidden;
+  border-radius: 10px;
+  margin-bottom: 4px;
+  touch-action: pan-y;
+  transition:
+    transform 0.15s ease,
+    height 0.16s ease,
+    opacity 0.16s ease;
+}
+.song.leaving {
+  opacity: 0;
+  height: 0 !important;
+}
+.song.dragging {
+  z-index: 3;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.5);
+  transition: none;
+}
+.song.edge {
+  margin-top: 10px;
+  outline: 2px dashed var(--muted);
+  outline-offset: 4px;
+}
+.song-bg {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 50%;
+  display: flex;
+  align-items: center;
+  color: #fff;
+  pointer-events: none;
+}
+.song-bg.add {
+  left: 0;
+  background: #2e7d32;
+  padding-left: 1rem;
+}
+.song-bg.del {
+  right: 0;
+  justify-content: flex-end;
+  background: #c62828;
+  padding-right: 1rem;
+}
+.song-fg {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.75rem 0 0;
+  background: var(--surface);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.song.over .song-fg {
+  background: var(--bg);
+  color: var(--muted);
+}
+.grip {
+  flex: none;
+  width: 44px;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  font-size: 1.3rem;
+  color: var(--muted);
+  cursor: grab;
+  touch-action: none;
+}
+.song-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.song-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.song-artist {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+/* Keyboard and screen-reader buttons: out of sight until a row has focus. */
+.song-actions {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0 0.25rem;
+  background: var(--surface);
+  clip-path: inset(50%);
+}
+.song-fg:focus-within .song-actions {
+  clip-path: none;
+}
+.song-actions button {
+  min-width: 36px;
+  min-height: 36px;
+  border: 1px solid var(--muted);
+  border-radius: 6px;
+  background: var(--btn-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+.song-actions button:disabled {
+  opacity: 0.4;
+}
+.playlist-status {
+  flex: none;
+  min-width: 2rem;
+  text-align: center;
+  font-size: 0.8rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+.playlist-cell {
+  flex-wrap: wrap;
+}
+.playlist-error {
+  flex-basis: 100%;
+  margin: 0;
+}

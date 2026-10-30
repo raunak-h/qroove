@@ -16,6 +16,18 @@ export interface ResolvedLink {
   suggestedStyle: StyleId | null;
 }
 
+export interface PlaylistSong {
+  title: string;
+  artist: string | null;
+  durationMs: number | null;
+  sourceUrl: string | null;
+}
+
+export interface BatchResponse {
+  results: Array<{ index: number; status: 'ADDED' | 'DUPLICATE' | 'QUOTA_FULL' | 'FAILED' }>;
+  accepted: number;
+}
+
 export interface Creds {
   participantId: string;
   token: string;
@@ -116,6 +128,22 @@ export const api = {
     idempotencyKey: string,
   ) =>
     request<{ request: RequestView }>('POST', `/api/events/${eventId}/requests`, {
+      body,
+      creds,
+      idempotencyKey,
+    }),
+  resolvePlaylist: (url: string, signal?: AbortSignal) =>
+    request<{ tracks: PlaylistSong[] }>('POST', '/api/resolve-playlist', {
+      body: { url },
+      ...(signal ? { signal } : {}),
+    }),
+  submitBatch: (
+    eventId: string,
+    creds: Creds,
+    body: { style: StyleId; songs: PlaylistSong[] },
+    idempotencyKey: string,
+  ) =>
+    request<BatchResponse>('POST', `/api/events/${eventId}/requests/batch`, {
       body,
       creds,
       idempotencyKey,

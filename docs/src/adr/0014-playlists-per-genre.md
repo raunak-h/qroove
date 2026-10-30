@@ -1,6 +1,6 @@
 # ADR 0014 — Playlist import needs a playlist for every genre
 
-**Status:** accepted · **Date:** 2026-10-29
+**Status:** partly superseded by [ADR 0016](/adr/0016-sortable-playlist-import) (the organiser now sorts the songs; genre coverage still applies) · **Date:** 2026-10-29
 
 ## Context
 

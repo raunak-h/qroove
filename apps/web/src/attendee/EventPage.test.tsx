@@ -130,6 +130,67 @@ describe('EventPage', () => {
     await waitFor(() => expect(joined).toEqual([{}]));
   });
 
+  it('adds a whole playlist: only as many as are left can be added, the rest are greyed out', async () => {
+    localStorage.setItem(
+      'qroove:p:ev1',
+      JSON.stringify({ participantId: 'p1', token: 'tok'.repeat(10) }),
+    );
+    const mine = { accepted: 3, limit: 5, requests: [] as unknown[] };
+    let batch: { style: string; songs: Array<{ title: string }> } | undefined;
+    handler = (url, init) => {
+      if (url.includes('by-slug')) return { body: { eventId: 'ev1', slug: 'ABC123' } };
+      if (url.endsWith('/my-requests')) return { body: mine };
+      if (url.endsWith('/resolve-playlist')) {
+        return {
+          body: {
+            tracks: ['A', 'B', 'C', 'D'].map((t) => ({
+              title: `Song ${t}`,
+              artist: null,
+              durationMs: 180000,
+              sourceUrl: null,
+            })),
+          },
+        };
+      }
+      if (url.endsWith('/requests/batch')) {
+        batch = JSON.parse(init.body as string);
+        return {
+          body: {
+            results: [
+              { index: 0, status: 'ADDED' },
+              { index: 1, status: 'ADDED' },
+            ],
+            accepted: 2,
+          },
+        };
+      }
+      return { body: baseView };
+    };
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText('Someone Else');
+    await user.click(screen.getByLabelText('Add a playlist')); // opens the playlist section
+    await user.type(
+      screen.getByLabelText(/Playlist link/),
+      'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
+    );
+    const list = await screen.findByRole('list', { name: 'Playlist songs' });
+    const rows = within(list).getAllByRole('listitem');
+    expect(rows).toHaveLength(4);
+    // 5 allowed - 3 already accepted = 2 left: the third and fourth are over the limit.
+    expect(rows.map((r) => r.className.includes('over'))).toEqual([false, false, true, true]);
+    // Send the last song to the top: it becomes active and pushes Song B past the limit.
+    await user.click(screen.getByRole('button', { name: 'Move Song D to the top' }));
+    const after = within(list).getAllByRole('listitem');
+    expect(after[0]).toHaveAccessibleName(/^Song D/);
+    expect(after.map((r) => r.className.includes('over'))).toEqual([false, false, true, true]);
+    await user.click(screen.getAllByRole('radio', { name: 'Bachata' }).at(-1)!);
+    await user.click(screen.getByRole('button', { name: 'Add 2' }));
+    await screen.findByText(/2 added/);
+    expect(batch!.style).toBe('bachata');
+    expect(batch!.songs.map((x) => x.title)).toEqual(['Song D', 'Song A']);
+  });
+
   it('shows a break in the queue where it falls', async () => {
     handler = (url) =>
       url.includes('by-slug')

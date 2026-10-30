@@ -75,3 +75,13 @@ const youtube = (id: string): ParsedLink => ({
   id,
   canonicalUrl: `https://www.youtube.com/watch?v=${id}`,
 });
+
+/** A client-supplied source link, kept only if it is a supported song link (never an arbitrary URL). */
+export function safeSourceUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  try {
+    return parseLink(raw).canonicalUrl;
+  } catch {
+    return null;
+  }
+}

@@ -1,6 +1,6 @@
 # ADR 0008 — Joining needs a secret carried by the QR code
 
-**Status:** accepted · **Date:** 2026-10-29
+**Status:** superseded by [ADR 0015](/adr/0015-permanent-room-code) · **Date:** 2026-10-29
 
 ## Context
 

@@ -8,6 +8,31 @@ const Id = z.string().min(1).max(64);
 const Nickname = z.string().trim().min(1).max(30);
 const Ms = z.number().int().nonnegative();
 
+// POST /api/resolve-playlist, POST /api/events/:id/requests/batch
+export const PlaylistSong = z.object({
+  title: z.string().trim().min(1).max(200),
+  artist: z.string().trim().max(200).nullable(),
+  durationMs: z.number().int().positive().max(3_600_000).nullable(),
+  sourceUrl: z.string().max(500).nullable(),
+});
+export type PlaylistSong = z.infer<typeof PlaylistSong>;
+export const ResolvePlaylistBody = z.object({ url: z.string().url().max(500) });
+export const ResolvePlaylistResponse = z.object({ tracks: z.array(PlaylistSong) });
+export const BatchSubmitBody = z.object({
+  style: StyleId,
+  /** In the order the person wants them; the first ones are accepted first. */
+  songs: z.array(PlaylistSong).min(1).max(30),
+});
+export const BatchResult = z.object({
+  index: z.number().int(),
+  status: z.enum(['ADDED', 'DUPLICATE', 'QUOTA_FULL', 'FAILED']),
+});
+export const BatchSubmitResponse = z.object({
+  results: z.array(BatchResult),
+  accepted: z.number().int(),
+});
+export type BatchSubmitResponse = z.infer<typeof BatchSubmitResponse>;
+
 // POST /api/events
 export const SegmentInput = z.object({
   enabledStyles: z.array(StyleId).min(1),
@@ -41,13 +66,11 @@ export const CreateEventBody = z
       .max(3)
       .optional(),
     /**
-     * Pre-queue songs from public Spotify, YouTube (Music) or Apple Music playlists: one per
-     * style, and every active genre needs at least one (see `playlistCoverageProblem`).
+     * Songs to pre-queue, already loaded and ordered by the organiser from playlists
+     * (`/api/resolve-playlist`). They must fit the planned time minus one minute, and every
+     * active genre needs at least one (see `songCoverageProblem`).
      */
-    playlists: z
-      .array(z.object({ url: z.string().url().max(500), style: StyleId }))
-      .max(7)
-      .optional(),
+    songs: z.array(PlaylistSong.extend({ style: StyleId })).max(150).optional(),
   })
   // Unknown fields (a client-supplied `name`, say) are an error, not silently dropped.
   .strict();

@@ -18,16 +18,20 @@ import {
   SubmitRequestBody,
   UpdateDraftBody,
   VersionedBody,
-  playlistCoverageProblem,
+  songCoverageProblem,
+  ResolvePlaylistBody,
+  BatchSubmitBody,
   type ExportSnapshot,
 } from '@qroove/contracts';
 import { DEFAULT_ENABLED_STYLES, STYLE_PRESETS } from '@qroove/config';
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
 import * as cmd from '../domain/commands/index.js';
 import { SESSION_HEADROOM_MS } from '../domain/commands/import.js';
 import { MAX_SEEDS, type SeedSong } from '../domain/draft.js';
-import { capPlaytime, interleave } from '../ingestion/playlist.js';
+import { capPlaytime } from '../ingestion/playlist.js';
+import { safeSourceUrl } from '../ingestion/parseLink.js';
 import { verifyAdmin, verifyParticipant } from '../domain/queries.js';
 import { HOUR, MINUTE } from '../security/rateLimit.js';
 import {
@@ -136,6 +140,14 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
     };
   });
 
+  // Public playlist page -> its songs, so a person (or an organiser) can sort them before adding.
+  app.post('/api/resolve-playlist', async (req) => {
+    limit(`playlist:${req.ip}`, 12, MINUTE);
+    const { url } = parse(ResolvePlaylistBody, req.body);
+    const pl = await ingestion.resolvePlaylist(url);
+    return { tracks: pl.tracks.slice(0, MAX_SEEDS) };
+  });
+
   // Reserved for a future user-auth Spotify adapter; client-credentials needs no redirect.
   app.get('/api/spotify/callback', async (_req, reply) => reply.code(204).send());
 
@@ -160,39 +172,28 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
 
   app.post('/api/events', async (req, reply) => {
     limit(`create:${req.ip}`, 5, HOUR);
-    const { playlists, ...body } = parse(CreateEventBody, req.body);
+    const { songs, ...body } = parse(CreateEventBody, req.body);
     let seeds: SeedSong[] = [];
-    if (playlists?.length) {
+    if (songs?.length) {
       if (!body.plannedDurationMin) {
-        throw new DomainError('VALIDATION', 'Set a planned time before importing a playlist.');
+        throw new DomainError('VALIDATION', 'Set a planned time before adding playlist songs.');
       }
       const everywhere = new Set(
         (
           body.segments ?? [{ enabledStyles: body.enabledStyles ?? DEFAULT_ENABLED_STYLES }]
         ).flatMap((s) => s.enabledStyles),
       );
-      const problem = playlistCoverageProblem(
-        STYLE_PRESETS.filter((p) => everywhere.has(p.id)).map((p) => p.id),
-        playlists.map((p) => p.style),
-      );
-      if (problem) throw new DomainError('VALIDATION', problem);
-      limit(`playlist:${req.ip}`, 30, HOUR);
-      const fetched = await Promise.all(
-        playlists.map(async (p) =>
-          (await ingestion.resolvePlaylist(p.url)).tracks.map((t) => ({ ...t, style: p.style })),
-        ),
-      );
+      // Keep the organiser's order, but never more than fits in the planned time minus a minute.
       seeds = capPlaytime(
-        interleave(fetched),
+        songs.map((t) => ({ ...t, sourceUrl: safeSourceUrl(t.sourceUrl) })),
         body.plannedDurationMin * 60_000 - SESSION_HEADROOM_MS,
         MAX_SEEDS,
       );
-      if (seeds.length === 0) {
-        throw new DomainError(
-          'VALIDATION',
-          'None of the playlists’ songs fit in the planned time.',
-        );
-      }
+      const problem = songCoverageProblem(
+        STYLE_PRESETS.filter((p) => everywhere.has(p.id)).map((p) => p.id),
+        seeds.map((t) => t.style),
+      );
+      if (problem) throw new DomainError('VALIDATION', problem);
     }
     const r = await cmd.createEvent(deps, body, { seeds });
     reply.header('cache-control', 'no-store');
@@ -398,6 +399,59 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
       idempotencyKey: idemKey(req),
     });
     return { request: requestView(r.request, await agg(id)) };
+  });
+
+  // A whole (already sorted) playlist at once: songs are added in order until the quota is full.
+  app.post('/api/events/:id/requests/batch', async (req) => {
+    const { id } = parse(idParams, req.params);
+    const who = participantFromRequest(req);
+    limit(`batch:p:${who.participantId}`, 4, MINUTE);
+    limit(`batch:ip:${req.ip}`, 12, MINUTE);
+    const body = parse(BatchSubmitBody, req.body);
+    const batchKey = idemKey(req) ?? randomUUID();
+    const results: Array<{
+      index: number;
+      status: 'ADDED' | 'DUPLICATE' | 'QUOTA_FULL' | 'FAILED';
+    }> = [];
+    let full = false;
+    for (const [index, song] of body.songs.entries()) {
+      if (full) {
+        results.push({ index, status: 'QUOTA_FULL' });
+        continue;
+      }
+      try {
+        const resolved = ingestion.resolveManual({
+          title: song.title,
+          ...(song.artist ? { artist: song.artist } : {}),
+          ...(song.durationMs ? { durationMs: song.durationMs } : {}),
+        });
+        await cmd.submitRequest(deps, {
+          eventId: id,
+          ...who,
+          style: body.style,
+          track: { ...resolved.track, sourceUrl: safeSourceUrl(song.sourceUrl) },
+          idempotencyKey: `${batchKey}:${index}`,
+        });
+        results.push({ index, status: 'ADDED' });
+      } catch (e) {
+        if (e instanceof DomainError && e.code === 'QUOTA_FULL') {
+          full = true;
+          results.push({ index, status: 'QUOTA_FULL' });
+        } else if (e instanceof DomainError && e.code === 'DUPLICATE') {
+          results.push({ index, status: 'DUPLICATE' });
+        } else if (
+          e instanceof DomainError &&
+          ['UNAUTHORISED', 'EVENT_ENDED', 'EVENT_NOT_ACTIVE', 'NOT_FOUND', 'VALIDATION'].includes(
+            e.code,
+          )
+        ) {
+          throw e; // the whole request is wrong, not just one song
+        } else {
+          results.push({ index, status: 'FAILED' });
+        }
+      }
+    }
+    return { results, accepted: results.filter((r) => r.status === 'ADDED').length };
   });
 
   app.get('/api/events/:id/my-requests', async (req, reply) => {

@@ -1,13 +1,14 @@
 # Attendee guide
 
-You do not need an account or an app. Scan the organiser's QR code with your phone camera. The home page's six code boxes
-show whether an event exists, but **a code alone cannot join**: joining needs the secret inside the QR code.
+You do not need an account or an app. Type the event's **room code** into the six boxes on the home page (it is shown as
+two triplets, like `ABC-123`, and never changes during the event), or scan the organiser's QR code with your camera.
+Both lead to the same page, so remote classes can join with the code alone.
 
 ![The home page with the join-by-code box](/screens/landing.png){width=280}
 
 ## Joining
 
-The queue is visible to anyone with the code. To add songs, scan the QR code, then tap **Join this event**. Your device gets a private pass for this event only, kept in your browser. You can add a
+To add songs, tap **Join this event**. Your device gets a private pass for this event only, kept in your browser. You can add a
 nickname first (optional); it is shown next to your songs. Other attendees' names are not shown in the queue.
 
 ![The event page before joining](/screens/attendee-join.png){width=280}
@@ -47,6 +48,21 @@ nickname first (optional); it is shown next to your songs. Other attendees' name
 
 If something goes wrong the message says what to do next, for example _Already queued as "…". Pick a different
 song or version._ A song can only be in an event once, even from a different platform.
+
+## Adding a whole playlist
+
+Tap **♫ +** and paste a public Spotify, YouTube Music, YouTube or Apple Music playlist link. Its songs appear as a
+list you can sort before anything is added:
+
+- Only as many songs as you have room for can be added (the first ones); the rest are greyed out, below a dashed line.
+- **Drag** a song by its grip (⠿) up or down to put it where you want it.
+- **Swipe left** to remove it: a red bin appears as you go. Let go early and it springs back.
+- **Swipe right** on any song except the first to send it straight to the top: a green arrow appears and the song
+  slides up.
+- Buttons for each of these appear when you tab to a song, for keyboard and screen-reader use.
+
+Pick one **dance style** for the songs, then tap **Add**. Songs already in the event are skipped and do not use up
+your limit. Playlist pages are public web pages, so this is best effort and long playlists show only their first part.
 
 ## My songs and the five-song limit
 

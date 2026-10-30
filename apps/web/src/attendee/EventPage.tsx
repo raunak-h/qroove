@@ -6,6 +6,7 @@ import { useMenuRules } from '../shared/menu';
 import { clearCreds, loadCreds } from '../shared/storage';
 import { useLockedPage } from '../shared/useLockedPage';
 import { useEventStream, useTick } from '../shared/useEventStream';
+import { AddPlaylist } from './AddPlaylist';
 import { AddSong } from './AddSong';
 import { ConnectionBadge } from './ConnectionBadge';
 import { JoinCard } from './JoinCard';
@@ -131,6 +132,15 @@ function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
       ) : ended ? null : (
         <JoinCard eventId={eventId} onJoined={setCreds} />
       )}
+      {creds ? (
+        <AddPlaylist
+          view={view}
+          eventId={eventId}
+          creds={creds}
+          remaining={mine ? Math.max(0, mine.limit - mine.accepted) : 0}
+          onAdded={reload}
+        />
+      ) : null}
       {creds && mine ? (
         <MyRequests
           mine={mine}

@@ -88,20 +88,18 @@ export function ratioProblem(parts: readonly number[]): string | null {
 }
 
 /**
- * Playlists must cover every genre that is active somewhere in the evening. One playlist per
- * style is allowed, and either a Latin style's playlist or its non-Latin counterpart's covers the
- * genre. With no playlists at all there is nothing to check.
+ * If any playlist songs are queued, every genre that is active somewhere in the evening needs at
+ * least one of them (a Latin style's song or its non-Latin counterpart's covers the genre).
  */
-export function playlistCoverageProblem(
+export function songCoverageProblem(
   allowed: readonly StyleId[],
-  playlistStyles: readonly StyleId[],
+  songStyles: readonly StyleId[],
 ): string | null {
-  if (playlistStyles.length === 0) return null;
-  if (new Set(playlistStyles).size !== playlistStyles.length) return 'One playlist per style.';
-  for (const s of playlistStyles) {
-    if (!allowed.includes(s)) return 'A playlist is for a style that is not part of the event.';
+  if (songStyles.length === 0) return null;
+  for (const s of songStyles) {
+    if (!allowed.includes(s)) return 'A song is for a style that is not part of the event.';
   }
-  const have = new Set(playlistStyles.map(genreOf));
+  const have = new Set(songStyles.map(genreOf));
   const missing = genresOf(allowed).filter((g) => !have.has(g));
-  return missing.length > 0 ? 'Add a playlist for every genre, or remove them all.' : null;
+  return missing.length > 0 ? 'Every genre needs at least one playlist song, or remove them all.' : null;
 }

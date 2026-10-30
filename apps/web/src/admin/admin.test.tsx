@@ -278,6 +278,25 @@ describe('CreateEvent', () => {
     const SPOT = 'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M';
     const APPLE = 'https://music.apple.com/us/playlist/hits/pl.f4d106fed2bd41149aaacabb233eb5eb';
     const link = (style: string) => screen.getByLabelText(`Playlist link for ${style}`);
+    const tracks = (prefix: string, n: number, mins = 4) =>
+      Array.from({ length: n }, (_, i) => ({
+        title: `${prefix} ${i}`,
+        artist: 'Band',
+        durationMs: mins * 60_000,
+        sourceUrl: null,
+      }));
+    /** The create flow, plus playlist resolution: Spotify links are salsa-ish, Apple ones the rest. */
+    const withPlaylists = (c: Call) =>
+      c.url === '/api/resolve-playlist'
+        ? {
+            body: {
+              tracks: tracks(
+                String(c.body && (c.body as { url: string }).url).includes('spotify') ? 'Sp' : 'Ap',
+                6,
+              ),
+            },
+          }
+        : flow(c);
 
     it('lays the fields out like the style grid, one per active style', () => {
       respond = flow;
@@ -294,42 +313,76 @@ describe('CreateEvent', () => {
       expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled(); // none is fine
     });
 
-    it('needs a playlist for every active genre once any playlist is added', async () => {
-      respond = flow;
+    it('loads a pasted link into a sortable list, and needs songs for every active genre', async () => {
+      respond = withPlaylists;
       const user = userEvent.setup();
       page('/new#playlist');
       await user.type(link('Salsa'), SPOT);
-      expect(await screen.findByText(/playlist for every genre/i)).toBeInTheDocument();
+      const list = await screen.findByRole('list', { name: 'Playlist songs' });
+      expect(within(list).getAllByRole('listitem')).toHaveLength(6);
+      expect(await screen.findByText(/at least one playlist song/i)).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
-      // A Latin style's playlist covers its non-Latin counterpart, and vice versa.
+      // A non-Latin style's playlist covers the genre of its Latin counterpart and vice versa.
       await user.type(link('Non-Latin bachata-compatible'), APPLE);
-      expect(screen.queryByText(/playlist for every genre/i)).toBeNull();
+      await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(12));
+      await waitFor(() => expect(screen.queryByText(/at least one playlist song/i)).toBeNull());
       expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
       await user.click(screen.getByRole('button', { name: 'Create event' }));
       await screen.findByRole('heading', { name: 'Friday Social' });
-      expect(calls[0]!.body).toMatchObject({
-        playlists: [
-          { url: SPOT, style: 'salsa' },
-          { url: APPLE, style: 'bachata_nl' },
-        ],
-      });
+      const body = calls.find((c) => c.url === '/api/events')!.body as {
+        songs: Array<{ title: string; style: string }>;
+        playlists?: unknown;
+      };
+      expect(body.playlists).toBeUndefined();
+      expect(body.songs).toHaveLength(12); // 12 x 4 min = 48 min fits in 2 h
+      expect(new Set(body.songs.map((x) => x.style))).toEqual(new Set(['salsa', 'bachata_nl']));
+      // The two playlists are mixed, so neither is stuck behind the other.
+      expect(body.songs.slice(0, 4).map((x) => x.style)).toEqual([
+        'salsa',
+        'bachata_nl',
+        'salsa',
+        'bachata_nl',
+      ]);
     });
 
-    it('asks for cha-cha too once it is selected, and for Other', async () => {
-      respond = flow;
+    it('greys out songs that do not fit the planned time minus a minute, and sends only the rest', async () => {
+      respond = withPlaylists;
+      const user = userEvent.setup();
+      page('/new#playlist');
+      screen.getByRole('spinbutton', { name: 'Planned time' }).focus();
+      await user.keyboard('{Home}'); // 0:15, so 14 minutes of music: three four-minute songs
+      await user.type(link('Salsa'), SPOT);
+      await user.type(link('Bachata'), APPLE);
+      const list = await screen.findByRole('list', { name: 'Playlist songs' });
+      await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(12));
+      const rows = within(list).getAllByRole('listitem');
+      expect(rows.filter((r) => r.className.includes('over'))).toHaveLength(9);
+      expect(rows[2]!.className).not.toContain('over');
+      expect(rows[3]!.className).toContain('over');
+      // 3 songs from two genres: one genre is missing from the first three? They alternate, so both are in.
+      expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
+      await user.click(screen.getByRole('button', { name: 'Create event' }));
+      await screen.findByRole('heading', { name: 'Friday Social' });
+      const body = calls.find((c) => c.url === '/api/events')!.body as { songs: unknown[] };
+      expect(body.songs).toHaveLength(3);
+    });
+
+    it('asks for cha-cha songs too once it is selected', async () => {
+      respond = withPlaylists;
       const user = userEvent.setup();
       page('/new#playlist');
       await user.type(link('Salsa'), SPOT);
-      await user.type(link('Bachata'), SPOT);
+      await user.type(link('Bachata'), APPLE);
+      const list = await screen.findByRole('list', { name: 'Playlist songs' });
+      await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(12));
       expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
       await user.click(styleBox('Cha-cha'));
       expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
       await user.type(link('Cha-cha'), APPLE);
-      expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
-      await user.click(styleBox('Other (Musicality Exercise)'));
-      expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
-      await user.type(link('Other (Musicality Exercise)'), APPLE);
-      expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
+      await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(18));
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled(),
+      );
     });
   });
 });
