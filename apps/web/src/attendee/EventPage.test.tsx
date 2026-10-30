@@ -106,6 +106,8 @@ describe('EventPage', () => {
         : { body: { ...baseView, name: 'Mango Octopus Rye' } };
     const { container } = renderPage();
     await screen.findByText('Someone Else');
+    // The header is filled from an effect, which can land just after the page's own content.
+    await waitFor(() => expect(container.querySelector('.topbar .event-token')).not.toBeNull());
     const token = container.querySelector('.topbar .event-token')!;
     const label = token.querySelector('[aria-hidden]')!;
     expect(label.textContent).toBe('mango-octopus-rye');
