@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import { ConnectionBadge } from '../attendee/ConnectionBadge';
 import { ApiError } from '../shared/api';
@@ -69,29 +69,28 @@ function AccessLost({
   );
 }
 
-type Tab = 'queue' | 'invite' | 'player' | 'more';
+type Page = 'live' | 'invite' | 'more';
 type Sub = 'handover' | 'time' | 'rules' | 'end';
 
-const TABS: Array<[Tab, string]> = [
-  ['queue', 'Queue'],
+const PAGES: Array<[Page, string]> = [
+  ['live', 'Playing'],
   ['invite', 'Invite'],
-  ['player', 'Player'],
   ['more', 'More'],
 ];
 
 /**
- * A fixed-height console: controls on top, one tab body, tab bar at the bottom. Only the queue
- * list scrolls; every other tab fits a phone screen.
+ * A fixed-height console. Swipe sideways between three pages: what is playing with the queue, the
+ * QR code to join, and the less-used controls (player, hand over, time, rules, end). Only the queue
+ * list scrolls vertically, so a swipe never fights a scroll.
  */
 export default function AdminPage() {
   const { eventId = '' } = useParams();
   const { state, csrf, connection, error, refresh } = useAdminStream(eventId);
-  const [tab, setTab] = useState<Tab>('queue');
+  const [page, setPage] = useState<Page>('live');
   const [sub, setSub] = useState<Sub | null>(null);
+  const pager = useRef<HTMLDivElement>(null);
   useLockedPage();
   useMenuRules(state?.rules);
-  // Once the event has ended the only thing left to do is carry songs over, which lives on Queue.
-  const endedNow = state?.view.state === 'ENDED' || state?.view.state === 'ARCHIVED';
   useEffect(() => {
     document.body.classList.add('console');
     return () => document.body.classList.remove('console');
@@ -107,8 +106,7 @@ export default function AdminPage() {
   if (error?.status === 401) return <AccessLost eventId={eventId} error={error} onBack={refresh} />;
 
   const v = state.view;
-  const ended = endedNow;
-  const shownTab: Tab = ended ? 'queue' : tab;
+  const ended = v.state === 'ENDED' || v.state === 'ARCHIVED';
   const cmd = commands(eventId, csrf ?? state.csrf);
   const props = { s: state, cmd, refresh };
   const live = v.state === 'ACTIVE' || v.state === 'PAUSED' || v.state === 'TRANSFERRING';
@@ -118,6 +116,11 @@ export default function AdminPage() {
     ['rules', 'Rules'],
     ['end', 'End the event'],
   ];
+  const go = (i: number) => {
+    const el = pager.current;
+    if (el) el.scrollTo?.({ left: i * el.clientWidth, behavior: 'smooth' });
+    setPage(PAGES[i]![0]);
+  };
   return (
     <div className="console">
       <header className="console-head">
@@ -128,19 +131,34 @@ export default function AdminPage() {
         </div>
         <ErrorLine error={error} />
       </header>
-      {!ended ? <PlaybackPanel {...props} /> : null}
-      <div className={`console-body${shownTab === 'queue' ? ' scroll' : ''}`} role="tabpanel">
-        {shownTab === 'queue' ? (
-          ended ? (
-            <CarryOverPanel s={state} eventId={eventId} />
+      <div
+        ref={pager}
+        className="pager"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          const i = Math.round(el.scrollLeft / Math.max(1, el.clientWidth));
+          const next = PAGES[Math.min(PAGES.length - 1, Math.max(0, i))]![0];
+          if (next !== page) setPage(next);
+        }}
+      >
+        <section className="page live" role="tabpanel" aria-label="Playing" id="page-live">
+          {ended ? (
+            <div className="queue-wrap scroll">
+              <CarryOverPanel s={state} eventId={eventId} />
+            </div>
           ) : (
-            <ModerationPanel {...props} />
-          )
-        ) : null}
-        {shownTab === 'invite' ? <SharePanel joinUrl={state.joinUrl} name={v.name} /> : null}
-        {shownTab === 'player' ? <PlayerPanel s={state} eventId={eventId} /> : null}
-        {shownTab === 'more' ? (
+            <>
+              <PlaybackPanel {...props} />
+              <ModerationPanel {...props} />
+            </>
+          )}
+        </section>
+        <section className="page" role="tabpanel" aria-label="Invite" id="page-invite">
+          <SharePanel joinUrl={state.joinUrl} name={v.name} />
+        </section>
+        <section className="page more" role="tabpanel" aria-label="More" id="page-more">
           <div className="stack">
+            <PlayerPanel s={state} eventId={eventId} />
             <div className="row">
               {SUBS.filter(([id]) => (id === 'time' ? live : true)).map(([id, label]) => (
                 <button
@@ -159,20 +177,20 @@ export default function AdminPage() {
             {sub === 'rules' ? <RulesPanel s={state} /> : null}
             {sub === 'end' ? <EndPanel {...props} /> : null}
           </div>
-        ) : null}
+        </section>
       </div>
-      <nav className="tabbar" role="tablist" aria-label="Organiser sections">
-        {TABS.map(([id, label]) => (
+      <nav className="pager-dots" role="tablist" aria-label="Organiser sections">
+        {PAGES.map(([id, label], i) => (
           <button
             key={id}
             type="button"
             role="tab"
-            aria-selected={shownTab === id}
-            className={`btn${shownTab === id ? ' primary' : ''}`}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </button>
+            aria-selected={page === id}
+            aria-label={label}
+            aria-controls={`page-${id}`}
+            className="dot"
+            onClick={() => go(i)}
+          />
         ))}
       </nav>
     </div>

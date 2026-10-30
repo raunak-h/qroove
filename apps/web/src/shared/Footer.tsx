@@ -1,5 +1,6 @@
 import { BRAND, footerText } from '@qroove/config';
 
+/** One thin line of small text (it wraps to two on a narrow phone). */
 export function Footer() {
   const text = footerText();
   const [before, after] = text.split(BRAND.company.name) as [string, string];
@@ -11,13 +12,17 @@ export function Footer() {
           {BRAND.company.name}
         </a>
         {after}
-      </p>
-      <nav aria-label="Project links">
+        <span className="sep" aria-hidden="true">
+          ·
+        </span>
         <a href={BRAND.docsPath}>Docs</a>
+        <span className="sep" aria-hidden="true">
+          ·
+        </span>
         <a href={BRAND.repoUrl} rel="noopener">
           Source
         </a>
-      </nav>
+      </p>
     </footer>
   );
 }

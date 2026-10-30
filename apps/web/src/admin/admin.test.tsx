@@ -375,6 +375,26 @@ describe('AdminPage', () => {
     expect(document.body.textContent).not.toContain('csrf-token');
   });
 
+  it('keeps playing + queue on one page, the QR on another, and the rest on a third; pause is an icon', async () => {
+    ok();
+    page();
+    await screen.findByText('Playing Now');
+    const pages = screen.getAllByRole('tabpanel');
+    expect(pages.map((p) => p.getAttribute('aria-label'))).toEqual(['Playing', 'Invite', 'More']);
+    expect(within(pages[0]!).getByText('Playing Now')).toBeInTheDocument();
+    expect(within(pages[0]!).getByRole('region', { name: 'Queue' }).className).toContain('queue');
+    expect(within(pages[1]!).getByRole('img', { name: /QR code/ })).toBeInTheDocument();
+    expect(within(pages[1]!).queryByText('Playing Now')).toBeNull(); // swiping shows the QR instead
+    const pause = screen.getByRole('button', { name: 'Pause' });
+    expect(pause.textContent).toBe(''); // an icon, not the word
+    expect(pause.querySelector('svg')).not.toBeNull();
+    expect(screen.getAllByRole('tab').map((t) => t.getAttribute('aria-label'))).toEqual([
+      'Playing',
+      'Invite',
+      'More',
+    ]);
+  });
+
   it('sends the CSRF header on commands, and confirms before skipping', async () => {
     ok();
     const user = userEvent.setup();

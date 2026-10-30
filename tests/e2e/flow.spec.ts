@@ -69,7 +69,7 @@ test('create → run → play manually → hand over → end → carry over', as
   await expectNoScroll(page, 'console (invite)');
   await page.getByRole('tab', { name: 'More' }).click();
   await expectNoScroll(page, 'console (more)');
-  await page.getByRole('tab', { name: 'Queue' }).click();
+  await page.getByRole('tab', { name: 'Playing' }).click();
 
   // Right-click is blocked on the organiser page ---------------------------------------------
   const blocked = await page.evaluate(() => {

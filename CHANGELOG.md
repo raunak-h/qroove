@@ -6,6 +6,8 @@ versioning: [SemVer](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- Organiser console: Playing + queue, the QR code and the rest (player, hand over, time, rules, end) are three pages to swipe between sideways, replacing the bottom tab bar, so scrolling the queue no longer affects them. Pause and Resume are icons. The queue has its own blue-grey background.
+- The footer is a single thin, small block (about a quarter of its former height), with Docs and Source inline.
 - Timeline gestures: tap a part of the bar to select it; press and hold a part to add a break in its middle (snapped to the 10-minute grid). Breaks are dragged as a whole, and only the end handle changes their length (the start handle is gone). Minutes are written above every break and every part. Breaks still cannot touch (at least 20 minutes of music between them).
 - Time stamps sit above the timeline (in a fixed-height row, so selecting a break never moves the bar); the "h:mm" caption under the time wheel is gone.
 - Breaks are royal purple (was sky blue).

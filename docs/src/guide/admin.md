@@ -47,16 +47,18 @@ Opening the link signs this browser in and then removes the secret from the addr
 - **Playback:** what is playing, what is next, the style run, and why the queue is waiting if it is. **Pause**
   keeps the next song reserved; **Resume** carries on. **Skip** (with confirmation) ends the current song; it still
   counts as played for fairness and for its owner's quota.
-  The organiser page is one screen with four tabs; only the queue list scrolls.
+  The organiser page is one screen with three pages you **swipe between sideways** (the dots at the bottom show where
+  you are and also work as buttons). Only the queue list scrolls up and down.
 
-- **Controls (always visible):** now playing, next, the genre run, why the queue is waiting, **Start / Pause /
-  Resume**, **Skip** (two taps; it still counts as played), and **Start break / End break** when a break is due.
-- **Queue:** every request with its contributor's tag. **Remove** (two taps) frees that person's slot. A song
-  marked _Possible duplicate_ is held until you choose **Distinct** or **Reject**.
-- **Invite:** only a QR code. Guests scan it with their camera; the room code alone cannot join, and there is no link
-  or copy button. Right-click and text selection are off on this page.
-- **Player:** whether a device controls playback, and a link to the player.
-- **More:** **Hand over**, **Time** (extend the end), **Rules** (read-only) and **End the event**.
+- **Playing (first page):** now playing, next, the genre run, why the queue is waiting, and the controls: **Start**,
+  **Pause** and **Resume** (icons), **Skip** (two taps; it still counts as played) and **Start break / End break**
+  when a break is due. Under them is the queue on its own blue-grey background: every request with its contributor's
+  tag. **Remove** (two taps) frees that person's slot. A song marked _Possible duplicate_ is held until you choose
+  **Distinct** or **Reject**.
+- **Invite (swipe left):** only the QR code. Guests scan it with their camera; the room code alone cannot join, and
+  there is no link or copy button. Right-click and text selection are off on this page.
+- **More (swipe again):** the player, **Hand over**, **Time** (extend the end), **Rules** (read-only) and **End the
+  event**.
 
 ## Hand over to someone else
 
@@ -69,7 +71,7 @@ secret**.
 
 ## End the event
 
-**More → End the event → End event → Yes, end the event now.** Two separate taps, nothing to type. Ending is
+**Swipe to More → End the event → End event → Yes, end the event now.** Two separate taps, nothing to type. Ending is
 permanent. Songs that never played appear under **Queue** as **Carry over to a new event**: choose which to keep,
 optionally shuffle within each style, and create the next event with the same planned time. Carried songs fit in
 that time minus one minute. The copies belong to a neutral "system" contributor that follows the same fairness
