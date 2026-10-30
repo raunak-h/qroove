@@ -21,5 +21,5 @@ export function EmbedPlayer({ source, ...events }: { source: Source } & EmbedEve
       },
     );
   }, [kind, id]);
-  return <div ref={host} className="embed-host" />;
+  return <div ref={host} className={`embed-host ${kind}`} />;
 }

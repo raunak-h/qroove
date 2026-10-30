@@ -3,13 +3,13 @@ import { useParams } from 'react-router';
 import { ApiError } from '../shared/api';
 import { useMenuRules } from '../shared/menu';
 import { useLockedPage } from '../shared/useLockedPage';
+import { PlayerConsole } from '../player/PlayerConsole';
 import { commands } from './adminApi';
 import {
   CarryOverPanel,
   EndPanel,
   HandoverPanel,
   ModerationPanel,
-  PlayerPanel,
   PlaybackPanel,
   RulesPanel,
   SchedulePanel,
@@ -46,12 +46,14 @@ const PAGES: Array<[Page, string]> = [
 
 /**
  * A fixed-height console. Swipe sideways between three pages: what is playing with the queue, the
- * QR code to join, and the less-used controls (player, hand over, time, rules, end). Only the queue
+ * QR code to join, and the less-used controls (sound check, hand over, time, rules, end). Only the queue
  * list scrolls vertically, so a swipe never fights a scroll.
  */
 export default function AdminPage() {
   const { eventId = '' } = useParams();
-  const { state, csrf, connection, error, refresh } = useAdminStream(eventId);
+  const stream = useAdminStream(eventId);
+  const { state, csrf, connection, error, refresh } = stream;
+  const [extrasSlot, setExtrasSlot] = useState<HTMLDivElement | null>(null);
   const [page, setPage] = useState<Page>('live');
   const [sub, setSub] = useState<Sub | null>(null);
   const pager = useRef<HTMLDivElement>(null);
@@ -107,6 +109,9 @@ export default function AdminPage() {
             </div>
           ) : (
             <>
+              {live ? (
+                <PlayerConsole eventId={eventId} stream={stream} extrasSlot={extrasSlot} />
+              ) : null}
               <PlaybackPanel {...props} />
               <ModerationPanel {...props} />
             </>
@@ -117,7 +122,7 @@ export default function AdminPage() {
         </section>
         <section className="page more" role="tabpanel" aria-label="More" id="page-more">
           <div className="stack">
-            <PlayerPanel s={state} eventId={eventId} />
+            <div ref={setExtrasSlot} />
             <div className="row">
               {SUBS.filter(([id]) => (id === 'time' ? live : true)).map(([id, label]) => (
                 <button

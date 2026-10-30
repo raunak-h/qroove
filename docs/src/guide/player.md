@@ -1,17 +1,16 @@
 # Player guide
 
-The player is the one device that makes sound. Open it at `/player/<event id>` (the organiser page has a
-button). It needs organiser access on that device, because taking the player role is an organiser action.
+The organiser's device plays the music. There is no separate player page: the organiser page takes the player role by
+itself, and a second device with organiser access takes over from the first. After a handover, the new organiser's device
+becomes the player.
 
-## Set up before doors open
+## Starting
 
-1. **Take the player role.** Press _Use this device as the player_. If another device is already the
-   player you will be asked to take over. Taking over stops the other device; whatever it was playing counts
-   as played, and you start the next song yourself.
-2. **Sound check.** Press _Play test chime_ and listen in the room. Starting a song is blocked until you
-   have done this once.
-3. **Choose your music.** Pick files (or a whole folder where the browser supports it). They are read in
-   the browser and **never uploaded**; Qroove never streams, hosts or copies recordings.
+Press **Start playing** at the top of the organiser page. Browsers need one tap before they play sound; after that, songs
+start by themselves. **Keep the page open**, because the music stops if you leave it.
+
+Under **More** you will find an optional test chime and **Sound check and audio files**, where you can pick files or a
+folder. They are read in the browser and **never uploaded**.
 
 Each requested song is matched to a file by the same artist/title/version fingerprint the server uses for
 duplicates, so `Marc Anthony - Vivir Mi Vida.mp3` matches a request for "Vivir Mi Vida (feat. X)" by Marc

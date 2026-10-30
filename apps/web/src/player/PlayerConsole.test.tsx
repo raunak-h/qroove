@@ -1,8 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import PlayerPage from './PlayerPage';
+import { useAdminStream } from '../admin/useAdminStream';
+import { PlayerConsole } from './PlayerConsole';
 
 type Events = import('./embed').EmbedEvents;
 let embedEvents: Events | null = null;
@@ -98,24 +98,21 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-const open = () =>
-  render(
-    <MemoryRouter initialEntries={['/player/ev1']}>
-      <Routes>
-        <Route path="/player/:eventId" element={<PlayerPage />} />
-      </Routes>
-    </MemoryRouter>,
-  );
+function Harness() {
+  const stream = useAdminStream('ev1');
+  return <PlayerConsole eventId="ev1" stream={stream} extrasSlot={document.body} />;
+}
+const open = () => render(<Harness />);
 
-async function ready(user: ReturnType<typeof userEvent.setup>) {
-  await screen.findByText(/Vivir Mi Vida — Marc Anthony/);
-  await user.click(screen.getByRole('button', { name: 'Use this device as the player' }));
-  await screen.findByText(/This device is playing/);
-  await user.click(screen.getByRole('button', { name: 'Play test chime' }));
-  await screen.findByText('Sound check done.');
+/** The console takes the player role by itself; nothing else is needed before Start. */
+async function ready() {
+  await waitFor(() => expect(calls.some((c) => c.url.endsWith('/player/claim'))).toBe(true));
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: /Start playing|Mark started/ })).toBeEnabled(),
+  );
 }
 
-describe('PlayerPage with a Spotify or YouTube link', () => {
+describe('PlayerConsole with a Spotify link', () => {
   const withLink = () => {
     const st = mkState({ reserved: true });
     (st.requests[0] as { sourceUrl: string }).sourceUrl =
@@ -127,9 +124,8 @@ describe('PlayerPage with a Spotify or YouTube link', () => {
     withLink();
     const user = userEvent.setup();
     open();
-    await ready(user);
-    await screen.findByText(/Plays in its official player/);
-    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await ready();
+    await user.click(screen.getByRole('button', { name: 'Start playing' }));
     await waitFor(() => expect(embedEvents).not.toBeNull());
     expect(calls.some((c) => c.url.endsWith('/player/started'))).toBe(false); // not until audio plays
     act(() => embedEvents!.onPlaying(200_000));
@@ -142,8 +138,8 @@ describe('PlayerPage with a Spotify or YouTube link', () => {
     withLink();
     const user = userEvent.setup();
     open();
-    await ready(user);
-    await user.click(await screen.findByRole('button', { name: 'Start' }));
+    await ready();
+    await user.click(await screen.findByRole('button', { name: 'Start playing' }));
     await waitFor(() => expect(embedEvents).not.toBeNull());
     act(() => embedEvents!.onFailed('preview'));
     await screen.findByText(/only a 30-second preview/);
@@ -153,25 +149,28 @@ describe('PlayerPage with a Spotify or YouTube link', () => {
   });
 });
 
-describe('PlayerPage', () => {
-  it('blocks Start until the lease is held and the sound check is done', async () => {
+describe('PlayerConsole', () => {
+  it('takes the player role by itself, with a takeover, and needs no sound check', async () => {
     open();
-    await screen.findByText(/No matching file on this device/);
-    expect(screen.getByRole('button', { name: 'Mark started' })).toBeDisabled();
-    expect(screen.getByText('Take the player role first.')).toBeInTheDocument();
+    await ready();
+    expect(calls.find((c) => c.url.endsWith('/player/claim'))!.body).toMatchObject({
+      takeover: true,
+    });
   });
 
   it('plays a matched file: reports started on "playing" and finished on "ended"', async () => {
     const user = userEvent.setup();
     const { container } = open();
-    await ready(user);
-    const input = container.querySelector('input[type=file][multiple]:not([webkitdirectory])')!;
+    await ready();
+    const input = document.querySelector('input[type=file][multiple]:not([webkitdirectory])')!;
     await user.upload(
       input as HTMLInputElement,
       new File(['x'], 'Marc Anthony - Vivir Mi Vida.mp3', { type: 'audio/mpeg' }),
     );
-    await screen.findByText(/File found: Marc Anthony - Vivir Mi Vida.mp3/);
-    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await screen.findByText(/File found: Marc Anthony - Vivir Mi Vida.mp3/, undefined, {
+      timeout: 3000,
+    });
+    await user.click(screen.getByRole('button', { name: 'Start playing' }));
     const audio = container.querySelector('audio')!;
     expect(HTMLMediaElement.prototype.play).toHaveBeenCalled();
     await act(async () => {
@@ -193,7 +192,7 @@ describe('PlayerPage', () => {
   it('manual mode: mark started, then mark ended; never auto-ends', async () => {
     const user = userEvent.setup();
     open();
-    await ready(user);
+    await ready();
     expect(screen.getByRole('link', { name: /requester's link/ })).toHaveAttribute(
       'href',
       'https://open.spotify.com/track/x',
@@ -205,19 +204,19 @@ describe('PlayerPage', () => {
   it('stops and says so when the server reports a stale lease', async () => {
     const user = userEvent.setup();
     const { container } = open();
-    await ready(user);
+    await ready();
     failPath = '/player/started';
-    const input = container.querySelector('input[type=file][multiple]:not([webkitdirectory])')!;
+    const input = document.querySelector('input[type=file][multiple]:not([webkitdirectory])')!;
     await user.upload(
       input as HTMLInputElement,
       new File(['x'], 'Marc Anthony - Vivir Mi Vida.mp3', { type: 'audio/mpeg' }),
     );
     await screen.findByText(/File found/);
-    await user.click(screen.getByRole('button', { name: 'Start' }));
+    await user.click(screen.getByRole('button', { name: 'Start playing' }));
     await act(async () => {
       fireEvent.playing(container.querySelector('audio')!);
     });
-    expect(await screen.findByText('Another device took over playback')).toBeInTheDocument();
+    expect(await screen.findByText(/Another device took over playback/)).toBeInTheDocument();
     expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled();
     expect(sessionStorage.getItem('qroove:lease:ev1')).toBeNull();
   });

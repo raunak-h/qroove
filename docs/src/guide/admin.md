@@ -82,4 +82,4 @@ rules, and you can remove any before starting.
 
 ## Playing Spotify songs
 
-On the player page, a song with a Spotify link plays in Spotify's own player when no local file matches. Use a browser signed in to Spotify Premium, or Spotify offers only a 30-second preview; Qroove then refuses to start the song and offers the link and **Mark started**. You still need the licences to play music at your venue.
+On the organiser page, a song with a Spotify link plays in Spotify's own player when no local file matches. Use a browser signed in to Spotify Premium, or Spotify offers only a 30-second preview; Qroove then refuses to start the song and offers the link and **Mark started**. You still need the licences to play music at your venue.

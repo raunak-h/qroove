@@ -1,6 +1,6 @@
 import type { AdminRequestView, ExportSnapshot } from '@qroove/contracts';
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { GenreSwatch } from '../shared/Genre';
 import { ApiError } from '../shared/api';
 import { formatClock, fromLocalInput, pluralise, toLocalInput } from '../shared/time';
@@ -314,28 +314,6 @@ export function HandoverPanel({ s, cmd, refresh, eventId }: PanelProps & { event
         </div>
       ) : null}
       <ErrorLine error={error} />
-    </section>
-  );
-}
-
-export function PlayerPanel({ s, eventId }: { s: AdminStateResponse; eventId: string }) {
-  return (
-    <section className="card stack" aria-labelledby="pl-h">
-      <h2 id="pl-h">Player</h2>
-      {s.lease ? (
-        <p>A device is controlling playback (session {s.lease.epoch}).</p>
-      ) : (
-        <p className="muted">No device is controlling playback.</p>
-      )}
-      <p>
-        <Link className="btn" to={`/player/${eventId}`}>
-          Open the player on the speaker device
-        </Link>
-      </p>
-      <p className="muted small">
-        Opening it on another device takes over playback; the previous device is stopped and the
-        song it was playing counts as played.
-      </p>
     </section>
   );
 }

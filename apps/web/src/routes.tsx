@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react';
-import { Navigate, Route, Routes } from 'react-router';
+import { Navigate, Route, Routes, useParams } from 'react-router';
 import { EventPage } from './attendee/EventPage';
 import { Landing } from './landing/Landing';
 import { Privacy } from './landing/Privacy';
@@ -10,7 +10,12 @@ const CreateEvent = lazy(() => import('./admin/CreateEvent'));
 const AdminEntry = lazy(() => import('./admin/AdminEntry'));
 const AdminPage = lazy(() => import('./admin/AdminPage'));
 const Historical = lazy(() => import('./admin/Historical'));
-const PlayerPage = lazy(() => import('./player/PlayerPage'));
+
+/** Old links: the player now lives on the organiser page. */
+function PlayerRedirect() {
+  const { eventId = '' } = useParams();
+  return <Navigate to={`/admin/${eventId}`} replace />;
+}
 
 export function AppRoutes() {
   return (
@@ -27,7 +32,7 @@ export function AppRoutes() {
             <Route path="/claim/:eventId" element={<AdminEntry mode="claim" />} />
             <Route path="/admin/:eventId" element={<AdminPage />} />
             <Route path="/h/:slug" element={<Historical />} />
-            <Route path="/player/:eventId" element={<PlayerPage />} />
+            <Route path="/player/:eventId" element={<PlayerRedirect />} />
             <Route path="*" element={<Landing />} />
           </Routes>
         </Suspense>

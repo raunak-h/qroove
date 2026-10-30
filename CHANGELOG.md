@@ -13,6 +13,7 @@ versioning: [SemVer](https://semver.org/).
 
 ### Changed
 - Joining requires a name.
+- The organiser's device is now the player: the organiser page takes the role by itself and shows one **Start playing** button, with a warning while nothing plays. The separate player page and the required sound check are gone; the chime and local files are optional under More.
 - The queue now looks only at genres: one person's songs can play back to back, up to each genre's limit. The per-person song limit stays, and an event with one genre has no run limit.
 - Landing page: the "Start from a playlist" button and the tagline are gone. The footer is now a short copyright and contact note there, and a single copyright line on every other page. The licence moved to a new License page in the docs.
 - The interface and its messages now mention only Spotify, for the first test.

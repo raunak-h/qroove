@@ -129,13 +129,7 @@ test('create → run → play manually → hand over → end → carry over', as
   const player = await newPage(browser, ctxOpts);
   await player.page.goto(`/a/${eventId}${adminUrl.slice(adminUrl.indexOf('#'))}`);
   await expect(player.page.getByRole('heading', { name: eventName })).toBeVisible();
-  await player.page.goto(`/player/${eventId}`);
-  await expect(player.page.getByText(/No matching file on this device/)).toBeVisible();
-  await expectAccessible(player.page, '/player');
-  await player.page.getByRole('button', { name: 'Use this device as the player' }).click();
-  await expect(player.page.getByText(/This device is playing/)).toBeVisible();
-  await player.page.getByRole('button', { name: 'Play test chime' }).click();
-  await expect(player.page.getByText('Sound check done.')).toBeVisible();
+  await expectAccessible(player.page, '/admin (player)');
   await player.page.getByRole('button', { name: 'Mark started' }).click();
   await expect(player.page.getByRole('button', { name: 'Mark ended' })).toBeVisible();
 
