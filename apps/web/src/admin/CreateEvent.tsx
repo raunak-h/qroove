@@ -15,45 +15,13 @@ import {
   type BreakSlot,
 } from '@qroove/contracts/breaks';
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { ApiError } from '../shared/api';
 import { GenreDot, GenreSwatch, StyleGrid } from '../shared/Genre';
 import { WheelPicker } from '../shared/WheelPicker';
-import { adminApi, type Created } from './adminApi';
+import { adminApi, organiserPath } from './adminApi';
 import { hm, TimelineBar } from './TimelineBar';
 import { ErrorLine } from './useAction';
-
-/** The organiser link is shown exactly once; losing it means falling back to the recovery secret. */
-export function CreatedPanel({ created }: { created: Created }) {
-  const u = new URL(created.adminUrl);
-  return (
-    <section className="card stack" aria-labelledby="cr-h">
-      <h1 id="cr-h">{created.name}</h1>
-      <p className="warning" role="note">
-        <strong>Save this link — it is the only way to control the event.</strong> It is shown once
-        and is not stored anywhere we can show you again.
-      </p>
-      <p className="mono">{created.adminUrl}</p>
-      <div className="row">
-        <Link className="btn primary" to={`${u.pathname}${u.hash}`}>
-          Open organiser page
-        </Link>
-      </div>
-      <details>
-        <summary>Recovery secret</summary>
-        <p className="muted">
-          If you lose the link, this secret restores access. Keep it somewhere private and separate
-          from the link.
-        </p>
-        <p className="mono">{created.recoverySecret}</p>
-      </details>
-      <p className="muted">
-        {created.seeded ? `${created.seeded} songs from your playlist are queued. ` : ''}
-        Guests join by scanning the QR code on your organiser page.
-      </p>
-    </section>
-  );
-}
 
 interface Seg {
   styles: Set<StyleId>;
@@ -114,9 +82,7 @@ export default function CreateEvent() {
   const [lists, setLists] = useState<Partial<Record<StyleId, string>>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
-  const [created, setCreated] = useState<Created | null>(null);
-
-  if (created) return <CreatedPanel created={created} />;
+  const go = useNavigate();
 
   const cur = segs[Math.min(sel, segs.length - 1)]!;
   const curIndex = Math.min(sel, segs.length - 1);
@@ -146,37 +112,37 @@ export default function CreateEvent() {
     setError(null);
     try {
       const first = segs[0]!;
-      setCreated(
-        await adminApi.create({
-          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-          enabledStyles: orderedStyles(first.styles),
-          masterRunCap: first.master,
-          segments: segs.map((s) => ({
-            enabledStyles: orderedStyles(s.styles),
-            masterRunCap: s.master,
-            ...(Object.keys(s.ratio).length
-              ? {
-                  ratio: Object.fromEntries(
-                    genresOf(orderedStyles(s.styles)).map((g) => [g, s.ratio[g] ?? s.master]),
-                  ),
-                }
-              : {}),
-          })),
-          submissionLimit: limit,
-          plannedDurationMin: planned,
-          ...(breaks.length
+      // Straight to the organiser page: the entry route signs this browser in and clears the secret.
+      const made = await adminApi.create({
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        enabledStyles: orderedStyles(first.styles),
+        masterRunCap: first.master,
+        segments: segs.map((s) => ({
+          enabledStyles: orderedStyles(s.styles),
+          masterRunCap: s.master,
+          ...(Object.keys(s.ratio).length
             ? {
-                breaks: breaks.map((b) => ({
-                  startMin: b.startMin,
-                  durationSec: b.durationMin * 60,
-                })),
+                ratio: Object.fromEntries(
+                  genresOf(orderedStyles(s.styles)).map((g) => [g, s.ratio[g] ?? s.master]),
+                ),
               }
             : {}),
-          ...(chosen.length
-            ? { playlists: chosen.map((id) => ({ url: lists[id]!.trim(), style: id })) }
-            : {}),
-        }),
-      );
+        })),
+        submissionLimit: limit,
+        plannedDurationMin: planned,
+        ...(breaks.length
+          ? {
+              breaks: breaks.map((b) => ({
+                startMin: b.startMin,
+                durationSec: b.durationMin * 60,
+              })),
+            }
+          : {}),
+        ...(chosen.length
+          ? { playlists: chosen.map((id) => ({ url: lists[id]!.trim(), style: id })) }
+          : {}),
+      });
+      go(organiserPath(made), { replace: true });
     } catch (err) {
       setError(err instanceof ApiError ? err : null);
     } finally {

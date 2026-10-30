@@ -159,11 +159,18 @@ describe('CreateEvent', () => {
       seeded: 0,
     },
   };
+  /** Create, then the entry route signs in, then the organiser page loads its state. */
+  const flow = (c: Call) =>
+    c.url === '/api/events'
+      ? created
+      : c.url.endsWith('/admin/session')
+        ? { body: { ok: true, csrf: 'c' } }
+        : { body: state() };
   const wheel = (name: string) => screen.getByRole('spinbutton', { name });
   const styleBox = (name: string) => screen.getByRole('checkbox', { name });
 
   it('has no event-name field, a 2:00 time drum, and the default styles', async () => {
-    respond = () => created;
+    respond = flow;
     page('/new');
     expect(screen.queryByLabelText(/event name/i)).toBeNull();
     expect(wheel('Planned time')).toHaveAttribute('aria-valuetext', '2:00');
@@ -177,7 +184,7 @@ describe('CreateEvent', () => {
   });
 
   it('sends the drum choices and a break tapped on the bar, and shows the generated name', async () => {
-    respond = () => created;
+    respond = flow;
     Element.prototype.getBoundingClientRect = () =>
       ({
         left: 0,
@@ -204,8 +211,12 @@ describe('CreateEvent', () => {
     await user.click(screen.getByRole('button', { name: /^Part 2 of 2/ })); // a plain tap selects it
     await user.click(styleBox('Bachata')); // part two drops bachata
     await user.click(screen.getByRole('button', { name: 'Create event' }));
-    expect(await screen.findByRole('heading', { name: 'Mango Octopus Rye' })).toBeInTheDocument();
-    expect(document.body.textContent).not.toContain('JOINKEY');
+    // Straight to the organiser page: no interstitial with a link or a recovery secret.
+    expect(await screen.findByRole('heading', { name: 'Friday Social' })).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Save this link|RECOVERY|SECRETSECRET|JOINKEY/);
+    const session = calls.find((c) => c.url.endsWith('/admin/session'))!;
+    expect(session.url).toBe('/api/events/ev1/admin/session');
+    expect(session.body).toEqual({ secret: 'SECRETSECRET' });
     const body = calls[0]!.body as Record<string, unknown>;
     expect(body).not.toHaveProperty('name');
     expect(body).toMatchObject({
@@ -226,7 +237,7 @@ describe('CreateEvent', () => {
   });
 
   it('defaults to an equal split, and refuses a ratio below one part in ten', async () => {
-    respond = () => created;
+    respond = flow;
     const user = userEvent.setup();
     page('/new');
     await user.click(styleBox('Cha-cha')); // three genres
@@ -248,7 +259,7 @@ describe('CreateEvent', () => {
   });
 
   it('needs at least one style in every part', async () => {
-    respond = () => created;
+    respond = flow;
     const user = userEvent.setup();
     page('/new');
     for (const s of [
@@ -269,7 +280,7 @@ describe('CreateEvent', () => {
     const link = (style: string) => screen.getByLabelText(`Playlist link for ${style}`);
 
     it('lays the fields out like the style grid, one per active style', () => {
-      respond = () => created;
+      respond = flow;
       page('/new#playlist');
       const labels = screen
         .getAllByLabelText(/Playlist link for/)
@@ -284,7 +295,7 @@ describe('CreateEvent', () => {
     });
 
     it('needs a playlist for every active genre once any playlist is added', async () => {
-      respond = () => created;
+      respond = flow;
       const user = userEvent.setup();
       page('/new#playlist');
       await user.type(link('Salsa'), SPOT);
@@ -295,7 +306,7 @@ describe('CreateEvent', () => {
       expect(screen.queryByText(/playlist for every genre/i)).toBeNull();
       expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
       await user.click(screen.getByRole('button', { name: 'Create event' }));
-      await screen.findByText(/Save this link/);
+      await screen.findByRole('heading', { name: 'Friday Social' });
       expect(calls[0]!.body).toMatchObject({
         playlists: [
           { url: SPOT, style: 'salsa' },
@@ -305,7 +316,7 @@ describe('CreateEvent', () => {
     });
 
     it('asks for cha-cha too once it is selected, and for Other', async () => {
-      respond = () => created;
+      respond = flow;
       const user = userEvent.setup();
       page('/new#playlist');
       await user.type(link('Salsa'), SPOT);
@@ -535,33 +546,28 @@ describe('AdminPage', () => {
       name: 'Friday Social (next)',
       plannedDurationMin: 120,
     });
-    expect(await screen.findByText(/Save this link/)).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Friday Social' })).toBeInTheDocument();
+    expect(document.body.textContent).not.toMatch(/Save this link|RECOVERY/);
     void within;
   });
 
-  it('offers recovery when access is lost', async () => {
-    respond = (c) =>
-      c.url.endsWith('/admin/recover')
-        ? { body: { ok: true, csrf: 'x' } }
-        : {
-            status: 401,
-            body: {
-              error: {
-                code: 'UNAUTHORISED',
-                message: 'You do not have permission to do that.',
-                action: 'Open the link you were given, or ask the organiser.',
-              },
-            },
-          };
-    const user = userEvent.setup();
+  it('explains lost access plainly, with no recovery form', async () => {
+    respond = () => ({
+      status: 401,
+      body: {
+        error: {
+          code: 'UNAUTHORISED',
+          message: 'You do not have permission to do that.',
+          action: 'Open the link you were given, or ask the organiser.',
+        },
+      },
+    });
     page();
     expect(await screen.findByText(/You do not have organiser access/)).toBeInTheDocument();
-    await user.type(screen.getByLabelText('Recovery secret'), 'R'.repeat(20));
-    await user.click(screen.getByRole('button', { name: 'Recover access' }));
-    await waitFor(() =>
-      expect(calls.find((c) => c.url.endsWith('/admin/recover'))?.body).toEqual({
-        recoverySecret: 'R'.repeat(20),
-      }),
-    );
+    expect(
+      screen.getByText(/ask the current organiser to hand the event over/i),
+    ).toBeInTheDocument();
+    expect(screen.queryByLabelText(/recovery/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /recover/i })).toBeNull();
   });
 });

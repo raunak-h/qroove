@@ -1,6 +1,6 @@
 # Organiser guide
 
-You run an event from your phone. There is no account: control belongs to whoever holds the organiser link.
+You run an event from your phone. There is no account: control belongs to the browser that created the event (or that took it over by a handover).
 
 ## Create an event
 
@@ -29,15 +29,12 @@ _Mango Octopus Rye_ ([ADR 0013](/adr/0013-generated-event-names)).
   queued up to one minute less than the planned time. These are public web pages, so the import is best effort and
   long playlists are cut short; if a link cannot be read you can still add songs by hand.
 
-## Save the organiser link
+## After you create it
 
-![The link is shown once](/screens/admin-created.png){width=280}
-
-The organiser link is shown **once**. Copy it somewhere private. Anyone with it can run the event, so do not post
-it where attendees can see it. The **recovery secret** under it restores access if the link is lost; keep it
-separately. Guests do not use this link.
-
-Opening the link signs this browser in and then removes the secret from the address bar.
+Pressing **Create event** takes you straight to the organiser page: this browser is signed in automatically and the
+secret never appears on screen. There is no link or recovery code to save. The catch is that control belongs to
+this browser: if you clear its data or switch phones, you cannot get back in on your own. To change devices on
+purpose, use **Hand over** (below) before you leave.
 
 ## Run the event
 
@@ -66,8 +63,8 @@ Opening the link signs this browser in and then removes the secret from the addr
 opens it, your access ends immediately, playback pauses, the song in progress counts as played, and they resume
 when ready. Changed your mind? Use **Cancel handover and resume**.
 
-If you lose access (a handover, a cleared browser, a lost link) open the organiser page and enter the **recovery
-secret**.
+If you lose access (a handover, a cleared browser) the organiser page says so; ask the current organiser to hand the
+event over to you.
 
 ## End the event
 

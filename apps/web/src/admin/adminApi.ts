@@ -92,3 +92,9 @@ export const playerApi = {
   release: (id: string, l: LeaseCreds) =>
     request<{ ok: true }>('POST', `${player(id)}/release`, { body: l }),
 };
+
+/** `/a/:id#k=…` for a freshly created event: the entry route signs in and removes the secret. */
+export function organiserPath(c: Pick<Created, 'adminUrl'>): string {
+  const u = new URL(c.adminUrl);
+  return `${u.pathname}${u.hash}`;
+}

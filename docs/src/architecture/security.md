@@ -2,18 +2,20 @@
 
 ## Credentials
 
-| Credential       | Form                                        | Stored                        |
-| ---------------- | ------------------------------------------- | ----------------------------- |
-| Participant      | 32 random bytes, sent as `Bearer id:token`  | SHA-256 only                  |
-| Admin capability | 32 random bytes in the URL **fragment**     | SHA-256 only (`adminGrants`)  |
-| Recovery secret  | 32 random bytes, shown once at creation     | SHA-256 only, role `recovery` |
-| Player lease     | 32 random bytes + monotonic epoch           | SHA-256 only                  |
-| Handover code    | 16 Crockford characters, single use, 10 min | SHA-256 only                  |
+| Credential       | Form                                                          | Stored                        |
+| ---------------- | ------------------------------------------------------------- | ----------------------------- |
+| Participant      | 32 random bytes, sent as `Bearer id:token`                    | SHA-256 only                  |
+| Admin capability | 32 random bytes in the URL **fragment**                       | SHA-256 only (`adminGrants`)  |
+| Recovery secret  | 32 random bytes, returned by the API but not shown in the app | SHA-256 only, role `recovery` |
+| Player lease     | 32 random bytes + monotonic epoch                             | SHA-256 only                  |
+| Handover code    | 16 Crockford characters, single use, 10 min                   | SHA-256 only                  |
 
 The admin URL keeps its secret in the fragment, which browsers never send, so it does not reach logs or
 referrers. The page exchanges it once at `POST /admin/session` for an HttpOnly, `SameSite=Strict` cookie scoped
 to `/api/events/<id>` (and `Secure` in production). Handover revokes every earlier admin grant server-side, so a
-stale admin cannot return by refreshing; the recovery secret is the only other way back in.
+stale admin cannot return by refreshing. The app creates the event and signs the creating browser in directly
+(`/a/<id>#k=…` is opened by the client itself), so the link and the recovery secret are never displayed; the
+recovery endpoint still exists for operators who read the create response.
 
 ## CSRF and origin
 

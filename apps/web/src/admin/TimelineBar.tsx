@@ -145,10 +145,6 @@ export function TimelineBar({
         <span className="tl-sel" role="status">
           {selBreak !== null && breaks[selBreak] ? (
             <>
-              <span className="mono">
-                {hm(breaks[selBreak]!.startMin)} –{' '}
-                {hm(breaks[selBreak]!.startMin + breaks[selBreak]!.durationMin)}
-              </span>
               <button
                 type="button"
                 className="btn"
@@ -196,9 +192,10 @@ export function TimelineBar({
         aria-label="Evening timeline. Tap a part to choose its styles, press and hold to add a break."
       >
         {spans.map(([from, to], i) => (
-          <button
+          <div
             key={i}
-            type="button"
+            role="button"
+            tabIndex={0}
             aria-pressed={i === selected}
             aria-label={`Part ${i + 1} of ${spans.length}, ${Math.round(to - from)} minutes`}
             className={`tl-seg${i === selected ? ' sel' : ''}`}
@@ -223,13 +220,16 @@ export function TimelineBar({
               if (e.key === 'b' || e.key === 'B') {
                 e.preventDefault();
                 addIn(i);
+              } else if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onSelect(i);
               }
             }}
           >
             {STYLE_PRESETS.filter((s) => segments[i]?.includes(s.id)).map((s) => (
               <GenreBand key={s.id} style={s.id} />
             ))}
-          </button>
+          </div>
         ))}
         {breaks.map((b, i) => (
           <div
@@ -288,7 +288,7 @@ export function TimelineBar({
 
 function GenreBand({ style }: { style: StyleId }) {
   return (
-    <span
+    <div
       className={`tl-band${isNonLatin(style) ? ' striped' : ''}`}
       style={{ ['--c' as string]: GENRE_COLOURS[genreOf(style)] }}
     />

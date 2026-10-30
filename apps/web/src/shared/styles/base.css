@@ -6,6 +6,7 @@
   --accent: #f2a541;
   --accent-text: #1c1b1f;
   --queue-bg: #1f2a44; /* a cool blue-grey, distinct from the warm card surface */
+  --btn-bg: #45414d; /* lighter than the page and cards, so buttons read as buttons */
   --radius: 12px;
   color-scheme: dark;
 }
@@ -17,6 +18,7 @@
   --accent: #9a5b00;
   --accent-text: #fff;
   --queue-bg: #dce6f7;
+  --btn-bg: #e1d8ee;
   color-scheme: light;
 }
 * {
@@ -198,7 +200,7 @@ summary:focus-visible,
   padding: 0.5rem 1rem;
   font: inherit;
   color: var(--text);
-  background: transparent;
+  background: var(--btn-bg);
   border: 2px solid var(--muted);
   border-radius: 8px;
   cursor: pointer;
@@ -219,6 +221,7 @@ summary:focus-visible,
 .btn.ghost {
   border-color: transparent;
   color: var(--accent);
+  background: transparent;
 }
 .btn:disabled {
   opacity: 0.5;
@@ -891,9 +894,6 @@ body.console .layout main {
   outline: 3px solid var(--accent);
 }
 .tl-seg {
-  padding: 0;
-  border: 0;
-  font: inherit;
   cursor: pointer;
   -webkit-touch-callout: none;
   user-select: none;
@@ -910,7 +910,9 @@ body.console .layout main {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
 .tl-band {
-  flex: 1;
+  flex: 1 1 0;
+  min-height: 0;
+  display: block;
   background-color: var(--c);
   border-top: 1px solid #fff;
 }

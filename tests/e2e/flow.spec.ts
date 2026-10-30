@@ -50,13 +50,18 @@ test('create → run → play manually → hand over → end → carry over', as
     '60',
   );
   await expectAccessible(page, '/new (with a break)');
+  // Creating goes straight to the organiser page: no interstitial, no link or recovery secret shown.
+  const created = page.waitForResponse(
+    (r) => r.url().endsWith('/api/events') && r.request().method() === 'POST',
+  );
   await page.getByRole('button', { name: 'Create event' }).click();
-  await expect(page.getByText(/Save this link/)).toBeVisible();
+  const made = (await (await created).json()) as { adminUrl: string };
+  const adminUrl = made.adminUrl;
+  expect(adminUrl).toContain('#k=');
+  await expect(page).toHaveURL(/\/admin\//);
+  await expect(page.getByText(/Save this link|recovery/i)).toHaveCount(0);
   const eventName = (await page.getByRole('heading', { level: 1 }).innerText()).trim();
   expect(eventName).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+ [A-Z][a-z]+$/);
-  const adminUrl = (await page.locator('p.mono').first().innerText()).trim();
-  expect(adminUrl).toContain('#k=');
-  await page.getByRole('link', { name: 'Open organiser page' }).click();
   await expect(page.getByRole('heading', { name: eventName })).toBeVisible();
   const eventId = new URL(page.url()).pathname.split('/').pop()!;
 
@@ -162,7 +167,9 @@ test('create → run → play manually → hand over → end → carry over', as
   await expect(admin.getByRole('heading', { name: 'Carry over to a new event' })).toBeVisible();
   await expectAccessible(admin, '/admin (ended)');
   await admin.getByRole('button', { name: 'Create event from these' }).click();
-  await expect(admin.getByText(/Save this link/)).toBeVisible();
+  // The carried-over event opens straight on its own organiser page, with a new generated name.
+  await expect(admin.getByRole('heading', { level: 1 })).not.toHaveText(eventName);
+  await expect(admin.getByRole('button', { name: 'Start event' })).toBeVisible();
 
   // Remaining public pages ------------------------------------------------------------------
   await page.goto('/privacy');

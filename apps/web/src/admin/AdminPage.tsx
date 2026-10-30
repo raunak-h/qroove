@@ -4,7 +4,7 @@ import { ConnectionBadge } from '../attendee/ConnectionBadge';
 import { ApiError } from '../shared/api';
 import { useMenuRules } from '../shared/menu';
 import { useLockedPage } from '../shared/useLockedPage';
-import { adminApi, commands } from './adminApi';
+import { commands } from './adminApi';
 import {
   CarryOverPanel,
   EndPanel,
@@ -19,17 +19,7 @@ import {
 import { ErrorLine } from './useAction';
 import { useAdminStream } from './useAdminStream';
 
-function AccessLost({
-  eventId,
-  error,
-  onBack,
-}: {
-  eventId: string;
-  error: ApiError;
-  onBack: () => void;
-}) {
-  const [secret, setSecret] = useState('');
-  const [err, setErr] = useState<ApiError | null>(null);
+function AccessLost({ error }: { error: ApiError }) {
   return (
     <section className="card stack" role="alert">
       <h1>{error.status === 401 ? 'You do not have organiser access' : 'Something went wrong'}</h1>
@@ -37,33 +27,10 @@ function AccessLost({
         {error.message} {error.action}
       </p>
       {error.status === 401 ? (
-        <>
-          <p className="muted">
-            Open your organiser link again. If it was lost, or someone took over, the recovery
-            secret you were given at creation restores access.
-          </p>
-          <label htmlFor="rec">Recovery secret</label>
-          <input
-            id="rec"
-            value={secret}
-            onChange={(e) => setSecret(e.target.value)}
-            autoComplete="off"
-          />
-          <ErrorLine error={err} />
-          <button
-            type="button"
-            className="btn primary"
-            disabled={secret.trim().length < 16}
-            onClick={() =>
-              void adminApi
-                .recover(eventId, secret.trim())
-                .then(onBack)
-                .catch((e: unknown) => setErr(e instanceof ApiError ? e : null))
-            }
-          >
-            Recover access
-          </button>
-        </>
+        <p className="muted">
+          Open the organiser link you were given again, or ask the current organiser to hand the
+          event over to you.
+        </p>
       ) : null}
     </section>
   );
@@ -97,13 +64,9 @@ export default function AdminPage() {
   }, []);
 
   if (!state) {
-    return error ? (
-      <AccessLost eventId={eventId} error={error} onBack={refresh} />
-    ) : (
-      <p role="status">Loading…</p>
-    );
+    return error ? <AccessLost error={error} /> : <p role="status">Loading…</p>;
   }
-  if (error?.status === 401) return <AccessLost eventId={eventId} error={error} onBack={refresh} />;
+  if (error?.status === 401) return <AccessLost error={error} />;
 
   const v = state.view;
   const ended = v.state === 'ENDED' || v.state === 'ARCHIVED';

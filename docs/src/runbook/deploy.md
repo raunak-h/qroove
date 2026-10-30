@@ -34,7 +34,7 @@ curl -sI https://qroove.sataklela.com/docs/changelog  # 200
 
 ## Smoke test on two real phones
 
-1. Phone A: open the site, **Create an event**, save the organiser link, open the organiser page, **Start**.
+1. Phone A: open the site, **Create an event** (it opens the organiser page directly), **Start**.
 2. Phone B (not on the same Wi-Fi if possible): join with the code or QR, add a song by pasting a Spotify
    link, and one by title.
 3. Phone A: the request appears; open the player on the speaker device, do the **sound check** through the

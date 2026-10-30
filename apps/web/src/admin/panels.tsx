@@ -1,13 +1,18 @@
 import type { AdminRequestView, ExportSnapshot } from '@qroove/contracts';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { GenreSwatch } from '../shared/Genre';
 import { ApiError } from '../shared/api';
 import { formatClock, fromLocalInput, pluralise, toLocalInput } from '../shared/time';
 import { RulesList } from '../shared/menu';
 import { ConfirmButton, CopyButton, QrCode } from '../shared/widgets';
-import { adminApi, type AdminStateResponse, type Commands, type Created } from './adminApi';
-import { CreatedPanel } from './CreateEvent';
+import {
+  adminApi,
+  organiserPath,
+  type AdminStateResponse,
+  type Commands,
+  type Created,
+} from './adminApi';
 import { ErrorLine, useAction } from './useAction';
 
 interface PanelProps {
@@ -446,7 +451,7 @@ export function ImportPicker({
 export function CarryOverPanel({ s, eventId }: { s: AdminStateResponse; eventId: string }) {
   const [songs, setSongs] = useState<ExportSnapshot | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
-  const [created, setCreated] = useState<Created | null>(null);
+  const go = useNavigate();
   const ended = s.view.state === 'ENDED' || s.view.state === 'ARCHIVED';
 
   useEffect(() => {
@@ -462,7 +467,6 @@ export function CarryOverPanel({ s, eventId }: { s: AdminStateResponse; eventId:
   }, [ended, eventId]);
 
   if (!ended) return null;
-  if (created) return <CreatedPanel created={created} />;
   return (
     <section className="card stack" aria-labelledby="co-h">
       <h2 id="co-h">Carry over to a new event</h2>
@@ -477,7 +481,7 @@ export function CarryOverPanel({ s, eventId }: { s: AdminStateResponse; eventId:
           name={`${s.view.name} (next)`.slice(0, 80)}
           plannedDurationMin={s.plannedDurationMin ?? 120}
           intro="These songs never played. They join the new event owned by a neutral “system” contributor and follow the same fairness rules; you can remove any of them before starting."
-          onCreated={setCreated}
+          onCreated={(c: Created) => go(organiserPath(c))}
         />
       ) : null}
     </section>
