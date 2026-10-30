@@ -1080,3 +1080,24 @@ body.console .layout main {
 .footer .sep {
   margin: 0 0.3rem;
 }
+
+/* The event name in the header: tiny, lower-case, hyphenated, in the menu's colour, so it reads as a label. */
+.event-token {
+  flex: 1;
+  min-width: 0;
+  padding: 0 0.5rem;
+  text-align: center;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.7rem;
+  line-height: 1.2;
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+  pointer-events: none;
+}
+.topbar-spacer {
+  flex: 1;
+}

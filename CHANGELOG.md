@@ -6,6 +6,7 @@ versioning: [SemVer](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
+- The event name moves to the header on organiser and attendee pages: very small, lower-case, hyphen-separated (`mango-octopus-rye`), Courier New, in the menu's colour and not selectable, so it reads as a label. The big heading is kept for screen readers only.
 - Creating an event (or carrying one over) goes straight to the organiser page. The interstitial that showed the organiser link and recovery secret is gone, and so is the recovery form: control belongs to the browser that created the event, and moves by handover.
 - Buttons have a lighter background so they stand out from the page; the timeline's genre stripes are drawn again on every browser (segments are no longer `<button>` elements, whose layout Safari ignores); the break's time range above the bar is gone, only its minutes and the remove button remain.
 - Organiser console: Playing + queue, the QR code and the rest (player, hand over, time, rules, end) are three pages to swipe between sideways, replacing the bottom tab bar, so scrolling the queue no longer affects them. Pause and Resume are icons. The queue has its own blue-grey background.

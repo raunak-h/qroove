@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { Link } from 'react-router';
 import { BRAND } from '@qroove/config';
 import { Footer } from './Footer';
-import { AppMenu } from './menu';
+import { AppMenu, HeaderEventName } from './menu';
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
@@ -11,6 +11,7 @@ export function Layout({ children }: { children: ReactNode }) {
         <Link to="/" className="brand" aria-label={`${BRAND.product} home`}>
           <img className="logo" src="/icons/logo-256.png" width={44} height={44} alt="" />
         </Link>
+        <HeaderEventName />
         <AppMenu />
       </header>
       <main>{children}</main>

@@ -57,7 +57,7 @@ export default function AdminPage() {
   const [sub, setSub] = useState<Sub | null>(null);
   const pager = useRef<HTMLDivElement>(null);
   useLockedPage();
-  useMenuRules(state?.rules);
+  useMenuRules(state?.rules, state?.view.name);
   useEffect(() => {
     document.body.classList.add('console');
     return () => document.body.classList.remove('console');
@@ -87,7 +87,7 @@ export default function AdminPage() {
   return (
     <div className="console">
       <header className="console-head">
-        <h1>{v.name}</h1>
+        <h1 className="sr-only">{v.name}</h1>
         <div className="row muted small">
           <span>{v.state.toLowerCase()}</span>
           <ConnectionBadge connection={connection} />

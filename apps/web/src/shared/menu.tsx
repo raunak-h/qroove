@@ -5,23 +5,44 @@ import { Link } from 'react-router';
 import { GenreDot, StyleSwatches } from './Genre';
 import { ThemeToggle } from './ThemeToggle';
 
-const RulesCtx = createContext<{
+interface HeaderEvent {
   rules: RulesSnapshot | null;
-  setRules: (r: RulesSnapshot | null) => void;
-}>({ rules: null, setRules: () => {} });
+  name: string | null;
+}
+const RulesCtx = createContext<{
+  event: HeaderEvent;
+  setEvent: (e: HeaderEvent) => void;
+}>({ event: { rules: null, name: null }, setEvent: () => {} });
 
 export function MenuProvider({ children }: { children: ReactNode }) {
-  const [rules, setRules] = useState<RulesSnapshot | null>(null);
-  return <RulesCtx.Provider value={{ rules, setRules }}>{children}</RulesCtx.Provider>;
+  const [event, setEvent] = useState<HeaderEvent>({ rules: null, name: null });
+  return <RulesCtx.Provider value={{ event, setEvent }}>{children}</RulesCtx.Provider>;
 }
 
-/** Pages with an event publish its rules here so the header menu can show them. */
-export function useMenuRules(rules: RulesSnapshot | null | undefined) {
-  const { setRules } = useContext(RulesCtx);
+/** "Mango Octopus Rye" -> "mango-octopus-rye". */
+export const nameToken = (name: string) => name.trim().toLowerCase().split(/\s+/).join('-');
+
+/** Pages with an event publish its rules and name here, for the header menu and the header name. */
+export function useMenuRules(
+  rules: RulesSnapshot | null | undefined,
+  name?: string | null | undefined,
+) {
+  const { setEvent } = useContext(RulesCtx);
   useEffect(() => {
-    setRules(rules ?? null);
-    return () => setRules(null);
-  }, [rules, setRules]);
+    setEvent({ rules: rules ?? null, name: name ?? null });
+    return () => setEvent({ rules: null, name: null });
+  }, [rules, name, setEvent]);
+}
+
+/** The event's name in the header: small, lower-case, hyphenated, and plainly not a control. */
+export function HeaderEventName() {
+  const { event } = useContext(RulesCtx);
+  if (!event.name) return <span className="topbar-spacer" />;
+  return (
+    <span className="event-token" aria-hidden="true">
+      {nameToken(event.name)}
+    </span>
+  );
 }
 
 export function RulesList({ rules }: { rules: RulesSnapshot }) {
@@ -69,7 +90,9 @@ const Burger = () => (
 
 /** Top-right controls: the sun/moon toggle and the three-line menu (Docs, Privacy, Source; rules on event pages). */
 export function AppMenu() {
-  const { rules } = useContext(RulesCtx);
+  const {
+    event: { rules },
+  } = useContext(RulesCtx);
   const [open, setOpen] = useState(false);
   const [showRules, setShowRules] = useState(false);
   useEffect(() => {

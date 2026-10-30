@@ -2,6 +2,8 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Layout } from '../shared/Layout';
+import { MenuProvider } from '../shared/menu';
 import { EventPage } from './EventPage';
 
 const baseView = {
@@ -77,9 +79,13 @@ afterEach(() => {
 const renderPage = () =>
   render(
     <MemoryRouter initialEntries={['/e/ABC123']}>
-      <Routes>
-        <Route path="/e/:slug" element={<EventPage />} />
-      </Routes>
+      <MenuProvider>
+        <Layout>
+          <Routes>
+            <Route path="/e/:slug" element={<EventPage />} />
+          </Routes>
+        </Layout>
+      </MenuProvider>
     </MemoryRouter>,
   );
 
@@ -93,6 +99,20 @@ describe('EventPage', () => {
     expect(screen.queryByText(/Secret Name/)).toBeNull();
     expect(screen.getByText('After end time')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Join this event' })).toBeInTheDocument();
+  });
+
+  it('shows the event name in the header: tiny, lower-case, hyphenated, and not selectable', async () => {
+    handler = (url) =>
+      url.includes('by-slug')
+        ? { body: { eventId: 'ev1', slug: 'ABC123' } }
+        : { body: { ...baseView, name: 'Mango Octopus Rye' } };
+    const { container } = renderPage();
+    await screen.findByText('Someone Else');
+    const token = container.querySelector('.topbar .event-token')!;
+    expect(token.textContent).toBe('mango-octopus-rye');
+    expect(token.getAttribute('aria-hidden')).toBe('true'); // decorative; the heading carries the name
+    expect(screen.getByRole('heading', { name: 'Mango Octopus Rye' })).toBeInTheDocument();
+    expect(token.closest('a,button')).toBeNull(); // nothing to tap
   });
 
   it('cannot join without the QR secret, but can still watch the queue', async () => {

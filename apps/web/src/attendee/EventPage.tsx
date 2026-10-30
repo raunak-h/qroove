@@ -59,7 +59,7 @@ export function EventPage() {
 
 function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
   const { view, connection, error, clockOffset } = useEventStream(eventId, slug);
-  useMenuRules(view?.rules);
+  useMenuRules(view?.rules, view?.name);
   const [joinKey] = useState(() => takeJoinKey(slug));
   const [creds, setCreds] = useState<Creds | null>(() => loadCreds(eventId));
   const [mine, setMine] = useState<Mine | null>(null);
@@ -106,7 +106,7 @@ function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
   return (
     <div className="stack">
       <header>
-        <h1>{view.name}</h1>
+        <h1 className="sr-only">{view.name}</h1>
         <p className="muted">
           {ended
             ? 'This event has ended.'
