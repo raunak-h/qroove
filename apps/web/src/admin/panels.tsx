@@ -36,26 +36,20 @@ export function PlaybackPanel({ s, cmd, refresh }: PanelProps) {
     v.breaks.find((b) => b.actualStart === null && b.actualEnd === null);
   return (
     <section className="card stack compact" aria-label="Playback">
-      <p className="big">{v.nowPlaying ? v.nowPlaying.track.title : 'Nothing playing'}</p>
-      <p className="muted small">
-        {v.nowPlaying ? (
-          <>
-            {v.nowPlaying.track.artist ? `${v.nowPlaying.track.artist} ` : ''}
-            <GenreSwatch style={v.nowPlaying.track.style} size={14} />
-          </>
-        ) : v.waitingReason ? (
-          `Waiting: ${v.waitingReason}`
-        ) : (
-          ''
-        )}
-        {v.nowPlaying || v.waitingReason ? ' · ' : ''}
-        Next: {next ? next.title : 'nothing reserved yet'}
+      {!v.nowPlaying && v.waitingReason ? (
+        <p className="muted small">Waiting: {v.waitingReason}</p>
+      ) : null}
+      <p className="muted small next-line">
+        <span>Next:</span>
+        {next ? <GenreSwatch style={next.style} size={14} /> : null}
+        <span className="nl-text">
+          {next ? `${next.title}${next.artist ? ` — ${next.artist}` : ''}` : 'nothing reserved yet'}
+        </span>
         {v.runIndicator && v.state === 'ACTIVE' ? (
-          <>
-            {' · '}
+          <span>
             <GenreSwatch style={v.runIndicator.style} size={14} /> {v.runIndicator.runLength}/
             {v.runIndicator.cap}
-          </>
+          </span>
         ) : null}
       </p>
       {overflow > 0 ? (

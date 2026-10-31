@@ -417,11 +417,11 @@ describe('AdminPage', () => {
     ok();
     const user = userEvent.setup();
     page();
-    expect(await screen.findByText('Playing Now')).toBeInTheDocument();
+    expect(await screen.findByRole('region', { name: 'Playback' })).toBeInTheDocument();
     expect(screen.getAllByRole('img', { name: 'Salsa' }).length).toBeGreaterThan(0); // the run, as a swatch
     expect(screen.getByText(/1\/2/)).toBeInTheDocument();
     expect(screen.getByText(/1 song would run past the end/)).toBeInTheDocument();
-    expect(screen.getByText(/Next: Next Song/)).toBeInTheDocument();
+    expect(screen.getAllByText(/Next Song/).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('tab', { name: 'Invite' }));
     expect(screen.getByRole('img', { name: /QR code to join Friday Social/ })).toBeInTheDocument();
     // The permanent room code is shown as two triplets, with the QR as a backup.
@@ -437,13 +437,13 @@ describe('AdminPage', () => {
   it('keeps playing + queue on one page, the QR on another, and the rest on a third', async () => {
     ok();
     page();
-    await screen.findByText('Playing Now');
+    await screen.findByRole('region', { name: 'Playback' });
     const pages = screen.getAllByRole('tabpanel');
     expect(pages.map((p) => p.getAttribute('aria-label'))).toEqual(['Playing', 'Invite', 'More']);
-    expect(within(pages[0]!).getByText('Playing Now')).toBeInTheDocument();
+    expect(within(pages[0]!).getByRole('region', { name: 'Playback' })).toBeInTheDocument();
     expect(within(pages[0]!).getByRole('region', { name: 'Queue' }).className).toContain('queue');
     expect(within(pages[1]!).getByRole('img', { name: /QR code/ })).toBeInTheDocument();
-    expect(within(pages[1]!).queryByText('Playing Now')).toBeNull(); // swiping shows the QR instead
+    expect(within(pages[1]!).queryByRole('region', { name: 'Playback' })).toBeNull(); // swiping shows the QR instead
     const pause = screen.getByRole('button', { name: 'Pause At End of Current Song' });
     expect(pause).toBeInTheDocument();
     expect(screen.getAllByRole('tab').map((t) => t.getAttribute('aria-label'))).toEqual([

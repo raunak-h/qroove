@@ -39,7 +39,8 @@ export function PlaylistInput({
       <input
         type="text"
         autoComplete="off"
-        inputMode="url"
+        inputMode="text"
+        enterKeyHint="search"
         aria-label={label}
         placeholder={placeholder}
         aria-invalid={missing || pl.status === 'error' || undefined}

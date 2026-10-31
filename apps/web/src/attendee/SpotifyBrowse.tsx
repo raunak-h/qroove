@@ -12,13 +12,24 @@ export function SpotifyBrowse({
   text,
   onPick,
   onPlaylist,
+  addedIds = [],
 }: {
   slug: string;
   /** What is typed in the shared field: words search, links are handled by the field itself. */
   text: string;
   onPick: (song: PlaylistSong) => void;
-  onPlaylist: (tracks: PlaylistSong[]) => void;
+  onPlaylist: (tracks: PlaylistSong[], playlistId: string) => void;
+  /** Playlists this person has already added to this event (shown first, disabled). */
+  addedIds?: string[];
 }) {
+  const [open, setOpen] = useState(false);
+  // A confirmed add collapses the list so the success message is what the person sees.
+  const addedCount = addedIds.length;
+  const [seen, setSeen] = useState(addedCount);
+  if (addedCount !== seen) {
+    setSeen(addedCount);
+    setOpen(false);
+  }
   const q = text.trim();
   const searchable = q.length >= 2 && !hasLink(q);
   const [found, setFound] = useState<{
@@ -66,11 +77,11 @@ export function SpotifyBrowse({
     };
   }, []);
 
-  async function open(id: string) {
+  async function openPlaylist(id: string) {
     setLoading(id);
     setProblem(null);
     try {
-      onPlaylist((await api.myPlaylist(id)).tracks);
+      onPlaylist((await api.myPlaylist(id)).tracks, id);
     } catch (e) {
       setProblem(e instanceof ApiError ? e.message : 'We could not load that playlist.');
     } finally {
@@ -78,6 +89,7 @@ export function SpotifyBrowse({
     }
   }
 
+  const added = new Set(addedIds);
   const results = searchable && found?.q === q ? found : null;
   return (
     <>
@@ -93,32 +105,64 @@ export function SpotifyBrowse({
         <ul className="search-results" aria-label="Search results">
           {results.tracks.map((t) => (
             <li key={t.sourceUrl ?? t.title}>
-              <button type="button" className="btn ghost" onClick={() => onPick(t)}>
-                {t.title}
-                {t.artist ? ` — ${t.artist}` : ''}
+              <button type="button" className="btn ghost result" onClick={() => onPick(t)}>
+                {t.artworkUrl ? (
+                  <img className="result-art" src={t.artworkUrl} alt="" loading="lazy" />
+                ) : (
+                  <span className="result-art" aria-hidden="true" />
+                )}
+                <span className="result-text">
+                  <span className="result-title">{t.title}</span>
+                  {t.artist ? <span className="result-artist">{t.artist}</span> : null}
+                </span>
               </button>
             </li>
           ))}
         </ul>
       ) : null}
       {mine ? (
-        <details>
-          <summary>My Spotify playlists</summary>
-          <ul className="search-results">
-            {mine.map((p) => (
-              <li key={p.id}>
-                <button
-                  type="button"
-                  className="btn ghost"
-                  disabled={loading !== null}
-                  onClick={() => void open(p.id)}
-                >
-                  {loading === p.id ? 'Loading…' : p.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </details>
+        <>
+          <details
+            className="pl-picker"
+            open={open}
+            onToggle={(e) => setOpen(e.currentTarget.open)}
+          >
+            <summary className="btn pill">My Spotify playlist</summary>
+            <ul className="search-results">
+              {[
+                ...mine.filter((p) => added.has(p.id)),
+                ...mine.filter((p) => !added.has(p.id)),
+              ].map((p) =>
+                added.has(p.id) ? (
+                  <li key={p.id}>
+                    <button type="button" className="btn ghost result added" disabled>
+                      <span className="result-title">{p.name}</span>
+                      <span className="added-badge">
+                        <span aria-hidden="true">✓ </span>Added
+                      </span>
+                    </button>
+                  </li>
+                ) : (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      className="btn ghost result"
+                      disabled={loading !== null}
+                      onClick={() => void openPlaylist(p.id)}
+                    >
+                      <span className="result-title">{loading === p.id ? 'Loading…' : p.name}</span>
+                    </button>
+                  </li>
+                ),
+              )}
+            </ul>
+          </details>
+          {addedCount > 0 ? (
+            <p className="pl-added-note" role="status">
+              <span aria-hidden="true">✓ </span>Playlist added
+            </p>
+          ) : null}
+        </>
       ) : (
         <p className="muted small">
           <a href={`/api/spotify/login?for=guest&return=${encodeURIComponent(`/e/${slug}`)}`}>

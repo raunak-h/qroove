@@ -52,6 +52,16 @@ export function AddMusic({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<ApiError | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  // Playlists added by this person to this event, kept on this device (no server field exists for it).
+  const addedKey = `qroove:pl-added:${eventId}:${creds.participantId}`;
+  const [addedIds, setAddedIds] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(addedKey) ?? '[]') as string[];
+    } catch {
+      return [];
+    }
+  });
+  const [loadedPlaylist, setLoadedPlaylist] = useState<string | null>(null);
   // Must stay stable: PlaylistInput reports tracks from an effect keyed on this function.
   // eslint-disable-next-line react-hooks/preserve-manual-memoization -- only uses stable setters
   const onTracks = useCallback((_id: string, tracks: PlaylistSong[]) => {
@@ -108,6 +118,16 @@ export function AddMusic({
       setUrl('');
       setSongs([]);
       setPicked(null);
+      if (loadedPlaylist && r.accepted > 0) {
+        const next = [...new Set([...addedIds, loadedPlaylist])];
+        setAddedIds(next);
+        try {
+          localStorage.setItem(addedKey, JSON.stringify(next));
+        } catch {
+          /* private mode: remembered until reload only */
+        }
+      }
+      setLoadedPlaylist(null);
       onAdded();
     } catch (e) {
       setError(e instanceof ApiError ? e : null);
@@ -148,7 +168,11 @@ export function AddMusic({
           setUrl('');
           setDone(null);
         }}
-        onPlaylist={(tracks) => onTracks('music', tracks)}
+        addedIds={addedIds}
+        onPlaylist={(tracks, id) => {
+          setLoadedPlaylist(id);
+          onTracks('music', tracks);
+        }}
       />
       <fieldset className="chips">
         <legend>Which genre is this?</legend>

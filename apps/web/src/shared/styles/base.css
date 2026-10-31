@@ -193,39 +193,107 @@ summary:focus-visible,
   gap: 0.75rem;
 }
 
+/* ---- tactile buttons: one light source (upper left), layered surface, edge, contact shadow ---- */
 .btn {
+  --btn-top: color-mix(in srgb, var(--btn-face) 86%, #fff);
+  --btn-bot: color-mix(in srgb, var(--btn-face) 90%, #000);
+  --btn-edge: color-mix(in srgb, var(--btn-face) 55%, #000);
+  --btn-hi: rgb(255 255 255 / 0.22);
+  --btn-ambient: rgb(0 0 0 / 0.28);
+  --btn-contact: rgb(0 0 0 / 0.45);
+  --btn-face: var(--btn-bg);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0.5rem 1rem;
   font: inherit;
   color: var(--text);
-  background: var(--btn-bg);
-  border: 2px solid var(--muted);
+  background: linear-gradient(180deg, var(--btn-top), var(--btn-bot));
+  border: 1px solid var(--btn-edge);
   border-radius: 8px;
+  box-shadow:
+    inset 0 1px 0 var(--btn-hi),
+    0 1px 0 var(--btn-contact),
+    0 3px 6px var(--btn-ambient);
   cursor: pointer;
   text-decoration: none;
+  transition:
+    transform 140ms ease-out,
+    box-shadow 140ms ease-out,
+    background-color 140ms ease-out,
+    filter 140ms ease-out;
 }
 .btn.primary {
-  background: var(--accent);
+  --btn-face: var(--accent);
+  --btn-edge: color-mix(in srgb, var(--accent) 60%, #000);
+  --btn-hi: rgb(255 255 255 / 0.4);
   color: var(--accent-text);
-  border-color: var(--accent);
   font-weight: 600;
   margin-top: 1rem;
+  box-shadow:
+    inset 0 1px 0 var(--btn-hi),
+    0 2px 0 var(--btn-edge),
+    0 5px 10px var(--btn-ambient);
 }
 .btn.danger {
-  background: #b3261e;
-  border-color: #b3261e;
+  --btn-face: #b3261e;
+  --btn-edge: #6e1510;
   color: #fff;
 }
+/* Ghost: almost flat; only hover, focus and press give it body. */
 .btn.ghost {
-  border-color: transparent;
+  --btn-top: transparent;
+  --btn-bot: transparent;
+  --btn-edge: transparent;
   color: var(--accent);
-  background: transparent;
+  box-shadow: none;
+}
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled):not([aria-disabled='true']) {
+    transform: translateY(-1px);
+    filter: brightness(1.07);
+    box-shadow:
+      inset 0 1px 0 var(--btn-hi),
+      0 2px 0 var(--btn-contact),
+      0 5px 9px var(--btn-ambient);
+  }
+  .btn.ghost:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.08);
+    transform: none;
+    box-shadow: none;
+  }
+}
+.btn:active:not(:disabled):not([aria-disabled='true']) {
+  transform: translateY(2px);
+  filter: brightness(0.95);
+  box-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.4),
+    0 0 0 var(--btn-contact);
+}
+/* A seated, engaged look for toggles (aria-pressed), distinct from the momentary press. */
+.btn[aria-pressed='true'] {
+  transform: translateY(1px);
+  box-shadow:
+    inset 0 2px 4px rgb(0 0 0 / 0.35),
+    0 0 0 1px var(--accent);
 }
 .btn:disabled {
-  opacity: 0.5;
+  color: var(--muted);
+  background: var(--surface);
+  border-color: color-mix(in srgb, var(--muted) 40%, transparent);
+  box-shadow: none;
+  filter: none;
+  transform: none;
   cursor: not-allowed;
+}
+.btn.pill {
+  border-radius: 999px;
+  padding: 0.5rem 1.25rem;
+}
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
 }
 
 .chips {
@@ -955,12 +1023,14 @@ body.console .layout main {
 .tl-handle:focus-visible {
   outline: 3px solid var(--accent);
 }
+/* The break's end marker sits just inside the right edge of the purple box, in sharp yellow. */
 .tl-grip {
-  width: 6px;
-  height: 60%;
-  border-radius: 3px;
-  background: #fff;
+  width: 5px;
+  height: 100%;
+  border-radius: 1px;
+  background: #ffe600;
   border: 1px solid #000;
+  transform: translateX(-5px);
 }
 .tl-stamps {
   display: grid;
@@ -1301,7 +1371,7 @@ body.console .layout main {
 }
 .player-console {
   flex: none;
-  max-height: 55dvh;
+  max-height: 42dvh;
   overflow-y: auto;
 }
 .list li.done {
@@ -1327,4 +1397,86 @@ body.console .layout main {
 .search-results .btn {
   width: 100%;
   text-align: left;
+}
+
+/* ---- search results and playlists ---- */
+.search-results .result {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  justify-content: flex-start;
+  text-align: left;
+  width: 100%;
+}
+.result-art {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--btn-bg);
+}
+.result-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.result-title {
+  color: var(--accent);
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.result-artist {
+  color: var(--text);
+  font-size: 0.875rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pl-picker > summary.btn {
+  list-style: none;
+  display: inline-flex;
+}
+.pl-picker > summary::-webkit-details-marker {
+  display: none;
+}
+.pl-added-note {
+  color: #6fd08c;
+  font-weight: 600;
+}
+.search-results .result.added {
+  opacity: 1;
+  color: var(--muted);
+  border-left: 4px solid #2e9e57;
+  background: var(--surface);
+  box-shadow: none;
+}
+.result.added .result-title,
+.result.added .result-artist {
+  color: var(--muted);
+}
+.added-badge {
+  margin-left: auto;
+  color: #6fd08c;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.next-line {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.next-line .nl-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

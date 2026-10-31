@@ -15,6 +15,8 @@ export interface PlaylistSong {
   artist: string | null;
   durationMs: number | null;
   sourceUrl: string | null;
+  /** Only shown when the provider already sent one. */
+  artworkUrl?: string | null;
 }
 
 export interface BatchResponse {
