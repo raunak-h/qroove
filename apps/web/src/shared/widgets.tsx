@@ -8,6 +8,7 @@ export function ConfirmButton({
   ariaLabel,
   danger = false,
   disabled = false,
+  warning,
   onConfirm,
 }: {
   label: string;
@@ -15,9 +16,29 @@ export function ConfirmButton({
   ariaLabel?: string;
   danger?: boolean;
   disabled?: boolean;
+  /** Adds a second confirmation: this is shown first, and needs its own tap to go on. */
+  warning?: string;
   onConfirm: () => unknown;
 }) {
   const [asking, setAsking] = useState(false);
+  const [warned, setWarned] = useState(false);
+  if (asking && warning && !warned) {
+    return (
+      <span className="stack">
+        <span className="warning small" role="alert">
+          {warning}
+        </span>
+        <span className="row">
+          <button type="button" className="btn" onClick={() => setWarned(true)}>
+            Continue
+          </button>
+          <button type="button" className="btn ghost" onClick={() => setAsking(false)}>
+            Cancel
+          </button>
+        </span>
+      </span>
+    );
+  }
   if (!asking) {
     return (
       <button
@@ -38,12 +59,20 @@ export function ConfirmButton({
         className="btn danger"
         onClick={() => {
           setAsking(false);
+          setWarned(false);
           void onConfirm();
         }}
       >
         {confirmLabel}
       </button>
-      <button type="button" className="btn ghost" onClick={() => setAsking(false)}>
+      <button
+        type="button"
+        className="btn ghost"
+        onClick={() => {
+          setAsking(false);
+          setWarned(false);
+        }}
+      >
         Cancel
       </button>
     </span>

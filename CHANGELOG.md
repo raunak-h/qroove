@@ -13,6 +13,9 @@ versioning: [SemVer](https://semver.org/).
 
 ### Changed
 - Joining requires a name.
+- Guests can search Spotify inside Qroove with no login, and accounts on the pilot list can log in to use their own playlists.
+- New defaults: 1 song in a row (up to 3); 20 songs per person, in steps of 5, with a maximum that grows with planned time (5 per 15 minutes).
+- Organiser controls: **Pause At End of Current Song** and **Resume Playback** replace the icons; Skip asks twice; the state label at the top is gone; played songs are greyed out; the player's corners no longer show white.
 - Organisers can log in with Spotify so the Qroove page itself plays full songs (Premium, pilot accounts only), with simple pause and resume. The embedded player remains as a fallback.
 - The organiser's device is now the player: the organiser page takes the role by itself and shows one **Start playing** button, with a warning while nothing plays. The separate player page and the required sound check are gone; the chime and local files are optional under More.
 - The queue now looks only at genres: one person's songs can play back to back, up to each genre's limit. The per-person song limit stays, and an event with one genre has no run limit.

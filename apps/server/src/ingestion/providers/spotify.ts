@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { DomainError } from '@qroove/contracts';
 import { fetchJson, type FetchLike } from '../fetch.js';
 import type { ParsedLink } from '../parseLink.js';
+import type { PlaylistTrack } from '../playlist.js';
 import type { MetadataProvider, TrackMetadata } from '../types.js';
 
 const Token = z.object({ access_token: z.string(), expires_in: z.number() });
@@ -66,4 +67,34 @@ export class SpotifyApiProvider implements MetadataProvider {
       confidence: 'high',
     };
   }
+
+  /** Song search with the app's own credentials, so guests need no Spotify login. */
+  async search(q: string): Promise<PlaylistTrack[]> {
+    const token = await this.accessToken();
+    const query = new URLSearchParams({ q, type: 'track', limit: '10' });
+    const raw = await fetchJson(this.doFetch, `https://api.spotify.com/v1/search?${query}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    const r = SearchResult.safeParse(raw);
+    if (!r.success) throw new DomainError('METADATA_UNAVAILABLE');
+    return r.data.tracks.items.map(songFromTrack);
+  }
 }
+
+const SearchResult = z.object({ tracks: z.object({ items: z.array(Track) }) });
+
+export const songFromTrack = (t: {
+  id: string;
+  name: string;
+  duration_ms?: number | null | undefined;
+  artists: Array<{ name: string }>;
+}): PlaylistTrack => ({
+  title: t.name.slice(0, 200),
+  artist:
+    t.artists
+      .map((a) => a.name)
+      .join(', ')
+      .slice(0, 200) || null,
+  durationMs: t.duration_ms ?? null,
+  sourceUrl: `https://open.spotify.com/track/${t.id}`,
+});

@@ -150,6 +150,16 @@ describe('PlayerConsole with a Spotify link', () => {
 });
 
 describe('PlayerConsole', () => {
+  it('holds the next song while paused, and offers no Start', async () => {
+    const st = mkState({ reserved: true });
+    (st.view as { state: string }).state = 'PAUSED';
+    adminState = st;
+    open();
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith('/player/claim'))).toBe(true));
+    expect(screen.queryByRole('button', { name: /Start playing|Mark started/ })).toBeNull();
+    expect(calls.some((c) => c.url.endsWith('/player/started'))).toBe(false);
+  });
+
   it('takes the player role by itself, with a takeover, and needs no sound check', async () => {
     open();
     await ready();

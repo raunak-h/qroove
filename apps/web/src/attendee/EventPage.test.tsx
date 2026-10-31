@@ -176,7 +176,7 @@ describe('EventPage', () => {
     renderPage();
     await screen.findByText('Someone Else');
     await user.type(
-      screen.getByLabelText('Playlist or song link'),
+      screen.getByLabelText('Search Spotify or paste a link'),
       'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
     );
     const list = await screen.findByRole('list', { name: 'Songs to add' });
@@ -308,7 +308,7 @@ describe('EventPage', () => {
     await user.click(screen.getByRole('button', { name: 'Join this event' }));
     // No artist or length fields, and only one place to add music.
     await user.type(
-      await screen.findByLabelText('Playlist or song link'),
+      await screen.findByLabelText('Search Spotify or paste a link'),
       `Listen https://open.spotify.com/track/${'a'.repeat(22)}`,
     );
     await screen.findByRole('list', { name: 'Songs to add' });
@@ -358,7 +358,10 @@ describe('EventPage', () => {
     };
     const user = userEvent.setup();
     renderPage();
-    await user.type(await screen.findByLabelText('Playlist or song link'), 'https://example.com/x');
+    await user.type(
+      await screen.findByLabelText('Search Spotify or paste a link'),
+      'https://example.com/x',
+    );
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'We could not read that link. Try another.',
     );

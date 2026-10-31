@@ -2,6 +2,7 @@ import {
   DEFAULT_ENABLED_STYLES,
   EVENT_LIMITS,
   RULE_DEFAULTS,
+  maxSubmissionLimit,
   STYLE_PRESETS,
   genreOf as genreOfStyle,
   genresOf,
@@ -73,8 +74,7 @@ function interleave<T>(a: readonly T[], b: readonly T[]): T[] {
   return out;
 }
 
-const ONE_TO_FIVE = [1, 2, 3, 4, 5];
-const ONE_TO_TWENTY = Array.from({ length: 20 }, (_, i) => i + 1);
+const RUN_CAPS = Array.from({ length: RULE_DEFAULTS.maxNewRunCap }, (_, i) => i + 1);
 
 /** Drops breaks (and merges their parts) until what is left fits the planned time. */
 function fitBreaks(planned: number, breaks: BreakSlot[], segs: Seg[]) {
@@ -93,7 +93,14 @@ export default function CreateEvent() {
   const [breaks, setBreaks] = useState<BreakSlot[]>([]);
   const [segs, setSegs] = useState<Seg[]>([newSeg()]);
   const [sel, setSel] = useState(0);
-  const [limit, setLimit] = useState<number>(RULE_DEFAULTS.submissionLimit);
+  const [wantedLimit, setLimit] = useState<number>(RULE_DEFAULTS.submissionLimit);
+  // The ceiling follows the planned time, so shortening the event can lower the choice.
+  const maxLimit = maxSubmissionLimit(planned);
+  const limit = Math.min(wantedLimit, maxLimit);
+  const limitChoices = Array.from(
+    { length: maxLimit / RULE_DEFAULTS.submissionStep },
+    (_, i) => (i + 1) * RULE_DEFAULTS.submissionStep,
+  );
   // Playlists: one link per style; their songs go into one list the organiser can sort.
   const [lists, setLists] = useState<Partial<Record<StyleId, string>>>({});
   const [songs, setSongs] = useState<Array<ListSong & { style: StyleId }>>([]);
@@ -253,7 +260,7 @@ export default function CreateEvent() {
         <div className="drum-cell">
           <WheelPicker
             label="Most songs in a row"
-            values={ONE_TO_FIVE}
+            values={RUN_CAPS}
             value={cur.master}
             onChange={(master) => patch({ master, ratio: {} })}
             className="small"
@@ -263,7 +270,7 @@ export default function CreateEvent() {
         <div className="drum-cell">
           <WheelPicker
             label="Accepted songs per person"
-            values={ONE_TO_TWENTY}
+            values={limitChoices}
             value={limit}
             onChange={setLimit}
             className="small"
@@ -282,7 +289,7 @@ export default function CreateEvent() {
               <div key={g} className="drum-cell">
                 <WheelPicker
                   label={`Ratio ${g}`}
-                  values={ONE_TO_FIVE}
+                  values={RUN_CAPS}
                   value={cur.ratio[g] ?? cur.master}
                   onChange={(n) =>
                     patch({

@@ -93,7 +93,7 @@ export class Client {
 
 export async function createAndStart(api: Client, body: Record<string, unknown> = {}) {
   const c = await api.call('POST', '/api/events', {
-    body: { timezone: 'Europe/London', ...body },
+    body: { timezone: 'Europe/London', masterRunCap: 2, submissionLimit: 5, ...body },
   });
   const secret = new URL(c.json.adminUrl).hash.replace('#k=', '');
   const s = await api.call('POST', `/api/events/${c.json.eventId}/admin/session`, {

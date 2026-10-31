@@ -64,7 +64,7 @@ export const RulesSnapshot = z.object({
     .array(Segment)
     .min(1)
     .max(EVENT_LIMITS.maxBreaks + 1),
-  submissionLimit: z.number().int().min(1).max(20),
+  submissionLimit: z.number().int().min(1).max(160),
   /** Retired (ADR 0018); only events created before then still carry these. */
   minStyleTransitions: z.literal(1).optional(),
   noSameRequesterAdjacent: z.literal(true).optional(),

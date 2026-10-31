@@ -4,7 +4,11 @@ import { useCallback, useState } from 'react';
 import { api, ApiError, type Creds, type PlaylistSong } from '../shared/api';
 import { styleBoxClass, styleBoxVars } from '../shared/Genre';
 import { PlaylistInput } from '../shared/PlaylistInput';
+import { SpotifyBrowse } from './SpotifyBrowse';
 import { SongList, type ListSong } from '../shared/SongList';
+
+/** The most one request may carry; the rest can be added afterwards. */
+const MAX_BATCH = 100;
 
 let counter = 0;
 const toList = (tracks: readonly PlaylistSong[]): ListSong[] =>
@@ -62,7 +66,7 @@ export function AddMusic({
   const genre = picked ?? (genres.length === 1 ? genres[0]!.id : null);
   // Songs are sent under the first style the event allows in that genre.
   const style = styles.find((s) => s.genre === genre)?.id ?? null;
-  const take = Math.min(remaining, songs.length);
+  const take = Math.min(remaining, songs.length, MAX_BATCH);
 
   async function paste() {
     try {
@@ -116,8 +120,8 @@ export function AddMusic({
     <section className="card stack" aria-labelledby="am-h">
       <h2 id="am-h">Add music</h2>
       <p className="muted small">
-        Paste a link to a playlist or a song from Spotify. Long-press the box to paste, or use the
-        button.
+        Search Spotify, or paste a link to a playlist or a song. Long-press the box to paste, or use
+        the button.
       </p>
       <div className="row">
         <PlaylistInput
@@ -125,13 +129,27 @@ export function AddMusic({
           value={url}
           onChange={setUrl}
           onTracks={onTracks}
-          label="Playlist or song link"
-          placeholder="Spotify link"
+          label="Search Spotify or paste a link"
+          placeholder="Search Spotify or paste a link"
         />
         <button type="button" className="btn" onClick={() => void paste()}>
           Paste
         </button>
       </div>
+      <SpotifyBrowse
+        slug={view.slug}
+        text={url}
+        onPick={(song) => {
+          setSongs((old) =>
+            old.some((o) => o.sourceUrl !== null && o.sourceUrl === song.sourceUrl)
+              ? old
+              : [...old, ...toList([song])],
+          );
+          setUrl('');
+          setDone(null);
+        }}
+        onPlaylist={(tracks) => onTracks('music', tracks)}
+      />
       <fieldset className="chips">
         <legend>Which genre is this?</legend>
         {genres.map((g) => {

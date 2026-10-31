@@ -21,7 +21,7 @@ export const ResolvePlaylistResponse = z.object({ tracks: z.array(PlaylistSong) 
 export const BatchSubmitBody = z.object({
   style: StyleId,
   /** In the order the person wants them; the first ones are accepted first. */
-  songs: z.array(PlaylistSong).min(1).max(30),
+  songs: z.array(PlaylistSong).min(1).max(100),
 });
 export const BatchResult = z.object({
   index: z.number().int(),
@@ -36,9 +36,9 @@ export type BatchSubmitResponse = z.infer<typeof BatchSubmitResponse>;
 // POST /api/events
 export const SegmentInput = z.object({
   enabledStyles: z.array(StyleId).min(1),
-  masterRunCap: z.number().int().min(1).max(5).optional(),
+  masterRunCap: z.number().int().min(1).max(3).optional(),
   /** Optional per-genre ratio parts (1–5); keys are genre ids. */
-  ratio: z.partialRecord(StyleId, z.number().int().min(1).max(5)).optional(),
+  ratio: z.partialRecord(StyleId, z.number().int().min(1).max(3)).optional(),
 });
 export type SegmentInput = z.infer<typeof SegmentInput>;
 
@@ -48,11 +48,11 @@ export const CreateEventBody = z
     timezone: z.string().min(1).max(64),
     /** Defaults applied to every segment that does not say otherwise. */
     enabledStyles: z.array(StyleId).min(1).optional(),
-    masterRunCap: z.number().int().min(1).max(5).optional(),
-    ratio: z.partialRecord(StyleId, z.number().int().min(1).max(5)).optional(),
+    masterRunCap: z.number().int().min(1).max(3).optional(),
+    ratio: z.partialRecord(StyleId, z.number().int().min(1).max(3)).optional(),
     /** One entry per stretch between breaks (breaks + 1). */
     segments: z.array(SegmentInput).min(1).max(4).optional(),
-    submissionLimit: z.number().int().min(1).max(20).optional(),
+    submissionLimit: z.number().int().min(1).max(160).optional(),
     /** Planned time in quarter hours, 15 min to 8 h. The clock starts with the event. */
     plannedDurationMin: z.number().int().min(15).max(480).multipleOf(15).optional(),
     breaks: z

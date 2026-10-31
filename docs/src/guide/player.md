@@ -4,6 +4,10 @@ The organiser's device plays the music. There is no separate player page: the or
 itself, and a second device with organiser access takes over from the first. After a handover, the new organiser's device
 becomes the player.
 
+## Pausing and skipping
+
+**Pause At End of Current Song** lets the song finish, then holds the queue. **Resume Playback** starts the next song. **Skip** asks twice, because the song is lost and the queue changes.
+
 ## Starting
 
 Tap **Log in with Spotify** once on the organiser's device, with a Premium account that is on the pilot list. The page then plays the music itself. If that cannot start on your device, Spotify's embedded player is used instead.

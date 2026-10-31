@@ -37,7 +37,7 @@ test('landing and the organiser console fit a 360×640 phone without scrolling',
   await page.goto(`/a/${created.eventId}${hash}`);
   await expect(page.getByRole('heading', { name: created.name })).toBeVisible();
   await page.getByRole('button', { name: 'Start event' }).click();
-  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pause At End of Current Song' })).toBeVisible();
   for (const tab of ['Playing', 'Invite', 'More']) {
     await page.getByRole('tab', { name: tab }).click();
     expect(await overflow(page), `${tab} tab`).toBeLessThanOrEqual(1);

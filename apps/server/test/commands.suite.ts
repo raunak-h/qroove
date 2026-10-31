@@ -206,7 +206,7 @@ export function runCommandSuite(name: string, make: () => Promise<Repository>, s
       const s = await snap(deps, ev.eventId);
       expect(s.event.reservation).toBeNull();
       expect(s.state(queued.request.id)).toBe('INELIGIBLE_TEMPORARILY');
-      expect(s.event.waitingReason).toMatch(/different style/);
+      expect(s.event.waitingReason).toMatch(/different genre/);
       const rb = await submit(a, 4, 'bachata');
       expect((await snap(deps, ev.eventId)).event.reservation?.requestId).toBe(rb.request.id);
     });

@@ -20,7 +20,7 @@ _Mango Octopus Rye_ ([ADR 0013](/adr/0013-generated-event-names)).
   the time, and at least 20 minutes of music before, between and after, so breaks never touch.
 - **Parts of the evening:** each break splits the bar. **Tap a part** of the bar to give it its own styles and
   numbers; new parts start as copies of the one they came from. A song waits for a part that allows its style.
-- **Drums:** most songs in a row (1 to 5, applied to every genre), and songs per person (1 to 20). Under the ratio
+- **Drums:** most songs in a row (1 to 3, default 1, applied to every genre), and songs per person (default 20, in steps of 5, up to 5 for each 15 planned minutes). Under the ratio
   summary you can give each genre its own number; the default is an equal split, and no genre may get less than 1
   part in 10 of the total.
 - **Playlists (optional, ♫ +):** paste one link per style from Spotify, YouTube Music, YouTube or Apple Music. The

@@ -23,7 +23,13 @@ import {
   BatchSubmitBody,
   type ExportSnapshot,
 } from '@qroove/contracts';
-import { DEFAULT_ENABLED_STYLES, STYLE_PRESETS } from '@qroove/config';
+import {
+  DEFAULT_ENABLED_STYLES,
+  EVENT_LIMITS,
+  RULE_DEFAULTS,
+  STYLE_PRESETS,
+  maxSubmissionLimit,
+} from '@qroove/config';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
@@ -148,6 +154,13 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
     return { tracks: pl.tracks.slice(0, MAX_SEEDS) };
   });
 
+  // Spotify's own search: anyone can find songs without a Spotify account of their own.
+  app.get('/api/spotify/search', async (req) => {
+    limit(`spotify-search:${req.ip}`, 30, MINUTE);
+    const { q } = parse(z.object({ q: z.string().trim().min(2).max(100) }), req.query);
+    return { tracks: await ingestion.searchSongs(q) };
+  });
+
   // ---- creating events ---------------------------------------------------------------------
   const created = (r: {
     eventId: string;
@@ -169,7 +182,20 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
 
   app.post('/api/events', async (req, reply) => {
     limit(`create:${req.ip}`, 5, HOUR);
-    const { songs, ...body } = parse(CreateEventBody, req.body);
+    const { songs, ...given } = parse(CreateEventBody, req.body);
+    const maxLimit = maxSubmissionLimit(
+      given.plannedDurationMin ?? EVENT_LIMITS.defaultDurationMin,
+    );
+    if ((given.submissionLimit ?? 0) > maxLimit) {
+      throw new DomainError(
+        'VALIDATION',
+        `Songs per person can be at most ${maxLimit} for this planned time.`,
+      );
+    }
+    const body = {
+      ...given,
+      submissionLimit: given.submissionLimit ?? Math.min(RULE_DEFAULTS.submissionLimit, maxLimit),
+    };
     let seeds: SeedSong[] = [];
     if (songs?.length) {
       if (!body.plannedDurationMin) {

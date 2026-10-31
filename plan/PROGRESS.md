@@ -194,3 +194,4 @@ Qroove 0.1.0 is live at https://qroove.sataklela.com: fair queue scheduler, atte
 - ADR 0018 (genres only): removed all owner-based eligibility after the live test stalled. Also applies to running events. Open: the queue still stops when only a capped genre has songs waiting; the iPhone guest's "top 5" report is unexplained.
 - Playback moved into the organiser console (`player/PlayerConsole.tsx`), auto-claiming with takeover; `/player/:id` redirects. A second organiser tab or device takes the role from the first.
 - ADR 0019: Web Playback SDK (`player/spotifySdk.ts`, `api/spotifyAuth.ts`). Not verified against a real Premium account or on a phone.
+- ADR 0020: search, guest playlists, limits, controls. Real guest login and playlist access are unverified; pause and resume are covered by tests only.

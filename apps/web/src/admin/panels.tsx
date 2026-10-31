@@ -24,18 +24,6 @@ interface PanelProps {
 
 const LIVE = new Set(['ACTIVE', 'PAUSED', 'TRANSFERRING']);
 
-const PauseIcon = () => (
-  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="currentColor">
-    <rect x="6" y="4" width="4" height="16" rx="1" />
-    <rect x="14" y="4" width="4" height="16" rx="1" />
-  </svg>
-);
-const PlayIcon = () => (
-  <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" fill="currentColor">
-    <path d="M7 4.5v15a1 1 0 0 0 1.5.86l12-7.5a1 1 0 0 0 0-1.72l-12-7.5A1 1 0 0 0 7 4.5z" />
-  </svg>
-);
-
 export function PlaybackPanel({ s, cmd, refresh }: PanelProps) {
   const { run, busy, error } = useAction(refresh);
   const v = s.view;
@@ -76,6 +64,9 @@ export function PlaybackPanel({ s, cmd, refresh }: PanelProps) {
           More.
         </p>
       ) : null}
+      {v.state === 'PAUSED' && v.nowPlaying ? (
+        <p className="notice small">Pausing after this song.</p>
+      ) : null}
       <div className="row">
         {v.state === 'DRAFT' ? (
           <button
@@ -88,31 +79,27 @@ export function PlaybackPanel({ s, cmd, refresh }: PanelProps) {
           </button>
         ) : null}
         {v.state === 'ACTIVE' ? (
-          <button
-            type="button"
-            className="btn icon-btn"
-            aria-label="Pause"
-            title="Pause"
-            disabled={busy}
-            onClick={() => void run(cmd.pause)}
-          >
-            <PauseIcon />
+          <button type="button" className="btn" disabled={busy} onClick={() => void run(cmd.pause)}>
+            Pause At End of Current Song
           </button>
         ) : null}
         {v.state === 'PAUSED' || v.state === 'TRANSFERRING' ? (
           <button
             type="button"
-            className="btn primary icon-btn"
-            aria-label={v.state === 'TRANSFERRING' ? 'Cancel handover and resume' : 'Resume'}
-            title={v.state === 'TRANSFERRING' ? 'Cancel handover and resume' : 'Resume'}
+            className="btn primary"
             disabled={busy}
             onClick={() => void run(cmd.resume)}
           >
-            <PlayIcon />
+            {v.state === 'TRANSFERRING' ? 'Cancel handover and resume' : 'Resume Playback'}
           </button>
         ) : null}
         {live && v.nowPlaying ? (
-          <ConfirmButton label="Skip" confirmLabel="Yes, skip" onConfirm={() => run(cmd.skip)} />
+          <ConfirmButton
+            label="Skip"
+            warning="This song will be lost and the queue will change."
+            confirmLabel="Yes, skip"
+            onConfirm={() => run(cmd.skip)}
+          />
         ) : null}
         {live && brk && brk.actualStart !== null ? (
           <button
@@ -146,8 +133,9 @@ export function ModerationPanel({ s, cmd, refresh }: PanelProps) {
     (r) => !['WITHDRAWN', 'REJECTED', 'UNAVAILABLE'].includes(r.state),
   );
   const started = new Set(['PLAYING', 'PLAYED', 'SKIPPED']);
+  const finished = new Set(['PLAYED', 'SKIPPED']);
   const row = (r: AdminRequestView) => (
-    <li key={r.id} className={started.has(r.state) ? 'overflow' : undefined}>
+    <li key={r.id} className={finished.has(r.state) ? 'done' : undefined}>
       <span className="title">{r.title}</span>
       <span className="muted small">
         {r.artist ? `${r.artist} ` : ''}

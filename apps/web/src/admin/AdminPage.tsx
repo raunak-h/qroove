@@ -89,7 +89,6 @@ export default function AdminPage() {
     <div className="console">
       <header className="console-head">
         <h1 className="sr-only">{v.name}</h1>
-        {v.state === 'ACTIVE' ? null : <p className="muted small">{v.state.toLowerCase()}</p>}
         <ErrorLine error={error} />
       </header>
       <div

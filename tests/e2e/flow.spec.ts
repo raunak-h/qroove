@@ -86,7 +86,7 @@ test('create → run → play manually → hand over → end → carry over', as
   expect(blocked).toBe(true);
 
   await page.getByRole('button', { name: 'Start event' }).click();
-  await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Pause At End of Current Song' })).toBeVisible();
 
   // The QR code opens the same public link the typed room code leads to ----------------------
   const state = await (await page.request.get(`/api/events/${eventId}/admin/state`)).json();
@@ -152,7 +152,7 @@ test('create → run → play manually → hand over → end → carry over', as
   // End with two clicks and no typing, then carry over ------------------------------------------
   const admin = second.page;
   await admin
-    .getByRole('button', { name: 'Resume' })
+    .getByRole('button', { name: 'Resume Playback' })
     .click()
     .catch(() => undefined);
   await admin.getByRole('tab', { name: 'More' }).click();

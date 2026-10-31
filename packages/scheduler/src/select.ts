@@ -71,6 +71,6 @@ function summarise(blocked: Selection['blocked']): string {
   const reasons = new Set(blocked.map((b) => b.reason));
   if (reasons.has('STYLE_DISABLED')) return 'Waiting for its part of the evening';
   if (reasons.has('NOT_PLAYABLE')) return 'Waiting for a playable source';
-  if (reasons.has('RUN_CAP')) return 'Waiting for a different style';
+  if (reasons.has('RUN_CAP')) return 'Waiting for a different genre. Add one to keep the music going';
   return 'No eligible song right now';
 }

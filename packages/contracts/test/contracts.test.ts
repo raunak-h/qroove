@@ -19,9 +19,9 @@ describe('rules', () => {
   it('defaults: salsa and bachata with their non-Latin styles; the master number is the cap', () => {
     const r = defaultRules();
     expect(RulesSnapshot.parse(r)).toEqual(r);
-    expect(r).toMatchObject({ rulesVersion: 3, submissionLimit: 5 });
+    expect(r).toMatchObject({ rulesVersion: 3, submissionLimit: 20 });
     expect(seg(r).enabledStyles).toEqual(['salsa', 'salsa_nl', 'bachata', 'bachata_nl']);
-    expect(seg(r)).toMatchObject({ masterRunCap: 2, runCaps: { salsa: 2, bachata: 2 } });
+    expect(seg(r)).toMatchObject({ masterRunCap: 1, runCaps: { salsa: 1, bachata: 1 } });
   });
   it('caps are per genre: a style and its non-Latin version share one', () => {
     const r = defaultRules(['salsa', 'salsa_nl', 'bachata', 'chacha_nl', 'other'], 3);

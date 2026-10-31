@@ -24,7 +24,13 @@ export async function liveEvent(
   body: Partial<Parameters<typeof createEvent>[1]> = {},
   start = true,
 ) {
-  const ev = await createEvent(deps, { timezone: 'Europe/London', ...body });
+  const ev = await createEvent(deps, {
+    timezone: 'Europe/London',
+    // Fixed here so these tests do not move with the product defaults.
+    masterRunCap: 2,
+    submissionLimit: 5,
+    ...body,
+  });
   if (start) await startEvent(deps, { eventId: ev.eventId, adminSecret: ev.adminSecret });
   return ev;
 }

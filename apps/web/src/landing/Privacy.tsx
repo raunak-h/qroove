@@ -16,7 +16,8 @@ export function Privacy() {
         <li>Participant records are deleted 30 days after an event ends.</li>
         <li>No audio is stored or streamed by Qroove. There are no ads or trackers.</li>
         <li>
-          Pasting a link sends only the song id to the music service it came from to read its title.
+          Searching sends your search words to Spotify. Pasting a link sends only the song id to the
+          music service it came from to read its title.
         </li>
       </ul>
       <p>

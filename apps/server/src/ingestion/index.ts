@@ -7,7 +7,13 @@ import { parseLink, type ParsedLink, type Platform } from './parseLink.js';
 import { ItunesProvider } from './providers/itunes.js';
 import { OEmbedProvider } from './providers/oembed.js';
 import { SpotifyApiProvider } from './providers/spotify.js';
-import { fetchPlaylist, fetchSong, parsePlaylistUrl, type Playlist } from './playlist.js';
+import {
+  fetchPlaylist,
+  fetchSong,
+  parsePlaylistUrl,
+  type Playlist,
+  type PlaylistTrack,
+} from './playlist.js';
 import { suggestStyle } from './style.js';
 import type { MetadataProvider, TrackMetadata } from './types.js';
 
@@ -24,6 +30,7 @@ export interface Ingestion {
    */
   resolvePlaylist(url: string): Promise<Playlist>;
   resolveUrl(url: string): Promise<ResolvedTrack>;
+  searchSongs(q: string): Promise<PlaylistTrack[]>;
   resolveManual(m: {
     title: string;
     artist?: string | undefined;
@@ -119,6 +126,10 @@ export function createIngestion(opts: IngestionOptions): Ingestion {
       };
     },
     resolveUrl,
+    async searchSongs(q) {
+      if (!spotifyApi) throw new DomainError('METADATA_UNAVAILABLE');
+      return spotifyApi.search(q);
+    },
     resolveManual(m) {
       const artist = m.artist?.trim() || null;
       const fp = fingerprint(m.title, artist);

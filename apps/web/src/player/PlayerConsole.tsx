@@ -532,7 +532,7 @@ export function PlayerConsole({
           </button>
         </div>
       ) : null}
-      {reserved && idle ? (
+      {reserved && idle && s.view.state === 'ACTIVE' ? (
         match || source ? (
           <>
             <p className="warning small">Nothing is playing yet.</p>

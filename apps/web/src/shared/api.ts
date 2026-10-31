@@ -111,6 +111,17 @@ export const api = {
       body: { url },
       ...(signal ? { signal } : {}),
     }),
+  searchSpotify: (q: string, signal?: AbortSignal) =>
+    request<{ tracks: PlaylistSong[] }>('GET', `/api/spotify/search?q=${encodeURIComponent(q)}`, {
+      ...(signal ? { signal } : {}),
+    }),
+  myPlaylists: () =>
+    request<{ signedIn: boolean; playlists: Array<{ id: string; name: string }> }>(
+      'GET',
+      '/api/spotify/me/playlists',
+    ),
+  myPlaylist: (id: string) =>
+    request<{ tracks: PlaylistSong[] }>('GET', `/api/spotify/me/playlists/${id}`),
   submitBatch: (
     eventId: string,
     creds: Creds,

@@ -38,7 +38,7 @@ breaks never touch history.
 
 It returns the pick, a human-readable `reason` (for example `Oldest eligible Bachata; Salsa at run cap 2/2`) and the
 list of blocked requests with their reasons. With no pick, the reason is `NO_CANDIDATES` or
-`ALL_BLOCKED_FAIRNESS: …` (for example "Waiting for a different style").
+`ALL_BLOCKED_FAIRNESS: …` (for example "Waiting for a different genre. Add one to keep the music going").
 
 ## Projection
 
@@ -61,7 +61,7 @@ A owns all the Salsa songs and B all the Bachata songs (cap 2 each):
 | 4    | B-B2 | Same logic for B.                                               |
 
 `A-S1, A-S2, B-B1, B-B2` is never produced, even though it respects the 2:2 style cap. If only one person owns every
-remaining song, one plays and the queue shows "Waiting for a different style".
+remaining song, one plays and the queue shows "Waiting for a different genre. Add one to keep the music going".
 
 ## Invariants (property-tested)
 

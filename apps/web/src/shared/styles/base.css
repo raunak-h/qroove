@@ -1304,3 +1304,27 @@ body.console .layout main {
   max-height: 55dvh;
   overflow-y: auto;
 }
+.list li.done {
+  opacity: 0.45;
+}
+/* Clipped here because the provider's rounded player paints square corners outside its curve. */
+.embed-host {
+  border-radius: 12px;
+  overflow: hidden;
+}
+.embed-host iframe {
+  display: block;
+  background: transparent;
+  color-scheme: normal;
+}
+.search-results {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.search-results .btn {
+  width: 100%;
+  text-align: left;
+}

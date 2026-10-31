@@ -4,18 +4,40 @@ import { z } from 'zod';
 import { DomainError } from '@qroove/contracts';
 import { parse } from './errors.js';
 import { fetchJson, type FetchLike } from '../ingestion/fetch.js';
+import { songFromTrack } from '../ingestion/providers/spotify.js';
 import { parseCookies, requireSameOrigin, type Security } from '../security/tokens.js';
 
 const SCOPES = 'streaming user-read-email user-read-private user-modify-playback-state';
 const STATE_COOKIE = 'qs_state';
 const SESSION_COOKIE = 'qs_session';
 const SESSION_MAX_AGE = 30 * 86400;
-const RETURN_PATH = /^\/admin\/[A-Za-z0-9_-]{1,64}$/;
+const GUEST_SCOPES = 'playlist-read-private playlist-read-collaborative';
+const RETURN_PATH = /^\/(admin|e)\/[A-Za-z0-9_-]{1,64}$/;
+const PLAYLIST_ID = /^[A-Za-z0-9]{10,40}$/;
+const NOT_ALLOWED =
+  "Spotify would not share this account's playlists. It may not be on the pilot list. You can still search or paste links.";
 
 const TokenResponse = z.object({
   access_token: z.string(),
   expires_in: z.number(),
   refresh_token: z.string().optional(),
+});
+
+const MyPlaylists = z.object({
+  items: z.array(z.object({ id: z.string(), name: z.string() }).nullable()),
+});
+const ItemTrack = z
+  .object({
+    id: z.string().nullable(),
+    name: z.string(),
+    type: z.string().optional(),
+    duration_ms: z.number().int().nullable().optional(),
+    artists: z.array(z.object({ name: z.string() })),
+  })
+  .nullable()
+  .optional();
+const PlaylistItems = z.object({
+  items: z.array(z.object({ item: ItemTrack, track: ItemTrack })),
 });
 
 export interface SpotifyAuthOptions {
@@ -85,13 +107,17 @@ export function registerSpotifyAuth(app: FastifyInstance, o: SpotifyAuthOptions)
 
   app.get('/api/spotify/login', async (req, reply) => {
     o.limit(`spotify-login:${req.ip}`, 10, 60_000);
-    const { return: back } = parse(z.object({ return: z.string().regex(RETURN_PATH) }), req.query);
+    const { return: back, for: who } = parse(
+      z.object({ return: z.string().regex(RETURN_PATH), for: z.enum(['guest']).optional() }),
+      req.query,
+    );
     if (!o.creds) throw new DomainError('METADATA_UNAVAILABLE');
     const state = randomBytes(16).toString('hex');
     const q = new URLSearchParams({
       response_type: 'code',
       client_id: o.creds.id,
-      scope: SCOPES,
+      // Guests only list their playlists, so they are never asked for streaming rights.
+      scope: who === 'guest' ? GUEST_SCOPES : SCOPES,
       redirect_uri: redirectUri,
       state,
     });
@@ -148,6 +174,75 @@ export function registerSpotifyAuth(app: FastifyInstance, o: SpotifyAuthOptions)
     } catch {
       return { accessToken: null };
     }
+  });
+
+  const accessToken = async (cookieHeader: string | undefined) => {
+    const refresh = open(parseCookies(cookieHeader)[SESSION_COOKIE]);
+    if (!refresh || !o.creds) return null;
+    return (await tokenRequest({ grant_type: 'refresh_token', refresh_token: refresh }))
+      .access_token;
+  };
+
+  // The guest's own playlists, fetched here so a guest page never holds a Spotify token.
+  app.get('/api/spotify/me/playlists', async (req, reply) => {
+    o.limit(`spotify-me:${req.ip}`, 30, 60_000);
+    reply.header('cache-control', 'no-store');
+    const token = await accessToken(req.headers.cookie).catch(() => null);
+    if (!token) return { signedIn: false, playlists: [] };
+    try {
+      const r = MyPlaylists.parse(
+        await fetchJson(o.doFetch, 'https://api.spotify.com/v1/me/playlists?limit=50', {
+          headers: { authorization: `Bearer ${token}` },
+        }),
+      );
+      return {
+        signedIn: true,
+        playlists: r.items.flatMap((p) => (p ? [{ id: p.id, name: p.name }] : [])),
+      };
+    } catch {
+      throw new DomainError('METADATA_UNAVAILABLE', NOT_ALLOWED);
+    }
+  });
+
+  app.get('/api/spotify/me/playlists/:id', async (req, reply) => {
+    o.limit(`spotify-me:${req.ip}`, 30, 60_000);
+    reply.header('cache-control', 'no-store');
+    const { id } = parse(z.object({ id: z.string().regex(PLAYLIST_ID) }), req.params);
+    const token = await accessToken(req.headers.cookie).catch(() => null);
+    if (!token) throw new DomainError('UNAUTHORISED');
+    const headers = { authorization: `Bearer ${token}` };
+    let raw: unknown;
+    try {
+      // `/items` replaced `/tracks` in 2026; Spotify has not moved every app at once.
+      raw = await fetchJson(
+        o.doFetch,
+        `https://api.spotify.com/v1/playlists/${id}/items?limit=50`,
+        { headers },
+      ).catch(() =>
+        fetchJson(o.doFetch, `https://api.spotify.com/v1/playlists/${id}/tracks?limit=50`, {
+          headers,
+        }),
+      );
+    } catch {
+      throw new DomainError(
+        'METADATA_UNAVAILABLE',
+        'Spotify only shares songs from playlists you own or collaborate on. Search for the songs or paste a link instead.',
+      );
+    }
+    const parsed = PlaylistItems.safeParse(raw);
+    const tracks = parsed.success
+      ? parsed.data.items.flatMap((i) => {
+          const t = i.item ?? i.track;
+          return t && t.id && t.type !== 'episode' ? [songFromTrack({ ...t, id: t.id })] : [];
+        })
+      : [];
+    if (tracks.length === 0) {
+      throw new DomainError(
+        'METADATA_UNAVAILABLE',
+        'Spotify only shares songs from playlists you own or collaborate on. Search for the songs or paste a link instead.',
+      );
+    }
+    return { tracks };
   });
 
   app.post('/api/spotify/logout', async (req, reply) => {

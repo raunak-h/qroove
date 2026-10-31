@@ -43,12 +43,12 @@ test('a guest sorts a playlist by swiping, then adds only the songs they have ro
   const a = await admin.newPage();
   await a.goto(`/a/${created.eventId}${new URL(created.adminUrl).hash}`);
   await a.getByRole('button', { name: 'Start event' }).click();
-  await expect(a.getByRole('button', { name: 'Pause' })).toBeVisible();
+  await expect(a.getByRole('button', { name: 'Pause At End of Current Song' })).toBeVisible();
 
   await page.goto(`/e/${created.slug}`);
   await joinAs(page, 'Ana');
   await page
-    .getByLabel('Playlist or song link')
+    .getByLabel('Search Spotify or paste a link')
     .fill('https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M');
   const list = page.getByRole('list', { name: 'Songs to add' });
   const rows = list.getByRole('listitem');
@@ -75,5 +75,43 @@ test('a guest sorts a playlist by swiping, then adds only the songs they have ro
   const mine = page.getByRole('heading', { name: 'My songs' }).locator('..');
   await expect(mine.getByText('Echo')).toBeVisible();
   await expect(mine.getByText('Delta')).toHaveCount(0);
+  await admin.close();
+});
+
+test('a guest finds a song by searching, with no Spotify login', async ({ page, request }) => {
+  await page.route('**/api/spotify/search*', (route) =>
+    route.fulfill({
+      json: {
+        tracks: [
+          {
+            title: 'Vivir Mi Vida',
+            artist: 'Marc Anthony',
+            durationMs: 252_000,
+            sourceUrl: 'https://open.spotify.com/track/3QHMxEOAGD51PDlbFPHLyJ',
+          },
+        ],
+      },
+    }),
+  );
+  const created = await (
+    await request.post('/api/events', {
+      data: { timezone: 'UTC', plannedDurationMin: 120, enabledStyles: ['salsa', 'bachata'] },
+    })
+  ).json();
+  const admin = await page.context().browser()!.newContext();
+  const a = await admin.newPage();
+  await a.goto(`/a/${created.eventId}${new URL(created.adminUrl).hash}`);
+  await a.getByRole('button', { name: 'Start event' }).click();
+  await expect(a.getByRole('button', { name: 'Pause At End of Current Song' })).toBeVisible();
+
+  await page.goto(`/e/${created.slug}`);
+  await joinAs(page, 'Ana');
+  await page.getByLabel('Search Spotify or paste a link').fill('vivir');
+  await page.getByRole('button', { name: 'Vivir Mi Vida — Marc Anthony' }).click();
+  await expect(page.getByRole('list', { name: 'Songs to add' })).toContainText('Vivir Mi Vida');
+  await page.getByRole('radio', { name: 'Salsa', exact: true }).check();
+  await page.getByRole('button', { name: 'Add 1' }).click();
+  await expect(page.getByText('1 added')).toBeVisible();
+  await expectAccessible(page, '/e/:slug (search)');
   await admin.close();
 });

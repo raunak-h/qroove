@@ -204,7 +204,7 @@ describe('CreateEvent', () => {
     expect(wheel('Planned time')).toHaveAttribute('aria-valuetext', '2:30');
     await user.click(styleBox('Cha-cha'));
     wheel('Accepted songs per person').focus();
-    await user.keyboard('{ArrowDown}{ArrowDown}'); // 5 -> 7
+    await user.keyboard('{ArrowDown}{ArrowDown}'); // 20 -> 30, which 2:30 allows
     // Press and hold the part: the break goes to its middle (2:30 -> 75 min, centred on 10).
     fireEvent.keyDown(screen.getAllByRole('button', { name: /^Part/ })[0]!, { key: 'b' });
     expect(screen.getAllByRole('button', { name: /^Part/ })).toHaveLength(2);
@@ -221,7 +221,7 @@ describe('CreateEvent', () => {
     expect(body).not.toHaveProperty('name');
     expect(body).toMatchObject({
       plannedDurationMin: 150,
-      submissionLimit: 7,
+      submissionLimit: 30,
       breaks: [{ startMin: 70, durationSec: 600 }],
     });
     const segs = body.segments as Array<{ enabledStyles: string[] }>;
@@ -236,26 +236,23 @@ describe('CreateEvent', () => {
     expect(segs[1]!.enabledStyles).toEqual(['salsa', 'salsa_nl', 'bachata_nl', 'chacha']);
   });
 
-  it('defaults to an equal split, and refuses a ratio below one part in ten', async () => {
+  it('defaults to 1:1, stops at 3, and scales songs per person with the planned time', async () => {
     respond = flow;
     const user = userEvent.setup();
     page('/new');
     await user.click(styleBox('Cha-cha')); // three genres
     await user.click(screen.getByLabelText('Ratio between genres'));
     for (const g of ['salsa', 'bachata', 'chacha']) {
-      expect(wheel(`Ratio ${g}`)).toHaveAttribute('aria-valuenow', '2'); // equal to the master number
+      expect(wheel(`Ratio ${g}`)).toHaveAttribute('aria-valuenow', '1');
     }
     wheel('Ratio bachata').focus();
-    await user.keyboard('{End}'); // 5
-    wheel('Ratio chacha').focus();
-    await user.keyboard('{End}'); // 5
-    wheel('Ratio salsa').focus();
-    await user.keyboard('{Home}'); // 1 : 5 : 5 is 1 part in 11
-    expect(await screen.findByText(/at least 1 part in 10/)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
-    wheel('Ratio chacha').focus();
-    await user.keyboard('{Home}'); // 1 : 5 : 1
-    expect(screen.queryByText(/at least 1 part in 10/)).toBeNull();
+    await user.keyboard('{End}');
+    expect(wheel('Ratio bachata')).toHaveAttribute('aria-valuenow', '3');
+    const songs = wheel('Accepted songs per person');
+    expect(songs).toHaveAttribute('aria-valuenow', '20');
+    songs.focus();
+    await user.keyboard('{End}');
+    expect(songs).toHaveAttribute('aria-valuenow', '40'); // the default 2 hours allow 40
   });
 
   it('needs at least one style in every part', async () => {
@@ -437,7 +434,7 @@ describe('AdminPage', () => {
     expect(document.body.textContent).not.toContain('csrf-token');
   });
 
-  it('keeps playing + queue on one page, the QR on another, and the rest on a third; pause is an icon', async () => {
+  it('keeps playing + queue on one page, the QR on another, and the rest on a third', async () => {
     ok();
     page();
     await screen.findByText('Playing Now');
@@ -447,9 +444,8 @@ describe('AdminPage', () => {
     expect(within(pages[0]!).getByRole('region', { name: 'Queue' }).className).toContain('queue');
     expect(within(pages[1]!).getByRole('img', { name: /QR code/ })).toBeInTheDocument();
     expect(within(pages[1]!).queryByText('Playing Now')).toBeNull(); // swiping shows the QR instead
-    const pause = screen.getByRole('button', { name: 'Pause' });
-    expect(pause.textContent).toBe(''); // an icon, not the word
-    expect(pause.querySelector('svg')).not.toBeNull();
+    const pause = screen.getByRole('button', { name: 'Pause At End of Current Song' });
+    expect(pause).toBeInTheDocument();
     expect(screen.getAllByRole('tab').map((t) => t.getAttribute('aria-label'))).toEqual([
       'Playing',
       'Invite',
@@ -461,13 +457,15 @@ describe('AdminPage', () => {
     ok();
     const user = userEvent.setup();
     page();
-    await user.click(await screen.findByRole('button', { name: 'Pause' }));
+    await user.click(await screen.findByRole('button', { name: 'Pause At End of Current Song' }));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith('/admin/pause'))).toBe(true));
     expect(calls.find((c) => c.url.endsWith('/admin/pause'))!.headers['x-qroove-csrf']).toBe(
       'csrf-token',
     );
     await user.click(screen.getByRole('button', { name: 'Skip' }));
     expect(calls.some((c) => c.url.endsWith('/admin/skip'))).toBe(false);
+    expect(screen.getByRole('alert')).toHaveTextContent(/song will be lost/);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
     await user.click(screen.getByRole('button', { name: 'Yes, skip' }));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith('/admin/skip'))).toBe(true));
   });

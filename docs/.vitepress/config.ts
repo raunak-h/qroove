@@ -87,6 +87,7 @@ export default defineConfig({
           },
           { text: '0018 Genre-only queue', link: '/adr/0018-genre-only-queue' },
           { text: '0019 Spotify Web Playback', link: '/adr/0019-spotify-web-playback' },
+          { text: '0020 Spotify search and limits', link: '/adr/0020-spotify-browse-and-limits' },
         ],
       },
       {
