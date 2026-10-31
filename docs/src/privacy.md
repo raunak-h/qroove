@@ -23,5 +23,5 @@ read-only.
 
 ## Third parties
 
-Looking up a song link sends only the song id to Spotify, Apple (iTunes Lookup) or YouTube. Hosting is on
+If an organiser logs in with Spotify, a login token is kept in an encrypted cookie on that device for up to 30 days, and is not stored by Qroove. Looking up a song link sends only the song id to Spotify, Apple (iTunes Lookup) or YouTube. Hosting is on
 Railway and the database on Google Cloud Firestore (EU multi-region).

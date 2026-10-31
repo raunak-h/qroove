@@ -1,8 +1,13 @@
 import { useEffect, useRef } from 'react';
 import { mountEmbed, type EmbedEvents, type Source } from './embed';
+import type { SpotifyConnection } from './spotifySdk';
 
 /** Hosts one provider player for one song; a new song means a new player. */
-export function EmbedPlayer({ source, ...events }: { source: Source } & EmbedEvents) {
+export function EmbedPlayer({
+  source,
+  spotify,
+  ...events
+}: { source: Source; spotify: SpotifyConnection | null } & EmbedEvents) {
   const host = useRef<HTMLDivElement>(null);
   const latest = useRef(events);
   useEffect(() => {
@@ -11,15 +16,16 @@ export function EmbedPlayer({ source, ...events }: { source: Source } & EmbedEve
   const { kind, id } = source;
   useEffect(() => {
     if (!host.current) return;
-    return mountEmbed(
-      host.current,
-      { kind, id },
-      {
-        onPlaying: (ms) => latest.current.onPlaying(ms),
-        onEnded: () => latest.current.onEnded(),
-        onFailed: (why) => latest.current.onFailed(why),
-      },
-    );
-  }, [kind, id]);
-  return <div ref={host} className={`embed-host ${kind}`} />;
+    const ev: EmbedEvents = {
+      onPlaying: (ms) => latest.current.onPlaying(ms),
+      onEnded: () => latest.current.onEnded(),
+      onFailed: (why) => latest.current.onFailed(why),
+    };
+    // Signed in: the page itself plays, so there is no provider box to show.
+    if (spotify && kind === 'spotify') return spotify.play(id, ev);
+    return mountEmbed(host.current, { kind, id }, ev);
+  }, [kind, id, spotify]);
+  return (
+    <div ref={host} className={spotify && kind === 'spotify' ? undefined : `embed-host ${kind}`} />
+  );
 }

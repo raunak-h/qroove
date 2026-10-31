@@ -504,11 +504,6 @@ describe('admin state and carry-over', () => {
 });
 
 describe('misc routes', () => {
-  it('reserves the Spotify callback path with a 204', async () => {
-    const { api } = await setup();
-    expect((await api.call('GET', '/api/spotify/callback')).status).toBe(204);
-  });
-
   it('exports a snapshot and imports it into a new draft with a new admin', async () => {
     const { api, id, join, manual, app } = await setup();
     await manual(await join(), 'One');

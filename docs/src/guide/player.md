@@ -6,6 +6,8 @@ becomes the player.
 
 ## Starting
 
+Tap **Log in with Spotify** once on the organiser's device, with a Premium account that is on the pilot list. The page then plays the music itself. If that cannot start on your device, Spotify's embedded player is used instead.
+
 Press **Start playing** at the top of the organiser page. Browsers need one tap before they play sound; after that, songs
 start by themselves. **Keep the page open**, because the music stops if you leave it.
 

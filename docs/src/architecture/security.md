@@ -42,6 +42,6 @@ refused because following them would need a redirect.
 
 ## Headers and logging
 
-Helmet sets a strict CSP (`'self'`, with documented exceptions for `/docs` and for the official Spotify and YouTube players, ADR 0017) and sends only the origin as a cross-origin referrer. Responses that carry
+Helmet sets a strict CSP (`'self'`, with documented exceptions for `/docs` and for the official Spotify and YouTube players, ADR 0017 and 0019) and sends only the origin as a cross-origin referrer. Responses that carry
 secrets or personal state send `Cache-Control: no-store`. Pino redacts `authorization`, cookies and `token` or
 `secret` fields, and the audit trail never stores secrets.

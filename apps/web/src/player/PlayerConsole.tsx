@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { BRAND } from '@qroove/config';
 import { createPortal } from 'react-dom';
 import { playerApi, type LeaseCreds } from '../admin/adminApi';
 import type { AdminStream } from '../admin/useAdminStream';
 import { ErrorLine } from '../admin/useAction';
 import { ApiError } from '../shared/api';
 import { EmbedPlayer } from './EmbedPlayer';
+import { connectSpotify, fetchSpotifyToken, type SpotifyConnection } from './spotifySdk';
 import { sourceOf, type EmbedFailure, type Source } from './embed';
 import {
   findMatch,
@@ -59,7 +61,11 @@ export function PlayerConsole({
   const [leaseState, setLeaseState] = useState<LeaseState>('none');
   const lease = useRef<LeaseCreds | null>(null);
   const [error, setError] = useState<ApiError | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(() =>
+    new URLSearchParams(window.location.search).has('spotify')
+      ? 'The Spotify login did not finish. Try again, or start without it.'
+      : null,
+  );
 
   const [library, setLibrary] = useState<LocalTrack[]>([]);
   const [remember, setRemember] = useState(false);
@@ -70,6 +76,12 @@ export function PlayerConsole({
   /** Mirrors of refs that the screen needs to show. */
   const [audioId, setAudioId] = useState<string | null>(null);
   const [embed, setEmbed] = useState<{ id: string; source: Source } | null>(null);
+
+  const [spotify, setSpotify] = useState<SpotifyConnection | null>(null);
+  const [spotifyStatus, setSpotifyStatus] = useState<'checking' | 'out' | 'ready' | 'problem'>(
+    'checking',
+  );
+  const [paused, setPaused] = useState(false);
 
   const audio = useRef<HTMLAudioElement>(null);
   /** Request the audio element is currently loaded with, and whether the server has been told. */
@@ -188,6 +200,32 @@ export function PlayerConsole({
   }, [epoch, leaseState, lose]);
 
   useEffect(() => () => stopAudio(), [stopAudio]);
+
+  // ---- Spotify sign-in ----------------------------------------------------------------------
+  useEffect(() => {
+    let live = true;
+    let conn: SpotifyConnection | null = null;
+    fetchSpotifyToken()
+      .then(async (t) => {
+        if (!t) {
+          if (live) setSpotifyStatus('out');
+          return;
+        }
+        conn = await connectSpotify(BRAND.product);
+        if (live) {
+          setSpotify(conn);
+          setSpotifyStatus('ready');
+        } else conn.disconnect();
+      })
+      .catch(() => {
+        // Unsupported browser or account: the embedded player still works.
+        if (live) setSpotifyStatus('problem');
+      });
+    return () => {
+      live = false;
+      conn?.disconnect();
+    };
+  }, []);
 
   // ---- library -----------------------------------------------------------------------------
   useEffect(() => {
@@ -311,14 +349,20 @@ export function PlayerConsole({
     const l = lease.current;
     if (!c || !l) return;
     stopAudio();
+    if (why === 'account') {
+      setSpotify(null);
+      setSpotifyStatus('problem');
+    }
     if (c.reported) await playerApi.finished(eventId, l, c.id, 'FAILED').catch(guard);
     else setFailed((f) => new Set(f).add(c.id));
     setNotice(
-      why === 'preview'
-        ? 'Spotify offered only a 30-second preview, so the song was not started. Sign in to Spotify Premium in this browser and try again, or play it another way.'
-        : why === 'blocked'
-          ? 'That song cannot be played here (its owner may not allow embedding). Open the link or pick a file.'
-          : 'That file could not be played. Use manual mode or pick another file.',
+      why === 'account'
+        ? 'Spotify refused this account. It needs Premium and must be on the Qroove pilot list.'
+        : why === 'preview'
+          ? 'Spotify offered only a 30-second preview, so the song was not started. Sign in to Spotify Premium in this browser and try again, or play it another way.'
+          : why === 'blocked'
+            ? 'That song cannot be played here (its owner may not allow embedding). Open the link or pick a file.'
+            : 'That file could not be played. Use manual mode or pick another file.',
     );
     stream.refresh();
   }
@@ -449,10 +493,22 @@ export function PlayerConsole({
         <EmbedPlayer
           key={embed.id}
           source={embed.source}
+          spotify={spotify}
           onPlaying={(ms) => void onPlaying(ms)}
           onEnded={() => void onEnded()}
           onFailed={(why) => void onMediaError(why)}
         />
+      ) : null}
+      {embed && spotify ? (
+        <button
+          className="btn"
+          onClick={() => {
+            spotify.togglePause();
+            setPaused(!paused);
+          }}
+        >
+          {paused ? 'Resume the music' : 'Pause the music'}
+        </button>
       ) : null}
       {/* Native controls keep the player usable without our UI (lock screen, headphones). */}
       <audio
@@ -485,10 +541,22 @@ export function PlayerConsole({
                 {match.kind === 'exact' ? 'File found' : 'Probable file (title only)'}:{' '}
                 {match.track.file.name}
               </p>
-            ) : source?.kind === 'spotify' ? (
+            ) : source?.kind === 'spotify' && spotifyStatus === 'out' ? (
+              <>
+                <a
+                  className="btn"
+                  href={`/api/spotify/login?return=${encodeURIComponent(`/admin/${eventId}`)}`}
+                >
+                  Log in with Spotify
+                </a>
+                <p className="muted small">
+                  Needs Spotify Premium. Without it, Spotify may offer only a preview.
+                </p>
+              </>
+            ) : source?.kind === 'spotify' && spotifyStatus === 'problem' ? (
               <p className="muted small">
-                Stay signed in to Spotify Premium in this browser, or Spotify offers only a preview
-                and the song will not start.
+                Spotify&apos;s player would not start here, so its embedded player is used. This
+                needs a Premium sign-in at open.spotify.com in this browser.
               </p>
             ) : null}
             <button

@@ -34,7 +34,7 @@ describe('CSP', () => {
     const api = await app.inject('/api/health');
     const docs = await app.inject('/docs/');
     expect(api.headers['content-security-policy']).toContain(
-      "script-src 'self' https://www.youtube.com;",
+      "script-src 'self' https://www.youtube.com https://sdk.scdn.co;",
     );
     expect(api.headers['content-security-policy']).not.toContain("'unsafe-inline' https");
     expect(docs.headers['content-security-policy']).toContain("script-src 'self' 'unsafe-inline'");

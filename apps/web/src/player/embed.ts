@@ -7,7 +7,7 @@ export interface Source {
   id: string;
 }
 
-export type EmbedFailure = 'blocked' | 'preview';
+export type EmbedFailure = 'blocked' | 'preview' | 'account';
 
 export interface EmbedEvents {
   /** Audio has really started. The length is only passed when the player can be trusted for it. */

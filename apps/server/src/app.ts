@@ -9,6 +9,7 @@ import { systemClock, type Clock } from './domain/clock.js';
 import { randomIds } from './domain/ids.js';
 import { registerErrors } from './api/errors.js';
 import { registerRoutes } from './api/routes.js';
+import { registerSpotifyAuth } from './api/spotifyAuth.js';
 import { parseEnv, type Env } from './env.js';
 import { runPurge, schedulePurge, secretMatches } from './maintenance/purge.js';
 import { createIngestion } from './ingestion/index.js';
@@ -69,11 +70,11 @@ export async function buildApp(
           'https://i.ytimg.com',
         ],
         mediaSrc: ["'self'", 'blob:'],
-        connectSrc: ["'self'"],
+        connectSrc: ["'self'", 'https://api.spotify.com'],
         styleSrc: ["'self'", "'unsafe-inline'"],
         // Official players only (see ADR 0017); no audio ever passes through this server.
-        scriptSrc: ["'self'", 'https://www.youtube.com'],
-        frameSrc: ['https://www.youtube.com', 'https://open.spotify.com'],
+        scriptSrc: ["'self'", 'https://www.youtube.com', 'https://sdk.scdn.co'],
+        frameSrc: ['https://www.youtube.com', 'https://open.spotify.com', 'https://sdk.scdn.co'],
         objectSrc: ["'none'"],
         frameAncestors: ["'none'"],
         baseUri: ["'self'"],
@@ -106,20 +107,33 @@ export async function buildApp(
       : undefined;
   const bus = new EventBus(repo);
   registerErrors(app);
+  const sec = createSecurity({
+    publicBaseUrl: env.PUBLIC_BASE_URL,
+    production: env.NODE_ENV === 'production',
+    cookieSecret: env.COOKIE_SECRET,
+  });
+  const doFetch: FetchLike = overrides.fetch ?? ((url, init) => fetch(url, init));
+  registerSpotifyAuth(app, {
+    base: env.PUBLIC_BASE_URL.replace(/\/$/, ''),
+    creds: spotify,
+    cookieSecret: env.COOKIE_SECRET,
+    doFetch,
+    sec,
+    limit: (key, max, windowMs) =>
+      env.RATE_LIMIT_OFF === '1' && env.NODE_ENV !== 'production'
+        ? undefined
+        : limiter.check(key, max, windowMs),
+  });
   registerRoutes(app, {
     deps: { repo, clock, ids: randomIds },
     env,
     ingestion: createIngestion({
-      fetch: overrides.fetch ?? ((url, init) => fetch(url, init)),
+      fetch: doFetch,
       now: () => clock.now(),
       spotify,
     }),
     bus,
-    sec: createSecurity({
-      publicBaseUrl: env.PUBLIC_BASE_URL,
-      production: env.NODE_ENV === 'production',
-      cookieSecret: env.COOKIE_SECRET,
-    }),
+    sec,
     limiter,
   });
   // Internal: external schedulers (or an operator) can trigger retention with the shared secret.

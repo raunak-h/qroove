@@ -148,9 +148,6 @@ export function registerRoutes(app: FastifyInstance, ctx: ApiContext) {
     return { tracks: pl.tracks.slice(0, MAX_SEEDS) };
   });
 
-  // Reserved for a future user-auth Spotify adapter; client-credentials needs no redirect.
-  app.get('/api/spotify/callback', async (_req, reply) => reply.code(204).send());
-
   // ---- creating events ---------------------------------------------------------------------
   const created = (r: {
     eventId: string;
