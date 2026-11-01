@@ -31,7 +31,7 @@ export async function addSong(page: Page, title: string, artist: string, style: 
   await page.getByLabel('Search Spotify or paste a link').fill('https://open.spotify.com/track/x');
   await page.getByRole('radio', { name: style, exact: true }).check();
   await expect(page.getByRole('list', { name: 'Songs to add' })).toContainText(title);
-  await page.getByRole('button', { name: 'Add 1' }).click();
+  await page.getByRole('button', { name: 'Add 1 song to queue' }).click();
   await expect(page.getByText('1 added')).toBeVisible();
   await page.unroute('**/api/resolve-playlist');
 }

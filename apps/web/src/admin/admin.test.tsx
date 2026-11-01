@@ -173,7 +173,7 @@ describe('CreateEvent', () => {
     respond = flow;
     page('/new');
     expect(screen.queryByLabelText(/event name/i)).toBeNull();
-    expect(wheel('Planned time')).toHaveAttribute('aria-valuetext', '2:00');
+    expect(wheel('Total duration')).toHaveAttribute('aria-valuetext', '2:00');
     expect(styleBox('Salsa')).toHaveAttribute('aria-checked', 'true');
     expect(styleBox('Non-Latin salsa-compatible')).toHaveAttribute('aria-checked', 'true');
     expect(styleBox('Bachata')).toHaveAttribute('aria-checked', 'true');
@@ -199,11 +199,12 @@ describe('CreateEvent', () => {
       }) as DOMRect;
     const user = userEvent.setup();
     page('/new');
-    wheel('Planned time').focus();
-    await user.keyboard('{ArrowDown}{ArrowDown}'); // 2:00 -> 2:30
-    expect(wheel('Planned time')).toHaveAttribute('aria-valuetext', '2:30');
+    await user.click(screen.getByRole('switch')); // independent: the time must not touch songs each
+    wheel('Total duration').focus();
+    await user.keyboard('{ArrowDown}'); // 2:00 -> 2:30
+    expect(wheel('Total duration')).toHaveAttribute('aria-valuetext', '2:30');
     await user.click(styleBox('Cha-cha'));
-    wheel('Accepted songs per person').focus();
+    wheel('Songs per person').focus();
     await user.keyboard('{ArrowDown}{ArrowDown}'); // 20 -> 30, which 2:30 allows
     // Press and hold the part: the break goes to its middle (2:30 -> 75 min, centred on 10).
     fireEvent.keyDown(screen.getAllByRole('button', { name: /^Part/ })[0]!, { key: 'b' });
@@ -248,7 +249,7 @@ describe('CreateEvent', () => {
     wheel('Ratio bachata').focus();
     await user.keyboard('{End}');
     expect(wheel('Ratio bachata')).toHaveAttribute('aria-valuenow', '3');
-    const songs = wheel('Accepted songs per person');
+    const songs = wheel('Songs per person');
     expect(songs).toHaveAttribute('aria-valuenow', '20');
     songs.focus();
     await user.keyboard('{End}');
@@ -269,6 +270,192 @@ describe('CreateEvent', () => {
     }
     expect(await screen.findByText('Pick at least one style.')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
+  });
+
+  describe('planner parameters and preview', () => {
+    const DURATIONS = [
+      '0:15',
+      '0:30',
+      '0:45',
+      '1:00',
+      '1:30',
+      '2:00',
+      '2:30',
+      '3:00',
+      '3:30',
+      '4:00',
+      '5:00',
+      '6:00',
+      '7:00',
+      '8:00',
+    ];
+
+    it('offers the planned times 0:15 to 8:00, and sends the chosen one as minutes', async () => {
+      respond = flow;
+      const user = userEvent.setup();
+      page('/new');
+      wheel('Total duration').focus();
+      await user.keyboard('{Home}');
+      const seen: string[] = [wheel('Total duration').getAttribute('aria-valuetext')!];
+      for (let i = 1; i < DURATIONS.length; i++) {
+        await user.keyboard('{ArrowDown}');
+        seen.push(wheel('Total duration').getAttribute('aria-valuetext')!);
+      }
+      expect(seen).toEqual(DURATIONS);
+      await user.keyboard(
+        '{ArrowUp}{ArrowUp}{ArrowUp}{ArrowUp}{ArrowUp}{ArrowUp}{ArrowUp}{ArrowUp}{ArrowUp}',
+      ); // 8:00 -> 1:30
+      expect(wheel('Total duration')).toHaveAttribute('aria-valuetext', '1:30');
+      await user.click(screen.getByRole('button', { name: 'Create event' }));
+      await screen.findByRole('heading', { name: 'Friday Social' });
+      expect(calls.find((c) => c.url === '/api/events')!.body).toMatchObject({
+        plannedDurationMin: 90,
+        submissionLimit: 30, // synced: 5 songs per quarter hour
+      });
+    });
+
+    it('sends the songs in a row and the songs per person that were chosen', async () => {
+      respond = flow;
+      const user = userEvent.setup();
+      page('/new');
+      await user.click(screen.getByRole('switch'));
+      wheel('Songs in a row').focus();
+      await user.keyboard('{ArrowDown}'); // 1 -> 2
+      wheel('Songs per person').focus();
+      await user.keyboard('{ArrowDown}'); // 20 -> 25
+      await user.click(screen.getByRole('button', { name: 'Create event' }));
+      await screen.findByRole('heading', { name: 'Friday Social' });
+      const body = calls.find((c) => c.url === '/api/events')!.body as {
+        masterRunCap: number;
+        submissionLimit: number;
+        segments: Array<{ masterRunCap: number }>;
+      };
+      expect(body).toMatchObject({ masterRunCap: 2, submissionLimit: 25 });
+      expect(body.segments[0]!.masterRunCap).toBe(2);
+    });
+
+    it('while synced, a new planned time sets songs per person: 5 for each quarter hour, 5 to 50', async () => {
+      respond = flow;
+      const user = userEvent.setup();
+      page('/new');
+      expect(screen.getByRole('switch')).toBeChecked();
+      expect(screen.getByText('Synced parameters')).toBeInTheDocument();
+      // Nothing is recalculated until the time is changed: the default stays as it is.
+      expect(wheel('Songs per person')).toHaveAttribute('aria-valuenow', '20');
+      wheel('Total duration').focus();
+      for (const [key, mins, songs] of [
+        ['{Home}', '0:15', '5'],
+        ['{ArrowDown}', '0:30', '10'],
+        ['{ArrowDown}{ArrowDown}', '1:00', '20'],
+        ['{End}', '8:00', '50'],
+      ] as const) {
+        await user.keyboard(key);
+        expect(wheel('Total duration')).toHaveAttribute('aria-valuetext', mins);
+        expect(wheel('Songs per person')).toHaveAttribute('aria-valuenow', songs);
+      }
+    });
+
+    it('in independent mode the time leaves a manual choice alone, and switching sync back on changes nothing by itself', async () => {
+      respond = flow;
+      const user = userEvent.setup();
+      page('/new');
+      await user.click(screen.getByRole('switch'));
+      expect(screen.getByText('Independent control')).toBeInTheDocument();
+      wheel('Songs per person').focus();
+      await user.keyboard('{ArrowDown}'); // 20 -> 25
+      wheel('Total duration').focus();
+      await user.keyboard('{Home}');
+      expect(wheel('Songs per person')).toHaveAttribute('aria-valuenow', '5'); // the 0:15 ceiling
+      await user.keyboard('{End}');
+      expect(wheel('Songs per person')).toHaveAttribute('aria-valuenow', '25'); // the manual choice returns
+      wheel('Songs per person').focus();
+      await user.keyboard('{End}');
+      const manual = wheel('Songs per person').getAttribute('aria-valuenow');
+      await user.click(screen.getByRole('switch')); // synced again
+      expect(wheel('Songs per person')).toHaveAttribute('aria-valuenow', manual!);
+      wheel('Total duration').focus();
+      await user.keyboard('{ArrowUp}'); // 7:00 -> the next change recomputes
+      expect(wheel('Songs per person')).toHaveAttribute('aria-valuenow', '50');
+    });
+
+    it('shows the ratio, an approximate song count, and a legend that follows the genres', async () => {
+      respond = flow;
+      const user = userEvent.setup();
+      page('/new');
+      expect(screen.getByTestId('ratio-badge')).toHaveTextContent('Ratio: 1 : 1');
+      expect(screen.getByTestId('summary-badge')).toHaveTextContent(
+        '2:00 total | about 24–35 songs',
+      );
+      const legend = screen.getByRole('list', { name: 'Legend' });
+      expect(within(legend).getAllByRole('listitem')).toHaveLength(4);
+      await user.click(styleBox('Cha-cha'));
+      expect(screen.getByTestId('ratio-badge')).toHaveTextContent('Ratio: 1 : 1 : 1');
+      expect(within(legend).getByText('Cha-cha')).toBeInTheDocument();
+      // The same sequence is also written out, for anyone who cannot tell the colours apart.
+      await user.click(screen.getByText('The rotation as text'));
+      expect(screen.getByText(/^Salsa, Bachata, Cha-cha, Salsa/)).toBeInTheDocument();
+    });
+
+    it('draws the bar from the real rotation: runs follow songs in a row, and non-Latin follows its parent', async () => {
+      respond = flow;
+      const user = userEvent.setup();
+      page('/new');
+      await user.click(styleBox('Non-Latin salsa-compatible'));
+      await user.click(styleBox('Non-Latin bachata-compatible'));
+      wheel('Songs in a row').focus();
+      await user.keyboard('{ArrowDown}'); // 2 in a row
+      await user.click(screen.getByText('The rotation as text'));
+      expect(screen.getByText(/^Salsa ×2, Bachata ×2, Salsa ×2/)).toBeInTheDocument();
+      const bar = screen.getByRole('img', { name: /^Rotation preview/ });
+      expect(bar.querySelectorAll('.flow-song').length).toBeGreaterThan(20);
+      expect(bar.querySelectorAll('.flow-song.striped')).toHaveLength(0);
+      await user.click(styleBox('Non-Latin salsa-compatible'));
+      expect(bar.querySelectorAll('.flow-song.striped').length).toBeGreaterThan(0);
+    });
+
+    it('explains an empty selection and will not create the event', async () => {
+      respond = flow;
+      const user = userEvent.setup();
+      page('/new');
+      for (const s of [
+        'Salsa',
+        'Non-Latin salsa-compatible',
+        'Bachata',
+        'Non-Latin bachata-compatible',
+      ]) {
+        await user.click(styleBox(s));
+      }
+      expect(
+        screen.getByText('Select at least one genre to see the rotation.'),
+      ).toBeInTheDocument();
+      expect(screen.getByTestId('ratio-badge')).toHaveTextContent('Ratio: none');
+      expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
+      expect(screen.getAllByText(/at least one style/i).length).toBeGreaterThan(0);
+    });
+
+    it('keeps everything and shows the real error when creating fails, and sends one request', async () => {
+      respond = (c) =>
+        c.url === '/api/events'
+          ? {
+              status: 500,
+              body: {
+                error: { code: 'INTERNAL', message: 'The server tripped.', action: 'Try again.' },
+              },
+            }
+          : flow(c);
+      const user = userEvent.setup();
+      page('/new');
+      wheel('Total duration').focus();
+      await user.keyboard('{ArrowDown}');
+      await user.click(styleBox('Cha-cha'));
+      await user.click(screen.getByRole('button', { name: 'Create event' }));
+      expect(await screen.findByRole('alert')).toHaveTextContent('The server tripped. Try again.');
+      expect(calls.filter((c) => c.url === '/api/events')).toHaveLength(1);
+      expect(screen.queryByRole('heading', { name: 'Friday Social' })).toBeNull();
+      expect(wheel('Total duration')).toHaveAttribute('aria-valuetext', '2:30');
+      expect(styleBox('Cha-cha')).toHaveAttribute('aria-checked', 'true');
+      expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
+    });
   });
 
   describe('playlists', () => {
@@ -317,12 +504,14 @@ describe('CreateEvent', () => {
       await user.type(link('Salsa'), SPOT);
       const list = await screen.findByRole('list', { name: 'Playlist songs' });
       expect(within(list).getAllByRole('listitem')).toHaveLength(6);
-      expect(await screen.findByText(/at least one playlist song/i)).toBeInTheDocument();
+      expect((await screen.findAllByText(/at least one playlist song/i)).length).toBeGreaterThan(0);
       expect(screen.getByRole('button', { name: 'Create event' })).toBeDisabled();
       // A non-Latin style's playlist covers the genre of its Latin counterpart and vice versa.
       await user.type(link('Non-Latin bachata-compatible'), APPLE);
       await waitFor(() => expect(within(list).getAllByRole('listitem')).toHaveLength(12));
-      await waitFor(() => expect(screen.queryByText(/at least one playlist song/i)).toBeNull());
+      await waitFor(() =>
+        expect(screen.queryAllByText(/at least one playlist song/i)).toHaveLength(0),
+      );
       expect(screen.getByRole('button', { name: 'Create event' })).toBeEnabled();
       await user.click(screen.getByRole('button', { name: 'Create event' }));
       await screen.findByRole('heading', { name: 'Friday Social' });
@@ -346,7 +535,7 @@ describe('CreateEvent', () => {
       respond = withPlaylists;
       const user = userEvent.setup();
       page('/new#playlist');
-      screen.getByRole('spinbutton', { name: 'Planned time' }).focus();
+      screen.getByRole('spinbutton', { name: 'Total duration' }).focus();
       await user.keyboard('{Home}'); // 0:15, so 14 minutes of music: three four-minute songs
       await user.type(link('Salsa'), SPOT);
       await user.type(link('Bachata'), APPLE);

@@ -13,3 +13,5 @@ Planned time, songs per person, most songs in a row and every ratio part are whe
 ## Consequences
 
 Colour is never the only cue: every swatch carries an accessible name, and the non-Latin stripes differ in pattern as well as hue. Playlist links are the only typed field on the create screen, and the name is no longer typed (ADR 0013).
+
+> Colours superseded by [ADR 0021](/adr/0021-ui-overhaul): red salsa, blue bachata, amber cha-cha, purple Other.

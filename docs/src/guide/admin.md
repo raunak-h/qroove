@@ -8,11 +8,18 @@ Open **Create an event** from the home page (`/new`). Everything is set by spinn
 looking at one bar. There is no name to type: the event gets a generated name of three neutral words, such as
 _Mango Octopus Rye_ ([ADR 0013](/adr/0013-generated-event-names)).
 
-- **Time drum:** quarter hours from 0:15 to 8:00, starting at 2:00. The clock starts when you press **Start event**.
-- **Styles:** tap swatches. Latin styles are on the left, their non-Latin counterparts directly across on the right,
-  and _Other (Musicality Exercise)_ underneath. Salsa, bachata and their non-Latin styles start selected; cha-cha is
-  an extra. Colours: red salsa, black bachata, orange cha-cha, grey Other; non-Latin styles are striped. A style and its
-  non-Latin version count as one genre.
+- **Three drums in a row:** _Total duration_ (0:15, 0:30, 0:45, 1:00, 1:30, 2:00, 2:30, 3:00, 3:30, 4:00, then whole
+  hours to 8:00; starts at 2:00), _Songs in a row_ and _Songs per person_. The clock starts when you press **Start event**.
+- **Synced parameters:** while the switch at the top is on, choosing a new total duration also sets songs per person to
+  5 for every 15 minutes (never below 5, never above 50 or the most the event may hold). Switch it off to set the two
+  independently. Switching it back on changes nothing by itself; the next duration change recalculates.
+- **Genres:** one card each for Salsa, Bachata and Cha-cha, with its _non-Latin-compatible_ version as a separate switch
+  underneath, and _Other (Musicality Exercise)_ on its own. Salsa, bachata and their non-Latin styles start selected;
+  cha-cha is an extra. Colours: red salsa, blue bachata, amber cha-cha, purple Other; non-Latin styles are striped. A
+  style and its non-Latin version count as one genre, and each switch is independent of its parent.
+- **Visual event progression:** above the bar, a ratio badge, an approximate song count and the rotation drawn
+  song by song from the same scheduler the queue uses, with a legend and the same sequence written out ("The rotation as
+  text"). The count is a rough guide (one song every 3.5 to 5 minutes of music); the real number depends on what people add.
 - **The bar:** the whole evening, always as wide as the screen, with the minutes written above every part and every
   break. **Press and hold a part** to add a 10-minute break in the middle of it (on the 10-minute grid). **Drag a
   break** to move it; drag its **end handle** to make it longer or shorter (10 to 30 minutes, one direction only).
@@ -20,7 +27,7 @@ _Mango Octopus Rye_ ([ADR 0013](/adr/0013-generated-event-names)).
   the time, and at least 20 minutes of music before, between and after, so breaks never touch.
 - **Parts of the evening:** each break splits the bar. **Tap a part** of the bar to give it its own styles and
   numbers; new parts start as copies of the one they came from. A song waits for a part that allows its style.
-- **Drums:** most songs in a row (1 to 3, default 1, applied to every genre), and songs per person (default 20, in steps of 5, up to 5 for each 15 planned minutes). Under the ratio
+- **Songs in a row** is 1 to 3 (default 1, applied to every genre), and songs per person defaults to 20, in steps of 5, up to 5 for each 15 planned minutes. Under the ratio
   summary you can give each genre its own number; the default is an equal split, and no genre may get less than 1
   part in 10 of the total.
 - **Playlists (optional, ♫ +):** paste one link per style from Spotify, YouTube Music, YouTube or Apple Music. The

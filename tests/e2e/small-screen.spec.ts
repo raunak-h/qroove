@@ -11,7 +11,7 @@ async function overflow(page: import('@playwright/test').Page) {
 
 test('landing, create and the organiser console fit a 360×640 phone', async ({ page }) => {
   await page.goto('/new');
-  await expect(page.getByRole('spinbutton', { name: 'Planned time' })).toBeVisible();
+  await expect(page.getByRole('spinbutton', { name: 'Total duration' })).toBeVisible();
   // The create form may scroll, but the timeline bar never grows wider than the screen.
   const bar = await page.getByRole('group', { name: /Evening timeline/ }).boundingBox();
   expect(bar!.width).toBeLessThanOrEqual(360);

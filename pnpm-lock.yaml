@@ -96,6 +96,9 @@ importers:
       '@qroove/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@qroove/scheduler':
+        specifier: workspace:*
+        version: link:../../packages/scheduler
       music-metadata:
         specifier: 12.2.1
         version: 12.2.1

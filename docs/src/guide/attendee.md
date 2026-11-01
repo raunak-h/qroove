@@ -17,13 +17,16 @@ other attendees do not see it in the queue. Your device gets a private pass for 
 
 ![The event page for an attendee](/screens/attendee-event.png){width=280}
 
-- **Connection:** _Live_ means updates arrive instantly. _Reconnecting_ means the app is checking every 10
-  seconds. _Offline_ means you are seeing the last update; check your signal.
-- **Now playing:** the current song and, when it matters, the style run (for example "Bachata run: 1 of 2").
+- **Status pill (top right of the deck):** _Live_ means updates arrive instantly. _Reconnecting_ means the app is
+  checking every 10 seconds. _Offline_ means you are seeing the last update; check your signal. It also says _Paused_,
+  _On a break_, _Not started_ or _Ended_ when that is what the event is doing.
+- **Now playing** (the wide card) shows the current song, its genre and, when it matters, the style run (for example
+  "1/2"). **Next up** (the narrow card) shows the next song in the queue, with `~N min` only when the queue can predict it.
+  Neither card can be changed by a guest; only the organiser moves the music on.
 - **My next song:** how many songs are ahead of yours, and a ticking `~MM:SS`. It says _Estimated_ when a song
   length is unknown. The timer is based on the server's clock, not your phone's.
-- **Up next:** titles in play order. Your songs are tagged _Yours_. Songs that would run past the planned end
-  are greyed and labelled _After end time_; they are not gone, and may play if the end time is extended.
+- **Whole queue:** a collapsed list of every title in play order. Your songs are tagged _Yours_. Songs that would run past
+  the planned end are greyed and labelled _After end time_; they are not gone, and may play if the end time is extended.
 
 ### When there is no countdown
 
@@ -59,10 +62,16 @@ list you can sort before anything is added:
   slides up.
 - Buttons for each of these appear when you tab to a song, for keyboard and screen-reader use.
 
-Pick one **dance style** for the songs, then tap **Add**. Songs already in the event are skipped and do not use up
+The card shows how many of your accepted songs you have used (for example _2 of 5 accepted songs_). Pick one **genre**
+for the songs (Salsa, Bachata, Cha-cha or Other, whichever the event plays); the line under the chips says what the
+choice means, for example which other genres' songs to remove. Then tap **Add N songs to queue**. Songs already in the event are skipped and do not use up
 your limit. Playlist pages are public web pages, so this is best effort and long playlists show only their first part.
 
 ## My songs and the five-song limit
+
+The **My songs** card lists your songs in the order they will play, the one playing now highlighted, each with its
+genre and status, and `Est. in ~N min` when the queue can predict it. Finished songs are under **Played songs (n)**, a
+button that opens and closes the list.
 
 You can have five accepted songs per event. Songs that have played, or were skipped after starting, still count.
 Removing a song that has **not started** with **Withdraw** frees its slot straight away. A song that is playing

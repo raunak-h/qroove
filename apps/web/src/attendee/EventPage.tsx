@@ -10,6 +10,8 @@ import { AddMusic } from './AddMusic';
 import { JoinCard } from './JoinCard';
 import { MyNextSong } from './MyNextSong';
 import { MyRequests } from './MyRequests';
+import { DeckHeader } from './DeckHeader';
+import { NextUp } from './NextUp';
 import { NowPlaying } from './NowPlaying';
 import { UpNext } from './UpNext';
 
@@ -58,7 +60,8 @@ export function EventPage() {
 
 function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
   const { view, connection, error, clockOffset } = useEventStream(eventId, slug);
-  useMenuRules(view?.rules, view?.name, connection);
+  // The deck header carries the connection state, so the top bar shows only the event's name.
+  useMenuRules(view?.rules, view?.name);
   const [creds, setCreds] = useState<Creds | null>(() => loadCreds(eventId));
   const [mine, setMine] = useState<Mine | null>(null);
   const now = useTick(1000);
@@ -108,16 +111,18 @@ function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
       : view.state === 'PAUSED' || view.state === 'TRANSFERRING'
         ? 'Session paused.'
         : null;
+  const serverNow = now + clockOffset;
   return (
-    <div className="stack">
-      <header>
-        <h1 className="sr-only">{view.name}</h1>
-        {status ? <p className="muted">{status}</p> : null}
-      </header>
+    <div className="deck stack">
+      <DeckHeader view={view} connection={connection} />
+      {status ? <p className="muted">{status}</p> : null}
 
-      <NowPlaying view={view} />
+      <div className="status-row">
+        <NowPlaying view={view} />
+        <NextUp view={view} serverNow={serverNow} />
+      </div>
       {creds && mine?.requests.length ? (
-        <MyNextSong view={view} mine={mine} serverNow={now + clockOffset} />
+        <MyNextSong view={view} mine={mine} serverNow={serverNow} />
       ) : null}
       {ended ? null : creds ? (
         <AddMusic
@@ -125,6 +130,7 @@ function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
           eventId={eventId}
           creds={creds}
           remaining={mine ? Math.max(0, mine.limit - mine.accepted) : 0}
+          quota={mine ? { accepted: mine.accepted, limit: mine.limit } : null}
           onAdded={reload}
         />
       ) : (
@@ -133,6 +139,8 @@ function Loaded({ slug, eventId }: { slug: string; eventId: string }) {
       {creds && mine ? (
         <MyRequests
           mine={mine}
+          live={view.state === 'ACTIVE'}
+          serverNow={serverNow}
           onWithdraw={async (r) => {
             await api.withdraw(eventId, creds, r.id);
             reload();

@@ -6,12 +6,14 @@ import { breakMinutes, queueRows } from './queueRows';
 /** Titles only: other attendees' names are deliberately not shown (SPEC §6). */
 export function UpNext({ view, mineIds }: { view: EventPublicView; mineIds: ReadonlySet<string> }) {
   return (
-    <section className="card" aria-labelledby="un-h">
-      <h2 id="un-h">Up next</h2>
+    <details className="card whole-queue">
+      <summary>
+        <h2 id="un-h">Whole queue ({view.queue.length})</h2>
+      </summary>
       {view.queue.length === 0 && view.breaks.every((b) => b.actualEnd !== null) ? (
         <p className="muted">The queue is empty. Be the first to add a song.</p>
       ) : (
-        <ol className="list">
+        <ol className="list" aria-labelledby="un-h">
           {queueRows(view).map((row) =>
             row.kind === 'break' ? (
               <li key={row.b.id} className="break-row">
@@ -34,6 +36,6 @@ export function UpNext({ view, mineIds }: { view: EventPublicView; mineIds: Read
           )}
         </ol>
       )}
-    </section>
+    </details>
   );
 }
