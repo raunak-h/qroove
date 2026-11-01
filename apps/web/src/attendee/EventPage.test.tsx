@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -93,7 +93,8 @@ describe('EventPage', () => {
       url.includes('by-slug') ? { body: { eventId: 'ev1', slug: 'ABC123' } } : { body: baseView };
     renderPage();
     expect(await screen.findByRole('heading', { name: 'Friday Social' })).toBeInTheDocument();
-    expect(screen.getByText('Someone Else')).toBeInTheDocument();
+    // The queue lists it, and so does the Next up card.
+    expect(screen.getAllByText('Someone Else').length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByText(/Secret Name/)).toBeNull();
     expect(screen.getByText('After end time')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Join this event' })).toBeInTheDocument();
@@ -105,7 +106,7 @@ describe('EventPage', () => {
         ? { body: { eventId: 'ev1', slug: 'ABC123' } }
         : { body: { ...baseView, name: 'Mango Octopus Rye' } };
     const { container } = renderPage();
-    await screen.findByText('Someone Else');
+    await screen.findAllByText('Someone Else');
     // The header is filled from an effect, which can land just after the page's own content.
     await waitFor(() => expect(container.querySelector('.topbar .event-token')).not.toBeNull());
     const token = container.querySelector('.topbar .event-token')!;
@@ -174,7 +175,7 @@ describe('EventPage', () => {
     };
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText('Someone Else');
+    await screen.findAllByText('Someone Else');
     await user.type(
       screen.getByLabelText('Search Spotify or paste a link'),
       'https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M',
@@ -194,7 +195,7 @@ describe('EventPage', () => {
     expect(
       screen.getByText('You selected BACHATA. Remove all SALSA, CHA-CHA, OTHER songs.'),
     ).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Add 2' }));
+    await user.click(screen.getByRole('button', { name: 'Add 2 songs to queue' }));
     await screen.findByText(/2 added/);
     expect(batch!.style).toBe('bachata');
     expect(batch!.songs.map((x) => x.title)).toEqual(['Song D', 'Song A']);
@@ -241,7 +242,7 @@ describe('EventPage', () => {
             },
           };
     renderPage();
-    await screen.findByText('Someone Else');
+    await screen.findAllByText('Someone Else');
     const items = screen.getAllByRole('listitem').map((li) => li.textContent ?? '');
     const at = items.findIndex((t) => /Break · 10 min/.test(t));
     expect(at).toBeGreaterThan(items.findIndex((t) => t.includes('Someone Else')));
@@ -315,7 +316,7 @@ describe('EventPage', () => {
     expect(screen.queryByLabelText(/Artist/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText(/Length/)).not.toBeInTheDocument();
     await user.click(screen.getByRole('radio', { name: 'Bachata' }));
-    await user.click(screen.getByRole('button', { name: 'Add 1' }));
+    await user.click(screen.getByRole('button', { name: 'Add 1 song to queue' }));
     expect(await screen.findByText(/1 added/)).toBeInTheDocument();
     const post = calls.find((c) => c.url.endsWith('/requests/batch'))!;
     expect((post.init.headers as Record<string, string>)['idempotency-key']).toBe('uuid-1');
@@ -384,5 +385,296 @@ describe('EventPage', () => {
     renderPage();
     expect(await screen.findByRole('button', { name: 'Join this event' })).toBeInTheDocument();
     expect(localStorage.getItem('qroove:p:ev1')).toBeNull();
+  });
+});
+
+describe('live deck', () => {
+  const login = () =>
+    localStorage.setItem(
+      'qroove:p:ev1',
+      JSON.stringify({ participantId: 'p1', token: 'tok'.repeat(10) }),
+    );
+  const track = (requestId: string, title: string, style = 'salsa') => ({
+    requestId,
+    title,
+    artist: 'Band',
+    style,
+    durationMs: 200000,
+    artworkUrl: null,
+    ownerNickname: null,
+  });
+  const req = (id: string, state: string, title: string, over: Record<string, unknown> = {}) => ({
+    id,
+    state,
+    title,
+    artist: 'Band',
+    style: 'salsa',
+    provider: 'manual',
+    durationMs: 200000,
+    artworkUrl: null,
+    acceptedSeq: Number(id.slice(1)),
+    position: null,
+    predictedStartMs: null,
+    uncertain: false,
+    statusText: null,
+    ...over,
+  });
+  /** A stream that reports the event as live, and lets a test push the next state. */
+  let emit: (v: unknown) => void = () => {};
+  const stream = () => {
+    vi.stubGlobal(
+      'EventSource',
+      class {
+        handlers: Array<(m: MessageEvent<string>) => void> = [];
+        onerror: (() => void) | null = null;
+        constructor() {
+          emit = (v) => {
+            for (const h of this.handlers) h({ data: JSON.stringify(v) } as MessageEvent<string>);
+          };
+          setTimeout(() => emit(viewNow), 0);
+        }
+        addEventListener(_: string, h: (m: MessageEvent<string>) => void) {
+          this.handlers.push(h);
+        }
+        close() {}
+      },
+    );
+  };
+  let viewNow: unknown = baseView;
+  const serve = (view: unknown, mine?: unknown) => {
+    viewNow = view;
+    handler = (url) => {
+      if (url.includes('by-slug')) return { body: { eventId: 'ev1', slug: 'ABC123' } };
+      if (url.endsWith('/my-requests'))
+        return { body: mine ?? { accepted: 0, limit: 5, requests: [] } };
+      return { body: view };
+    };
+  };
+
+  it('shows the real now playing and next up, with a time only when the queue is sure of it', async () => {
+    const now = Date.now();
+    serve({
+      ...baseView,
+      serverNow: now,
+      nowPlaying: { track: track('p0', 'Playing Now', 'bachata'), startedAt: now },
+      preview: {
+        revision: 1,
+        items: [
+          {
+            requestId: 'q1',
+            position: 1,
+            predictedStartMs: now + 4 * 60_000,
+            uncertain: false,
+            overflow: false,
+          },
+        ],
+        stoppedReason: 'EXHAUSTED',
+        computedAt: 0,
+      },
+    });
+    stream();
+    renderPage();
+    const nowCard = (await screen.findByRole('heading', { name: 'Now playing' })).closest(
+      'section',
+    )!;
+    expect(within(nowCard).getByText('Playing Now')).toBeInTheDocument();
+    expect(within(nowCard).getByText('Bachata')).toBeInTheDocument();
+    const next = screen.getByRole('heading', { name: 'Next up' }).closest('section')!;
+    expect(within(next).getByText('Someone Else')).toBeInTheDocument();
+    expect(within(next).getByText(/^~[34] min$/)).toBeInTheDocument();
+    expect(await screen.findByText('Live')).toBeInTheDocument();
+    // Advancing the track belongs to the organiser's console, never to a guest.
+    expect(screen.queryByRole('button', { name: /switchover|skip|next track/i })).toBeNull();
+    // A new state from the stream replaces both cards: there is no second, local queue.
+    act(() =>
+      emit({
+        ...(viewNow as typeof baseView),
+        version: 2,
+        nowPlaying: { track: track('q1', 'Someone Else'), startedAt: now },
+        queue: [{ ...baseView.queue[1]!, overflow: false }],
+        preview: { revision: 2, items: [], stoppedReason: 'EXHAUSTED', computedAt: 0 },
+      }),
+    );
+    expect(await within(nowCard).findByText('Someone Else')).toBeInTheDocument();
+    expect(within(next).getByText('Late Song')).toBeInTheDocument();
+    expect(within(next).queryByText(/min$/)).toBeNull();
+  });
+
+  it('does not invent a time for an uncertain prediction, and handles empty and paused states', async () => {
+    const now = Date.now();
+    serve({
+      ...baseView,
+      state: 'PAUSED',
+      serverNow: now,
+      queue: [],
+      preview: { revision: 1, items: [], stoppedReason: 'EXHAUSTED', computedAt: 0 },
+    });
+    stream();
+    renderPage();
+    const next = (await screen.findByRole('heading', { name: 'Next up' })).closest('section')!;
+    expect(within(next).getByText('No upcoming song.')).toBeInTheDocument();
+    expect(screen.getByText('Session paused')).toBeInTheDocument();
+    expect(await screen.findByText('Paused')).toBeInTheDocument();
+    cleanup();
+    serve({
+      ...baseView,
+      serverNow: now,
+      preview: {
+        revision: 1,
+        items: [
+          {
+            requestId: 'q1',
+            position: 1,
+            predictedStartMs: now + 240_000,
+            uncertain: true,
+            overflow: false,
+          },
+        ],
+        stoppedReason: 'EXHAUSTED',
+        computedAt: 0,
+      },
+    });
+    renderPage();
+    const next2 = (await screen.findByRole('heading', { name: 'Next up' })).closest('section')!;
+    await within(next2).findByText('Someone Else');
+    expect(within(next2).queryByText(/min$/)).toBeNull();
+  });
+
+  it('says so when the event has ended, or the stream is not delivering', async () => {
+    serve({ ...baseView, state: 'ENDED' });
+    stream();
+    renderPage();
+    expect(await screen.findByText('Ended')).toBeInTheDocument();
+    cleanup();
+    serve(baseView);
+    vi.stubGlobal('EventSource', undefined); // polling only: the header must not claim "Live"
+    renderPage();
+    expect(await screen.findByText('Reconnecting')).toBeInTheDocument();
+    expect(screen.queryByText('Live')).toBeNull();
+  });
+
+  it('lists my songs in play order with the playing one first, and keeps played ones in a disclosure', async () => {
+    login();
+    const now = Date.now();
+    serve(
+      { ...baseView, serverNow: now },
+      {
+        accepted: 4,
+        limit: 5,
+        requests: [
+          req('r4', 'PLAYED', 'Old Song'),
+          req('r3', 'QUEUED', 'Third', { position: 9, predictedStartMs: now + 20 * 60_000 }),
+          req('r2', 'QUEUED', 'Second', { position: 4, predictedStartMs: now + 8 * 60_000 }),
+          req('r1', 'PLAYING', 'First'),
+          req('r5', 'SKIPPED', 'Skipped Song'),
+          req('r6', 'REJECTED', 'Bad Link'),
+        ],
+      },
+    );
+    const user = userEvent.setup();
+    renderPage();
+    const mine = (await screen.findByRole('heading', { name: 'My songs' })).closest('section')!;
+    await within(mine).findByText('First');
+    const titles = within(mine)
+      .getAllByRole('listitem')
+      .map((li) => li.querySelector('.title')?.textContent);
+    // Playing, then the queue's own order, then the song that needs attention; history comes last.
+    expect(titles).toEqual(['First', 'Second', 'Third', 'Bad Link']);
+    expect(within(mine).getByText('Playing')).toBeInTheDocument();
+    expect(within(mine).getByText('Removed')).toBeInTheDocument();
+    expect(within(mine).getByText('Est. in ~8 min')).toBeInTheDocument();
+    const toggle = within(mine).getByRole('button', { name: /Played songs \(2\)/ });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(within(mine).getByText('Old Song').closest('ul')).toHaveAttribute('hidden');
+    toggle.focus();
+    await user.keyboard('{Enter}');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(within(mine).getByText('Old Song').closest('ul')).not.toHaveAttribute('hidden');
+    expect(
+      within(within(mine).getByText('Old Song').closest('ul')!)
+        .getAllByRole('listitem')
+        .map((li) => li.querySelector('.title')?.textContent),
+    ).toEqual(['Skipped Song', 'Old Song']); // newest first, still visible but secondary
+    await user.keyboard(' ');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('shows the real quota beside Add music', async () => {
+    login();
+    serve(baseView, { accepted: 2, limit: 5, requests: [] });
+    renderPage();
+    expect(await screen.findByText('2 of 5 accepted songs')).toBeInTheDocument();
+  });
+
+  it('pastes from the clipboard, and says so when it cannot', async () => {
+    login();
+    serve(baseView);
+    handler = (
+      (inner: Handler): Handler =>
+      (url, init) =>
+        url.endsWith('/resolve-playlist') ? { body: { tracks: [] } } : inner(url, init)
+    )(handler);
+    const user = userEvent.setup();
+    renderPage();
+    const input = await screen.findByLabelText('Search Spotify or paste a link');
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { readText: () => Promise.reject(new Error('denied')) },
+    });
+    await user.click(screen.getByRole('button', { name: 'Paste' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('We could not read your clipboard.');
+    await user.type(input, 'abc'); // still usable
+    expect(input).toHaveValue('abc');
+    await user.clear(input);
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { readText: () => Promise.resolve('  rumba  ') },
+    });
+    await user.click(screen.getByRole('button', { name: 'Paste' }));
+    await waitFor(() => expect(input).toHaveValue('rumba'));
+  });
+
+  it('keeps the songs, the genre and the quota when adding fails, and shows the real error', async () => {
+    login();
+    const mine = { accepted: 1, limit: 5, requests: [] as unknown[] };
+    handler = (url) => {
+      if (url.includes('by-slug')) return { body: { eventId: 'ev1', slug: 'ABC123' } };
+      if (url.endsWith('/my-requests')) return { body: mine };
+      if (url.endsWith('/resolve-playlist'))
+        return {
+          body: {
+            tracks: [{ title: 'Mi Bachata', artist: 'Band', durationMs: 200000, sourceUrl: null }],
+          },
+        };
+      if (url.endsWith('/requests/batch'))
+        return {
+          status: 429,
+          body: {
+            error: {
+              code: 'RATE_LIMITED',
+              message: 'Slow down a little.',
+              action: 'Try again in a minute.',
+            },
+          },
+        };
+      return { body: baseView };
+    };
+    const user = userEvent.setup();
+    renderPage();
+    await user.type(
+      await screen.findByLabelText('Search Spotify or paste a link'),
+      `https://open.spotify.com/track/${'a'.repeat(22)}`,
+    );
+    await screen.findByRole('list', { name: 'Songs to add' });
+    await user.click(screen.getByRole('radio', { name: 'Bachata' }));
+    await user.click(screen.getByRole('button', { name: 'Add 1 song to queue' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Slow down a little. Try again in a minute.',
+    );
+    expect(screen.getByRole('list', { name: 'Songs to add' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Bachata' })).toBeChecked();
+    expect(screen.getByText('1 of 5 accepted songs')).toBeInTheDocument();
+    expect(screen.queryByText(/\d added/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add 1 song to queue' })).toBeEnabled();
   });
 });

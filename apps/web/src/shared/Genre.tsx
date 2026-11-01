@@ -14,8 +14,7 @@ const ROWS: Array<[StyleId, StyleId]> = [
   ['bachata', 'bachata_nl'],
   ['chacha', 'chacha_nl'],
 ];
-/** A selector box: the style's name inside, its colour scheme as a thick border (striped for non-Latin). */
-export const styleBoxClass = (id: StyleId) => `style-box${isNonLatin(id) ? ' striped' : ''}`;
+/** The style's colour scheme as the `--c` custom property that the swatch and chip styles read. */
 export const styleBoxVars = (id: StyleId) => ({ ['--c' as string]: GENRE_COLOURS[genreOf(id)] });
 
 const known = (id: string): id is StyleId => STYLE_PRESETS.some((s) => s.id === id);
@@ -77,11 +76,16 @@ export function StyleSwatches({
   );
 }
 
+/** "Other (Musicality Exercise)" -> "Other": the short name used on chips and cards. */
+export const shortGenreLabel = (genre: GenreId): string =>
+  GENRES.find((g) => g.id === genre)!.label.split(' (')[0]!;
+
 /**
- * Pick styles by tapping swatches. Latin styles are one column on the left, their non-Latin
- * counterparts directly across on the right; "Other" sits underneath.
+ * Pick styles: one card per genre with the genre itself on top and, underneath, its non-Latin
+ * compatible variant as an independent switch. "Other" has no variant. Each control maps straight
+ * onto one style, so nothing is changed behind the organiser's back when a parent is switched off.
  */
-export function StyleGrid({
+export function GenreGroups({
   value,
   onChange,
   label = 'Dance styles',
@@ -96,13 +100,13 @@ export function StyleGrid({
     else next.add(id);
     onChange(next);
   };
-  const cell = (id: StyleId) => (
+  const control = (id: StyleId, kind: 'genre' | 'variant') => (
     <button
       key={id}
       type="button"
       role="checkbox"
       aria-checked={value.has(id)}
-      className={`${styleBoxClass(id)}${value.has(id) ? ' on' : ''}`}
+      className={`genre-toggle ${kind}${value.has(id) ? ' on' : ''}`}
       style={styleBoxVars(id)}
       onClick={() => toggle(id)}
     >
@@ -110,9 +114,17 @@ export function StyleGrid({
     </button>
   );
   return (
-    <div role="group" aria-label={label} className="style-grid">
-      {ROWS.map(([a, b]) => [cell(a), cell(b)])}
-      <div className="style-other">{cell('other')}</div>
+    <div role="group" aria-label={label} className="genre-groups">
+      {ROWS.map(([base, nonLatin]) => (
+        <div key={base} className="genre-group" style={styleBoxVars(base)}>
+          {control(base, 'genre')}
+          {control(nonLatin, 'variant')}
+        </div>
+      ))}
+      <div className="genre-group other" style={styleBoxVars('other')}>
+        {control('other', 'genre')}
+        <p className="muted small">Special exercises and warm-ups. No variant.</p>
+      </div>
     </div>
   );
 }

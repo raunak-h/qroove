@@ -1,4 +1,5 @@
 import {
+  BRAND,
   DEFAULT_ENABLED_STYLES,
   EVENT_LIMITS,
   RULE_DEFAULTS,
@@ -15,15 +16,17 @@ import {
   validateBreaks,
   type BreakSlot,
 } from '@qroove/contracts/breaks';
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { ApiError } from '../shared/api';
-import { GenreDot, StyleGrid } from '../shared/Genre';
+import { GenreDot, GenreGroups } from '../shared/Genre';
 import { PlaylistInput } from '../shared/PlaylistInput';
 import { SongList, type ListSong } from '../shared/SongList';
 import { WheelPicker } from '../shared/WheelPicker';
 import type { PlaylistSong } from '../shared/api';
 import { adminApi, organiserPath } from './adminApi';
+import { ProgressionFlow } from './ProgressionFlow';
+import { syncedLimit } from './progression';
 import { hm, TimelineBar } from './TimelineBar';
 import { ErrorLine } from './useAction';
 
@@ -47,13 +50,12 @@ const copySeg = (s: Seg): Seg => ({
 const orderedStyles = (s: Set<StyleId>) =>
   STYLE_PRESETS.filter((p) => s.has(p.id)).map((p) => p.id);
 
-const DURATIONS = Array.from(
-  {
-    length:
-      (EVENT_LIMITS.maxDurationMin - EVENT_LIMITS.minDurationMin) / EVENT_LIMITS.durationStepMin +
-      1,
-  },
-  (_, i) => EVENT_LIMITS.minDurationMin + i * EVENT_LIMITS.durationStepMin,
+/** The planned times on offer: quarter hours at first, then whole hours (all valid for the API). */
+const DURATIONS = [15, 30, 45, 60, 90, 120, 150, 180, 210, 240, 300, 360, 420, 480].filter(
+  (m) =>
+    m >= EVENT_LIMITS.minDurationMin &&
+    m <= EVENT_LIMITS.maxDurationMin &&
+    m % EVENT_LIMITS.durationStepMin === 0,
 );
 /** The same two-column layout as the style grid: Latin left, non-Latin directly across. */
 const PLAYLIST_ROWS: StyleId[][] = [
@@ -94,6 +96,9 @@ export default function CreateEvent() {
   const [segs, setSegs] = useState<Seg[]>([newSeg()]);
   const [sel, setSel] = useState(0);
   const [wantedLimit, setLimit] = useState<number>(RULE_DEFAULTS.submissionLimit);
+  // While synced, choosing a new planned time also sets the songs per person. Switching sync on
+  // again changes nothing by itself: the next planned time does.
+  const [synced, setSynced] = useState(true);
   // The ceiling follows the planned time, so shortening the event can lower the choice.
   const maxLimit = maxSubmissionLimit(planned);
   const limit = Math.min(wantedLimit, maxLimit);
@@ -125,7 +130,7 @@ export default function CreateEvent() {
     setSegs((all) => all.map((s, i) => (i === curIndex ? { ...s, ...p } : s)));
 
   const genres = genresOf(orderedStyles(cur.styles));
-  const parts = genres.map((g) => cur.ratio[g] ?? cur.master);
+  const ratioParts = genres.map((g) => cur.ratio[g] ?? cur.master);
   const ratioIssues = segs.map((s) =>
     ratioProblem(genresOf(orderedStyles(s.styles)).map((g) => s.ratio[g] ?? s.master)),
   );
@@ -152,10 +157,17 @@ export default function CreateEvent() {
   const covered = new Set(active.map((x) => genreOfStyle(x.style)));
   const playlistsUsed = visible.length > 0;
   const ready = !empty && ratioIssues.every((x) => !x) && !coverageProblem && !busy;
+  const problem = empty
+    ? 'Pick at least one style in every part of the evening.'
+    : (ratioIssues.find((x) => x) ?? coverageProblem ?? null);
+  const rotation = useMemo(
+    () => segs.map((s) => ({ styles: orderedStyles(s.styles), master: s.master, ratio: s.ratio })),
+    [segs],
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!ready) return;
+    if (!ready || busy) return;
     setBusy(true);
     setError(null);
     try {
@@ -207,120 +219,171 @@ export default function CreateEvent() {
   }
 
   return (
-    <form className="card stack" onSubmit={(e) => void submit(e)} noValidate>
-      <div className="drum-cell" style={{ margin: '0 auto' }}>
-        <WheelPicker
-          label="Planned time"
-          values={DURATIONS}
-          value={planned}
-          format={hm}
-          onChange={(m) => {
-            setPlanned(m);
-            const fit = fitBreaks(m, breaks, segs);
-            setBreaks(fit.breaks);
-            setSegs(fit.segs);
+    <form className="planner" onSubmit={(e) => void submit(e)} noValidate>
+      <header className="planner-head">
+        <div>
+          <h1>
+            <span className="logo-badge" aria-hidden="true">
+              Q
+            </span>
+            {BRAND.product} <span className="pill gold-pill">Planner</span>
+          </h1>
+          <p className="muted small">Plan the evening, then let everyone add music.</p>
+        </div>
+        <label className="sync-pill">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={synced}
+            onChange={(e) => setSynced(e.target.checked)}
+          />
+          <span className={`sync-dot${synced ? ' on' : ''}`} aria-hidden="true" />
+          <span>{synced ? 'Synced parameters' : 'Independent control'}</span>
+        </label>
+      </header>
+
+      <section className="card stack" aria-labelledby="pl-params">
+        <h2 id="pl-params">Event and rotation</h2>
+        <div className="params">
+          <div className="drum-cell">
+            <span className="param-label" aria-hidden="true">
+              Total duration
+            </span>
+            <WheelPicker
+              label="Total duration"
+              values={DURATIONS}
+              value={planned}
+              format={hm}
+              className="small"
+              onChange={(m) => {
+                setPlanned(m);
+                if (synced) setLimit(syncedLimit(m, maxSubmissionLimit(m)));
+                const fit = fitBreaks(m, breaks, segs);
+                setBreaks(fit.breaks);
+                setSegs(fit.segs);
+              }}
+            />
+            <span className="muted small">event length</span>
+          </div>
+          <div className="drum-cell">
+            <span className="param-label" aria-hidden="true">
+              Songs in a row
+            </span>
+            <WheelPicker
+              label="Songs in a row"
+              values={RUN_CAPS}
+              value={cur.master}
+              onChange={(master) => patch({ master, ratio: {} })}
+              render={(n) => `${n}`}
+              className="small"
+            />
+            <span className="muted small">per genre</span>
+          </div>
+          <div className="drum-cell">
+            <span className="param-label" aria-hidden="true">
+              Songs per person
+            </span>
+            <WheelPicker
+              label="Songs per person"
+              values={limitChoices}
+              value={limit}
+              onChange={setLimit}
+              className="small"
+            />
+            <span className="muted small">accepted songs</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="card stack" aria-labelledby="pl-flow">
+        <div>
+          <h2 id="pl-flow">Visual event progression</h2>
+          <p className="muted small">
+            The rotation the queue will follow, worked out from the settings below.
+          </p>
+        </div>
+        <ProgressionFlow plannedMin={planned} breaks={breaks} parts={rotation} ratio={ratioParts} />
+        <TimelineBar
+          plannedMin={planned}
+          breaks={breaks}
+          segments={segs.map((s) => orderedStyles(s.styles))}
+          selected={curIndex}
+          onSelect={setSel}
+          onAdd={(slot) => {
+            const at = breaks.filter((b) => b.startMin < slot.startMin).length;
+            setBreaks([...breaks, slot].sort((a, b) => a.startMin - b.startMin));
+            // The part that was split keeps its choices on both sides.
+            setSegs((all) => [
+              ...all.slice(0, at),
+              copySeg(all[at]!),
+              copySeg(all[at]!),
+              ...all.slice(at + 1),
+            ]);
+            setSel(at);
+          }}
+          onChange={(i, slot) => setBreaks(breaks.map((b, j) => (j === i ? slot : b)))}
+          onRemove={(i) => {
+            setBreaks(breaks.filter((_, j) => j !== i));
+            setSegs((all) => [...all.slice(0, i + 1), ...all.slice(i + 2)]);
+            setSel(Math.max(0, Math.min(sel, i)));
           }}
         />
-      </div>
+      </section>
 
-      <TimelineBar
-        plannedMin={planned}
-        breaks={breaks}
-        segments={segs.map((s) => orderedStyles(s.styles))}
-        selected={curIndex}
-        onSelect={setSel}
-        onAdd={(slot) => {
-          const at = breaks.filter((b) => b.startMin < slot.startMin).length;
-          setBreaks([...breaks, slot].sort((a, b) => a.startMin - b.startMin));
-          // The part that was split keeps its choices on both sides.
-          setSegs((all) => [
-            ...all.slice(0, at),
-            copySeg(all[at]!),
-            copySeg(all[at]!),
-            ...all.slice(at + 1),
-          ]);
-          setSel(at);
-        }}
-        onChange={(i, slot) => setBreaks(breaks.map((b, j) => (j === i ? slot : b)))}
-        onRemove={(i) => {
-          setBreaks(breaks.filter((_, j) => j !== i));
-          setSegs((all) => [...all.slice(0, i + 1), ...all.slice(i + 2)]);
-          setSel(Math.max(0, Math.min(sel, i)));
-        }}
-      />
+      <section className="card stack" aria-labelledby="pl-genres">
+        <h2 id="pl-genres">
+          Genres{segs.length > 1 ? ` for part ${curIndex + 1} of ${segs.length}` : ''}
+        </h2>
+        <GenreGroups value={cur.styles} onChange={(styles) => patch({ styles })} />
+        {cur.styles.size === 0 ? (
+          <p className="error" role="alert">
+            Pick at least one style.
+          </p>
+        ) : null}
 
-      <StyleGrid value={cur.styles} onChange={(styles) => patch({ styles })} />
-      {cur.styles.size === 0 ? (
-        <p className="error" role="alert">
-          Pick at least one style.
-        </p>
-      ) : null}
+        {genres.length > 1 ? (
+          <details>
+            <summary aria-label="Ratio between genres">
+              <span aria-hidden="true">Ratio {ratioParts.join(' : ')}</span>
+            </summary>
+            <div className="drums">
+              {genres.map((g) => (
+                <div key={g} className="drum-cell">
+                  <WheelPicker
+                    label={`Ratio ${g}`}
+                    values={RUN_CAPS}
+                    value={cur.ratio[g] ?? cur.master}
+                    onChange={(n) =>
+                      patch({
+                        ratio: {
+                          ...Object.fromEntries(genres.map((x) => [x, cur.ratio[x] ?? cur.master])),
+                          [g]: n,
+                        },
+                      })
+                    }
+                    className="small"
+                  />
+                  <GenreDot genre={g} />
+                </div>
+              ))}
+            </div>
+            {ratioIssues[curIndex] ? (
+              <p className="error" role="alert">
+                {ratioIssues[curIndex]}
+              </p>
+            ) : null}
+          </details>
+        ) : null}
+        {ratioIssues.some((x, i) => x && i !== curIndex) ? (
+          <p className="error" role="alert">
+            {ratioIssues.find((x, i) => x && i !== curIndex)}
+          </p>
+        ) : null}
+      </section>
 
-      <div className="drums">
-        <div className="drum-cell">
-          <WheelPicker
-            label="Most songs in a row"
-            values={RUN_CAPS}
-            value={cur.master}
-            onChange={(master) => patch({ master, ratio: {} })}
-            className="small"
-          />
-          <span className="muted small">in a row</span>
-        </div>
-        <div className="drum-cell">
-          <WheelPicker
-            label="Accepted songs per person"
-            values={limitChoices}
-            value={limit}
-            onChange={setLimit}
-            className="small"
-          />
-          <span className="muted small">songs each</span>
-        </div>
-      </div>
-
-      {genres.length > 1 ? (
-        <details>
-          <summary aria-label="Ratio between genres">
-            <span aria-hidden="true">{parts.join(' : ')}</span>
-          </summary>
-          <div className="drums">
-            {genres.map((g) => (
-              <div key={g} className="drum-cell">
-                <WheelPicker
-                  label={`Ratio ${g}`}
-                  values={RUN_CAPS}
-                  value={cur.ratio[g] ?? cur.master}
-                  onChange={(n) =>
-                    patch({
-                      ratio: {
-                        ...Object.fromEntries(genres.map((x) => [x, cur.ratio[x] ?? cur.master])),
-                        [g]: n,
-                      },
-                    })
-                  }
-                  className="small"
-                />
-                <GenreDot genre={g} />
-              </div>
-            ))}
-          </div>
-          {ratioIssues[curIndex] ? (
-            <p className="error" role="alert">
-              {ratioIssues[curIndex]}
-            </p>
-          ) : null}
-        </details>
-      ) : null}
-      {ratioIssues.some((x, i) => x && i !== curIndex) ? (
-        <p className="error" role="alert">
-          {ratioIssues.find((x, i) => x && i !== curIndex)}
-        </p>
-      ) : null}
-
-      <details id="playlist" open={loc.hash === '#playlist' || undefined}>
+      <details className="card" id="playlist" open={loc.hash === '#playlist' || undefined}>
         <summary aria-label="Start from playlists">
-          <span aria-hidden="true">♫ +</span>
+          <span aria-hidden="true">♫ Start from playlists</span>
         </summary>
         <div className="playlist-grid">
           {PLAYLIST_ROWS.flat().map((id) =>
@@ -366,9 +429,14 @@ export default function CreateEvent() {
       </details>
 
       <ErrorLine error={error} />
-      <button type="submit" className="btn primary" disabled={!ready}>
-        {busy ? '…' : 'Create event'}
-      </button>
+      <div className="action-bar">
+        <p className={problem ? 'error' : 'muted small'} role="status">
+          {problem ?? 'Ready. These settings are saved with the event.'}
+        </p>
+        <button type="submit" className="btn primary" disabled={!ready} aria-busy={busy}>
+          {busy ? 'Creating…' : 'Create event'}
+        </button>
+      </div>
     </form>
   );
 }

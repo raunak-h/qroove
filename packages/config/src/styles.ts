@@ -37,14 +37,15 @@ export const DEFAULT_ENABLED_STYLES: readonly StyleId[] = [
 ];
 
 /**
- * Colour code (each is drawn with a thin white outline so it never disappears into the
- * background). Non-Latin styles use their genre's colour with white diagonal stripes.
+ * Colour code, shared by the live deck and the planner (each is drawn with a thin white outline so
+ * it never disappears into the background). Non-Latin styles use their genre's colour with white
+ * diagonal stripes. Colour is never the only signal: names accompany every swatch.
  */
 export const GENRE_COLOURS: Record<GenreId, string> = {
-  salsa: '#d32f2f',
-  bachata: '#000000',
-  chacha: '#fb8c00',
-  other: '#757575',
+  salsa: '#ef4444',
+  bachata: '#3b82f6',
+  chacha: '#d97706',
+  other: '#a855f7',
 };
 
 export const isNonLatin = (style: StyleId): boolean => style.endsWith('_nl');

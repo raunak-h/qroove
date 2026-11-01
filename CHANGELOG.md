@@ -6,12 +6,16 @@ versioning: [SemVer](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- UI overhaul of the two main screens. **Live deck:** a header with the real live/paused/ended/reconnecting state, a wide _Now playing_ card beside a narrow _Next up_ card (a time only when the queue is sure of it), a compact _Add music_ card showing your accepted-songs count and genre chips, and a _My songs_ card in play order with a collapsible _Played songs (n)_. The old _Up next_ list is now the collapsed _Whole queue_. **Planner:** three drums in one row (total duration, songs in a row, songs per person), a _Synced parameters_ switch (5 songs per 15 minutes, 5 to 50), one card per genre with a separate non-Latin switch, a _Visual event progression_ preview drawn by the same scheduler the queue uses (ratio, approximate song count, legend and a text version), and a sticky **Create event** bar. See [ADR 0021](/adr/0021-ui-overhaul).
 - Spotify and YouTube songs now play on the player page, in each service's official player, and the queue advances when they end. Spotify needs a browser signed in to Premium; a 30-second preview is refused rather than counted as played.
 - Song links work wherever playlist links do, with title, artist and length taken from the source. A YouTube Music song link counts as that song, not its radio mix.
 - Guests can add a whole playlist: paste a link, sort the songs (drag to reorder, swipe left to remove with a red bin, swipe right to send to the top with a green arrow), and add the top songs that fit their remaining allowance; the rest are greyed out. `POST /api/resolve-playlist` and `POST /api/events/:id/requests/batch`.
 - The organiser's create page uses the same sortable list for playlist songs (greyed out beyond the planned time minus one minute); the create request now takes the sorted `songs` instead of playlist links.
 
 ### Changed
+- Genre colours are now the same everywhere: red salsa, blue bachata, amber cha-cha, purple Other (bachata was black, Other grey). The dark theme uses the new charcoal and amber palette.
+- Planned time on offer: 0:15, 0:30, 0:45, 1:00, 1:30, 2:00, 2:30, 3:00, 3:30, 4:00, then whole hours to 8:00 (the API still takes any multiple of 15 minutes).
+- The live status on the event page is now a labelled pill in the page, not a dot in the header.
 - Joining requires a name.
 - Guests can search Spotify inside Qroove with no login, and accounts on the pilot list can log in to use their own playlists.
 - New defaults: 1 song in a row (up to 3); 20 songs per person, in steps of 5, with a maximum that grows with planned time (5 per 15 minutes).

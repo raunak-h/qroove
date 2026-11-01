@@ -31,7 +31,7 @@ test('create → run → play manually → hand over → end → carry over', as
   await expectAccessible(page, '/new');
   // No name field: the server names the event from neutral words.
   await expect(page.getByLabel(/event name/i)).toHaveCount(0);
-  await expect(page.getByRole('spinbutton', { name: 'Planned time' })).toHaveAttribute(
+  await expect(page.getByRole('spinbutton', { name: 'Total duration' })).toHaveAttribute(
     'aria-valuetext',
     '2:00',
   );
@@ -119,6 +119,7 @@ test('create → run → play manually → hand over → end → carry over', as
   }
 
   // The 10-minute break shows in the attendees' queue at the midpoint of the plan -------------
+  await people[0]!.page.getByText(/^Whole queue/).click();
   await expect(people[0]!.page.getByText(/Break · 10 min/)).toBeVisible();
 
   // Organiser sees all three requests -------------------------------------------------------

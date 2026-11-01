@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_ENABLED_STYLES, type StyleId } from '@qroove/config';
-import { GenreSwatch, StyleGrid } from './Genre';
+import { GenreGroups, GenreSwatch } from './Genre';
 import { WheelPicker } from './WheelPicker';
 
 afterEach(cleanup);
@@ -93,17 +93,17 @@ describe('GenreSwatch', () => {
     );
     const salsa = screen.getByRole('img', { name: 'Salsa' });
     expect(salsa.className).toBe('swatch');
-    expect(salsa.style.getPropertyValue('--c')).toBe('#d32f2f');
+    expect(salsa.style.getPropertyValue('--c')).toBe('#ef4444');
     const nl = screen.getByRole('img', { name: 'Non-Latin bachata-compatible' });
     expect(nl.className).toContain('striped');
-    expect(nl.style.getPropertyValue('--c')).toBe('#000000'); // bachata is black
+    expect(nl.style.getPropertyValue('--c')).toBe('#3b82f6'); // bachata is blue
   });
 });
 
-describe('StyleGrid', () => {
+describe('GenreGroups', () => {
   function Grid() {
     const [v, set] = useState<Set<StyleId>>(new Set(DEFAULT_ENABLED_STYLES));
-    return <StyleGrid value={v} onChange={set} />;
+    return <GenreGroups value={v} onChange={set} />;
   }
   it('starts with salsa and bachata and their non-Latin styles; cha-cha is the extra', () => {
     render(<Grid />);
@@ -122,10 +122,9 @@ describe('StyleGrid', () => {
       'false',
     );
   });
-  it('lays out Latin styles on the left and each non-Latin counterpart directly across', () => {
+  it('groups each genre with its non-Latin counterpart directly under it, then Other alone', () => {
     render(<Grid />);
     const order = screen.getAllByRole('checkbox').map((c) => c.textContent);
-    // Two columns: row-major order alternates left / right, then Other alone.
     expect(order).toEqual([
       'Salsa',
       'Non-Latin salsa-compatible',
@@ -136,22 +135,49 @@ describe('StyleGrid', () => {
       'Other (Musicality Exercise)',
     ]);
   });
-  it('shows each name inside a box whose thick border is the style colour; non-Latin is striped', () => {
+  it('shows each name on a toggle drawn in the canonical genre colour', () => {
     render(<Grid />);
     const salsa = screen.getByRole('checkbox', { name: 'Salsa' });
     expect(salsa).toHaveTextContent('Salsa');
-    expect(salsa.className).toContain('style-box');
-    expect(salsa.className).not.toContain('striped');
-    expect(salsa.style.getPropertyValue('--c')).toBe('#d32f2f');
+    expect(salsa.className).toContain('genre-toggle genre');
+    expect(salsa.style.getPropertyValue('--c')).toBe('#ef4444');
     const nl = screen.getByRole('checkbox', { name: 'Non-Latin bachata-compatible' });
-    expect(nl.className).toContain('striped');
-    expect(nl.style.getPropertyValue('--c')).toBe('#000000');
+    expect(nl.className).toContain('variant');
+    expect(nl.style.getPropertyValue('--c')).toBe('#3b82f6');
+    expect(
+      screen
+        .getByRole('checkbox', { name: 'Other (Musicality Exercise)' })
+        .style.getPropertyValue('--c'),
+    ).toBe('#a855f7');
     expect(screen.getByRole('checkbox', { name: 'Cha-cha' }).style.getPropertyValue('--c')).toBe(
-      '#fb8c00',
+      '#d97706',
     );
-    // Enabled and disabled differ by the `on` state (full strength vs faded border and text).
+    // Enabled and disabled differ by the `on` state (and aria-checked, so it is not colour alone).
     expect(salsa.className).toContain(' on');
     expect(screen.getByRole('checkbox', { name: 'Cha-cha' }).className).not.toContain(' on');
+  });
+  it('keeps each non-Latin switch independent of its parent genre', async () => {
+    render(<Grid />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('checkbox', { name: 'Salsa' }));
+    expect(screen.getByRole('checkbox', { name: 'Salsa' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
+    // Switching the parent off does not rewrite the variant, and the other genres are untouched.
+    expect(screen.getByRole('checkbox', { name: 'Non-Latin salsa-compatible' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    await user.click(screen.getByRole('checkbox', { name: 'Non-Latin bachata-compatible' }));
+    expect(screen.getByRole('checkbox', { name: 'Bachata' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+    expect(screen.getByRole('checkbox', { name: 'Non-Latin bachata-compatible' })).toHaveAttribute(
+      'aria-checked',
+      'false',
+    );
   });
   it('toggles a style on tap', async () => {
     render(<Grid />);

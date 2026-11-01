@@ -195,3 +195,11 @@ Qroove 0.1.0 is live at https://qroove.sataklela.com: fair queue scheduler, atte
 - Playback moved into the organiser console (`player/PlayerConsole.tsx`), auto-claiming with takeover; `/player/:id` redirects. A second organiser tab or device takes the role from the first.
 - ADR 0019: Web Playback SDK (`player/spotifySdk.ts`, `api/spotifyAuth.ts`). Not verified against a real Premium account or on a phone.
 - ADR 0020: search, guest playlists, limits, controls. Real guest login and playlist access are unverified; pause and resume are covered by tests only.
+
+### Phase 15 — UI overhaul: live deck and planner (2026-11-01)
+
+- ADR 0021. Attendee: `DeckHeader` (status pill from the real event state and stream connection), `NowPlaying` (65%) beside `NextUp` (35%), `AddMusic` (quota counter, genre chips, validation line, always-visible submit), `MyRequests` (play order, playing highlighted, `Est. in ~N min` only from the queue's prediction, collapsible `Played songs (n)`), `UpNext` is now the collapsed `Whole queue`. Planner: `CreateEvent` (three drums in one row, Synced parameters switch, `GenreGroups`, sticky action bar), `ProgressionFlow` + `progression.ts` (preview from `projectQueue`, `syncedLimit`, `trackEstimate`).
+- Colours are now one map (`GENRE_COLOURS`): red, blue, amber, purple. Dark tokens changed globally to the charcoal/amber palette; light theme keeps its own tokens.
+- Template demo parts were not shipped: the Switchover button, canned Spotify results, fake toasts, the example data. No API, schema or business-rule changes; the web app now depends on `@qroove/scheduler`.
+- Decisions: planned-time wheel offers the 14 template values (API unchanged); the songs-per-person wheel still goes up to what the event may hold (not 50); the preview assumes songs added in blocks of the "songs in a row" size (fullest rotation); the top bar no longer shows the connection dot on the event page (the pill replaces it).
+- Not done: screenshots in the docs (`attendee-*.png`, create page) are stale; real-device touch testing of the wheels.

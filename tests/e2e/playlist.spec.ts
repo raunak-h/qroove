@@ -70,9 +70,9 @@ test('a guest sorts a playlist by swiping, then adds only the songs they have ro
 
   await page.getByRole('radio', { name: 'Salsa', exact: true }).check();
   await expect(page.getByText(/You selected SALSA\. Remove all BACHATA/)).toBeVisible();
-  await page.getByRole('button', { name: 'Add 3' }).click();
+  await page.getByRole('button', { name: 'Add 3 songs to queue' }).click();
   await expect(page.getByText(/3 added/)).toBeVisible();
-  const mine = page.getByRole('heading', { name: 'My songs' }).locator('..');
+  const mine = page.getByRole('region', { name: 'My songs' });
   await expect(mine.getByText('Echo')).toBeVisible();
   await expect(mine.getByText('Delta')).toHaveCount(0);
   await admin.close();
@@ -107,10 +107,10 @@ test('a guest finds a song by searching, with no Spotify login', async ({ page, 
   await page.goto(`/e/${created.slug}`);
   await joinAs(page, 'Ana');
   await page.getByLabel('Search Spotify or paste a link').fill('vivir');
-  await page.getByRole('button', { name: 'Vivir Mi Vida — Marc Anthony' }).click();
+  await page.getByRole('button', { name: 'Vivir Mi Vida Marc Anthony' }).click();
   await expect(page.getByRole('list', { name: 'Songs to add' })).toContainText('Vivir Mi Vida');
   await page.getByRole('radio', { name: 'Salsa', exact: true }).check();
-  await page.getByRole('button', { name: 'Add 1' }).click();
+  await page.getByRole('button', { name: 'Add 1 song to queue' }).click();
   await expect(page.getByText('1 added')).toBeVisible();
   await expectAccessible(page, '/e/:slug (search)');
   await admin.close();

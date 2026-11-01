@@ -2,7 +2,7 @@ import { GENRES, STYLE_PRESETS, type GenreId } from '@qroove/config';
 import { allowedStyles, type EventPublicView } from '@qroove/contracts';
 import { useCallback, useState } from 'react';
 import { api, ApiError, type Creds, type PlaylistSong } from '../shared/api';
-import { styleBoxClass, styleBoxVars } from '../shared/Genre';
+import { shortGenreLabel, styleBoxVars } from '../shared/Genre';
 import { PlaylistInput } from '../shared/PlaylistInput';
 import { SpotifyBrowse } from './SpotifyBrowse';
 import { SongList, type ListSong } from '../shared/SongList';
@@ -34,6 +34,7 @@ export function AddMusic({
   eventId,
   creds,
   remaining,
+  quota,
   onAdded,
 }: {
   view: EventPublicView;
@@ -41,6 +42,8 @@ export function AddMusic({
   creds: Creds;
   /** How many more songs this person may still add. */
   remaining: number;
+  /** Accepted songs against the person's limit, once the server has said; null while loading. */
+  quota: { accepted: number; limit: number } | null;
   onAdded: () => void;
 }) {
   const allowed = view.rules ? allowedStyles(view.rules) : null;
@@ -77,6 +80,21 @@ export function AddMusic({
   // Songs are sent under the first style the event allows in that genre.
   const style = styles.find((s) => s.genre === genre)?.id ?? null;
   const take = Math.min(remaining, songs.length, MAX_BATCH);
+
+  /** What the form can honestly say right now; the server still has the last word on each song. */
+  const banner = !genre
+    ? 'Choose the genre of the music first.'
+    : songs.length === 0
+      ? `Selected ${shout(GENRES.find((g) => g.id === genre)!.label)}. It is played at this event; paste a link or search to add songs.`
+      : genreAdvice(genre);
+  const allowance =
+    songs.length === 0
+      ? null
+      : remaining === 0
+        ? 'You have used all your songs for this event. Withdraw one that has not started to add another.'
+        : take < songs.length
+          ? `Only the first ${take} fit your allowance; the rest are greyed out.`
+          : null;
 
   async function paste() {
     try {
@@ -138,11 +156,14 @@ export function AddMusic({
 
   return (
     <section className="card stack" aria-labelledby="am-h">
-      <h2 id="am-h">Add music</h2>
-      <p className="muted small">
-        Search Spotify, or paste a link to a playlist or a song. Long-press the box to paste, or use
-        the button.
-      </p>
+      <div className="card-head">
+        <h2 id="am-h">Add music</h2>
+        {quota ? (
+          <span className="quota" id="add-quota">
+            {quota.accepted} of {quota.limit} accepted songs
+          </span>
+        ) : null}
+      </div>
       <div className="row">
         <PlaylistInput
           id="music"
@@ -174,14 +195,14 @@ export function AddMusic({
           onTracks('music', tracks);
         }}
       />
-      <fieldset className="chips">
-        <legend>Which genre is this?</legend>
+      <fieldset className="genre-chips">
+        <legend>Which genre?</legend>
         {genres.map((g) => {
           const id = styles.find((s) => s.genre === g.id)!.id;
           return (
             <label
               key={g.id}
-              className={`${styleBoxClass(id)}${genre === g.id ? ' on' : ''}`}
+              className={`genre-chip${genre === g.id ? ' on' : ''}`}
               style={styleBoxVars(id)}
             >
               <input
@@ -191,35 +212,34 @@ export function AddMusic({
                 checked={genre === g.id}
                 onChange={() => setPicked(g.id)}
               />
-              {g.label}
+              <span className="swatch" aria-hidden="true" style={{ width: 10, height: 10 }} />
+              {shortGenreLabel(g.id)}
             </label>
           );
         })}
       </fieldset>
+      <p className="validation" role="status">
+        {banner}
+      </p>
+      {allowance ? <p className="muted small">{allowance}</p> : null}
       {songs.length > 0 ? (
-        <>
-          {genre ? (
-            <p className="warning" role="status">
-              {genreAdvice(genre)}
-            </p>
-          ) : null}
-          <SongList songs={songs} onChange={setSongs} activeCount={take} label="Songs to add" />
-          {remaining === 0 ? (
-            <p className="muted">
-              You have used all your songs for this event. Withdraw one that has not started to add
-              another.
-            </p>
-          ) : null}
-          <button
-            type="button"
-            className="btn primary"
-            disabled={busy || take === 0 || !style}
-            onClick={() => void add()}
-          >
-            {busy ? '…' : genre ? `Add ${take}` : 'Choose a genre first'}
-          </button>
-        </>
+        <SongList songs={songs} onChange={setSongs} activeCount={take} label="Songs to add" />
       ) : null}
+      <button
+        type="button"
+        className="btn primary add-btn"
+        disabled={busy || take === 0 || !style}
+        aria-busy={busy}
+        onClick={() => void add()}
+      >
+        {busy
+          ? 'Adding…'
+          : songs.length > 0 && !genre
+            ? 'Choose a genre first'
+            : take > 0
+              ? `Add ${take} ${take === 1 ? 'song' : 'songs'} to queue`
+              : 'Add to queue'}
+      </button>
       {error ? (
         <p className="error" role="alert">
           {error.message} {error.action}
